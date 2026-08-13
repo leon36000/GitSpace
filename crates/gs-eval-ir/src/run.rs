@@ -44,7 +44,7 @@ pub struct RunEnvironment {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ExecutionWindow {
-    pub seed: i64,
+    pub seed: i128,
     pub started_at: String,
     pub ended_at: String,
     pub interruption_schedule: Vec<Value>,
