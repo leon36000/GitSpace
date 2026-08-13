@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "checked_at": "2026-08-13",
+  "rust": {"version": "1.97.1"},
+  "python": {"version": "3.12.13"},
+  "uv": {"version": "0.12.0"},
+  "compatibility": {
+    "harbor_requires_python": ">=3.12",
+    "inspect_evals_min_python": ">=3.11",
+    "inspect_evals_preferred_series": ["3.11", "3.12"]
+  }
+}
