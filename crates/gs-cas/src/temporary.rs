@@ -1,4 +1,4 @@
-use crate::{layout::digest_hex, CasError, Digest};
+use crate::{CasError, Digest, layout::digest_hex};
 use std::{
     fs::{self, File, OpenOptions},
     io,
@@ -16,10 +16,7 @@ pub(crate) fn create_temporary(
     let hex = digest_hex(digest);
     for _ in 0..TEMPORARY_ATTEMPTS {
         let serial = NEXT_TEMPORARY.fetch_add(1, Ordering::Relaxed);
-        let path = directory.join(format!(
-            ".put-{}-{serial}-{hex}",
-            std::process::id()
-        ));
+        let path = directory.join(format!(".put-{}-{serial}-{hex}", std::process::id()));
         match OpenOptions::new().write(true).create_new(true).open(&path) {
             Ok(file) => return Ok((file, TemporaryGuard::new(path))),
             Err(source) if source.kind() == io::ErrorKind::AlreadyExists => continue,

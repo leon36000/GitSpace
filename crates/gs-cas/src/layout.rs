@@ -1,4 +1,4 @@
-use crate::{safety::validate_directory, CasError, Digest};
+use crate::{CasError, Digest, safety::validate_directory};
 use std::{
     fs,
     path::{Path, PathBuf},

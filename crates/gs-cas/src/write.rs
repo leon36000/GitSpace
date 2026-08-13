@@ -1,11 +1,14 @@
 use crate::{
+    CasError, Digest, LocalCas,
     read::verify_for_put,
     safety::{finalize_read_only, prepare_read_only, sync_directory, validate_directory},
     temporary::create_temporary,
-    CasError, Digest, LocalCas,
 };
 use gs_canonical_json::sha256_digest;
-use std::{fs, io::{self, Write}};
+use std::{
+    fs,
+    io::{self, Write},
+};
 
 pub(crate) fn put(cas: &LocalCas, bytes: &[u8]) -> Result<Digest, CasError> {
     let digest = sha256_digest(bytes);
@@ -39,7 +42,11 @@ pub(crate) fn put(cas: &LocalCas, bytes: &[u8]) -> Result<Digest, CasError> {
         Ok(()) => {
             finalize_read_only(&target)?;
             temporary.cleanup().map_err(|source| {
-                CasError::io("remove committed temporary object", temporary.path(), source)
+                CasError::io(
+                    "remove committed temporary object",
+                    temporary.path(),
+                    source,
+                )
             })?;
             sync_directory(shard)?;
             sync_directory(&cas.temporary)?;

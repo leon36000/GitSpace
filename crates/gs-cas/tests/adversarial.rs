@@ -4,8 +4,8 @@ use std::{
     fs,
     path::{Path, PathBuf},
     sync::{
-        atomic::{AtomicU64, Ordering},
         Arc, Barrier,
+        atomic::{AtomicU64, Ordering},
     },
     thread,
 };
@@ -99,7 +99,10 @@ fn corrupted_object_is_rejected_and_never_silently_overwritten() {
         other => panic!("unexpected read error: {other:?}"),
     }
 
-    match cas.put(original).expect_err("put must not heal or overwrite corruption") {
+    match cas
+        .put(original)
+        .expect_err("put must not heal or overwrite corruption")
+    {
         CasError::CorruptObject { expected, actual } => {
             assert_eq!(expected, digest);
             assert_eq!(actual, sha256_digest(tampered));
@@ -107,7 +110,10 @@ fn corrupted_object_is_rejected_and_never_silently_overwritten() {
         other => panic!("unexpected put error: {other:?}"),
     }
 
-    assert_eq!(fs::read(path).expect("read preserved negative evidence"), tampered);
+    assert_eq!(
+        fs::read(path).expect("read preserved negative evidence"),
+        tampered
+    );
     assert_eq!(file_count(&root.path().join("tmp")), 0);
 }
 
@@ -133,10 +139,19 @@ fn concurrent_identical_writers_commit_one_complete_object() {
         .collect::<Vec<_>>();
 
     for handle in handles {
-        assert_eq!(handle.join().expect("writer thread").expect("concurrent put"), expected);
+        assert_eq!(
+            handle
+                .join()
+                .expect("writer thread")
+                .expect("concurrent put"),
+            expected
+        );
     }
 
-    assert_eq!(cas.get(&expected).expect("read concurrent winner"), bytes.as_slice());
+    assert_eq!(
+        cas.get(&expected).expect("read concurrent winner"),
+        bytes.as_slice()
+    );
     assert_eq!(file_count(&root.path().join("objects")), 1);
     assert_eq!(file_count(&root.path().join("tmp")), 0);
 }
@@ -158,7 +173,10 @@ fn interrupted_partial_temporary_file_is_not_addressable_or_blocking() {
     let committed = b"later complete bytes";
     let digest = cas.put(committed).expect("put after interrupted writer");
     assert_eq!(cas.get(&digest).expect("get committed bytes"), committed);
-    assert!(stale.exists(), "foreign stale temp remains non-addressable evidence");
+    assert!(
+        stale.exists(),
+        "foreign stale temp remains non-addressable evidence"
+    );
 }
 
 #[cfg(unix)]
@@ -175,7 +193,9 @@ fn write_permission_failure_is_reported_without_partial_object() {
 
     let result = cas.put(b"cannot create temp");
 
-    let mut restore = fs::metadata(&tmp).expect("tmp metadata after failure").permissions();
+    let mut restore = fs::metadata(&tmp)
+        .expect("tmp metadata after failure")
+        .permissions();
     restore.set_mode(0o700);
     fs::set_permissions(&tmp, restore).expect("restore tmp permissions");
 
