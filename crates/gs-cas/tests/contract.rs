@@ -89,6 +89,20 @@ fn put_get_round_trip_uses_documented_layout() {
 }
 
 #[test]
+fn empty_object_uses_the_standard_sha256_identity() {
+    let root = TestRoot::new("empty");
+    let cas = LocalCas::open(root.path()).expect("open local CAS");
+
+    let digest = cas.put(&[]).expect("put empty bytes");
+
+    assert_eq!(
+        digest.to_string(),
+        "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    );
+    assert_eq!(cas.get(&digest).expect("get empty bytes"), Vec::<u8>::new());
+}
+
+#[test]
 fn duplicate_put_is_idempotent_and_does_not_replace_the_object() {
     let root = TestRoot::new("dedup");
     let cas = LocalCas::open(root.path()).expect("open local CAS");
