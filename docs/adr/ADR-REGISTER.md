@@ -3,7 +3,7 @@ doc_id: GS-ADR-REGISTER
 title: GitSpace — Architecture Decision Register
 authority: DECISION_REGISTER
 status: ACTIVE
-version: 0.3.1
+version: 0.3.2
 updated: 2026-08-13
 ---
 
@@ -23,14 +23,12 @@ updated: 2026-08-13
 
 - **Statut : `ACCEPTED_OWNER`**
 - **Décision :** GitSpace possède un modèle du monde logiciel natif. Git et les forges sont des périphéries.
-- **Alternative rejetée :** forge agentisée comme noyau.
 - **Preuve future :** comparer l’approche native à une forge agentisée.
 
 ### ADR-0002 — Rust principal, sans mono-langage dogmatique
 
 - **Statut : `ACCEPTED_OWNER`**
 - **Décision :** Rust porte principalement le noyau de confiance; TypeScript, Python et d’autres langages restent possibles aux frontières appropriées.
-- **Preuve future :** qualifier la frontière Rust/Python.
 
 ### ADR-0003 — Souveraineté humaine
 
@@ -111,9 +109,9 @@ updated: 2026-08-13
 
 ### TDR-P00-008 — Paire canon/projection
 
-- **Statut : `PILOT_ACCEPTED`**
+- **Statut : `PILOT_ACCEPTED_WITH_EVIDENCE`**
 - **Décision :** un commit canonique X est suivi d’un commit projection Y avec `manifest.source_commit = X`.
-- **Raison :** éviter toute auto-référence impossible.
+- **Evidence :** A→B et C→D, puis paire de correction de revue active.
 
 ### TDR-P00-009 — Packetisation juste-à-temps
 
@@ -124,28 +122,34 @@ updated: 2026-08-13
 
 - **Statut : `EXECUTED_PENDING_OWNER_ACCEPTANCE`**
 - **Décision :** branche dédiée et PR; préserver `hermesclaw-ci` et l’historique.
-- **Evidence :** PR #1, base `f69b22d...`, A `488fd399...`, B `08a38c43...`.
-- **Reste à fermer :** décision propriétaire de merge.
+- **Evidence :** PR #1, `main` inchangé, branche préservée.
+- **Reste :** décision propriétaire de merge.
 
 ### TDR-P00-011 — Transport canonique byte-preserving
 
 - **Statut : `PILOT_ACCEPTED_WITH_EVIDENCE`**
 - **Décision :** publier par contenu UTF-8 direct ou filesystem authentifié, trees/blobs vérifiés et comparaison distante; interdire la transcription manuelle base64.
-- **Evidence négative :** plusieurs blobs orphelins divergents pendant les probes.
-- **Evidence positive :** A/B construits depuis blobs identifiés; cinq projections réutilisent les blobs sources.
+- **Evidence négative :** blobs orphelins divergents.
+- **Evidence positive :** commits, trees et projections partageant les blobs sources.
 
 ### TDR-P00-012 — Projection après clôture d’état
 
+- **Statut : `EXECUTED_WITH_EVIDENCE`**
+- **Décision :** lorsqu’une publication change l’état canonique `00/02/04`, créer un commit canonique puis sa projection.
+- **Evidence :** C `4802c26f...` puis D `0c6ed111...`.
+
+### TDR-P00-013 — Manifeste comme identité exacte de la paire active
+
 - **Statut : `PILOT_ACCEPTED`**
-- **Décision :** lorsqu’une publication change l’état canonique `00/02/04`, créer un commit de clôture C puis un commit de projection D avec `source_commit = C`.
-- **Raison :** la projection finale doit refléter l’état de la PR, pas seulement l’état prépublication.
+- **Décision :** les sources canoniques décrivent l’état et les paires historiques, mais n’inscrivent pas le SHA de leur propre commit. `raglite/RAGLITE-MANIFEST.yaml` porte seul l’identité exacte de la paire active.
+- **Raison :** éviter une régression auto-référentielle infinie à chaque mise à jour d’état.
 
 ## Décisions différées
 
 - Temporal versus moteur durable alternatif;
 - Neon versus Postgres local/auto-hébergé;
 - SonarQube et Fallow pour le code produit;
-- AMD optimizations;
+- optimisations AMD;
 - moteur de politique;
 - sandbox;
 - backend workspace;

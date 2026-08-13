@@ -25,19 +25,25 @@ La Phase 00 adopte **C0 — Native Evaluation Foundry hybride** : un IR d’éva
 
 ## Bootstrap en cours
 
-La pull request brouillon **#1** propose le corpus canonique initial :
+La pull request brouillon **#1** propose le corpus canonique initial.
 
 ```text
 main@f69b22d...
-  └─ A 488fd399... : 19 documents canoniques
-       └─ B 08a38c43... : manifeste + 5 projections RAGLite
+  └─ A 488fd399... : canon initial
+       └─ B 08a38c43... : projection de A
+            └─ C 4802c26f... : clôture d’état
+                 └─ D 0c6ed111... : projection de C
+                      └─ paire de correction de revue active
+                           voir raglite/RAGLITE-MANIFEST.yaml
 ```
 
 - la PR est ouverte et mergeable;
-- `main` n’a pas été modifiée directement;
-- `hermesclaw-ci` est préservée;
+- `main` et `hermesclaw-ci` n’ont pas été modifiées;
+- vingt documents canoniques et six fichiers de projection sont proposés;
 - aucun code produit, dépendance, licence ou CI produit n’est inclus;
-- le statut reste `PARTIALLY_VERIFIED` jusqu’aux revues et à la décision propriétaire.
+- trois revues structurées ont été exécutées et leurs findings matériels sont corrigés;
+- l’indépendance d’identité et la décision propriétaire restent ouvertes;
+- le statut reste `PARTIALLY_VERIFIED`.
 
 ## Ordre de lecture
 
@@ -66,7 +72,7 @@ Instructions du projet
 
 ## Dépôt et RAGLite
 
-Le dépôt devient la mémoire canonique éditable seulement après merge accepté. Le RAGLite mobile est une projection byte-identical générée depuis un commit canonique identifié. Voir [`raglite/README.md`](raglite/README.md).
+Le dépôt devient la mémoire canonique éditable seulement après merge accepté. Le RAGLite mobile est une projection byte-identical générée depuis un commit canonique identifié. Le manifeste courant porte l’identité exacte de la paire canon/projection active.
 
 ## Licence
 

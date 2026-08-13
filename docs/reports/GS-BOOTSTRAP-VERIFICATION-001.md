@@ -3,7 +3,7 @@ doc_id: GS-BOOTSTRAP-VERIFICATION-001
 title: GitSpace — Canonical Bootstrap Verification Report
 authority: VERIFICATION_EVIDENCE
 status: PARTIALLY_VERIFIED
-version: 0.1.0
+version: 0.2.0
 updated: 2026-08-13
 pull_request: 1
 ---
@@ -14,150 +14,147 @@ pull_request: 1
 
 `PARTIALLY_VERIFIED`
 
-La branche et la PR satisfont les propriétés documentaires et de transport contrôlées ci-dessous. Le bootstrap n’est pas `PROVEN` parce que la PR n’est pas fusionnée, les revues indépendantes GitHub ne sont pas encore soumises et le propriétaire n’a pas accepté le changement d’autorité de `main`.
+Le corpus, le transport, les paires canon/projection et les trois axes de revue passent après correction de leurs findings matériels. Le bootstrap n’est pas `PROVEN` parce que la PR n’est pas fusionnée, l’indépendance n’est pas établie par une identité distincte et le propriétaire n’a pas accepté le changement d’autorité de `main`.
 
 ## Scope vérifié
 
 - dépôt `leon36000/GitSpace`;
 - base `main@f69b22d2bd09aa5eae96693acf501b2464c3be25`;
 - branche `bootstrap/canonical-corpus-v0.3`;
-- commit A `488fd399314ad834881c7c59d78915ed236c9239`;
-- commit B `08a38c4360a8e5e83332aa5f8f39917576c20030`;
+- A `488fd399314ad834881c7c59d78915ed236c9239`;
+- B `08a38c4360a8e5e83332aa5f8f39917576c20030`;
+- C `4802c26f6ffc8c17d005cb41685bd2244cbd7593`;
+- D `0c6ed111dea42efb9b4a27e4c305b5ae5f2d1c25`;
+- paire de correction de revue identifiée par le manifeste final;
 - PR #1;
-- corpus documentaire, plan Phase 00 et projection RAGLite;
+- corpus, Phase 00 et RAGLite;
 - absence d’effet sur `main` et `hermesclaw-ci`.
 
-## Evidence E1 — Parent et tree du canon
+## Revue 1 — Autorité et cohérence
 
-```yaml
-commit: 488fd399314ad834881c7c59d78915ed236c9239
-parent: f69b22d2bd09aa5eae96693acf501b2464c3be25
-tree: da903750e480beb2806882e0603ab3822dae00bb
-message: "docs(canon): bootstrap GitSpace native world engine corpus"
-```
+### Contrôles
 
-Résultat : `PASS`.
-
-## Evidence E2 — Inventaire du tree A
-
-- 19 blobs canoniques;
-- tous les blobs sont des documents Markdown;
-- aucun `Cargo.toml`, `pyproject.toml`, fichier Rust/Python/TypeScript/Go ou workflow produit;
-- README staging remplacé uniquement sur la branche proposée;
-- plan Phase 00 v0.4.0 et spécification v0.3.0 présents.
-
-Résultat : `PASS`.
-
-## Evidence E3 — Projection RAGLite
-
-```yaml
-commit: 08a38c4360a8e5e83332aa5f8f39917576c20030
-parent: 488fd399314ad834881c7c59d78915ed236c9239
-tree: 7b6bb98c414cfbd8e81f5c820c75deb3ed9e2879
-changed_files: 6
-```
-
-Fichiers : manifeste + cinq projections. Les cinq projections ont le même blob SHA que leur source.
-
-Résultat : `PASS`.
-
-## Evidence E4 — Plan agentique
-
-- 22 unités ordonnées;
-- quatre milestones techniques + campagne scientifique;
+- architecture C et C0 cohérentes;
+- rôle du propriétaire, de ChatGPT, des exécuteurs et des reviewers cohérent;
+- ordre d’autorité stable;
+- décisions acceptées présentes;
 - plan maître non exécutable;
-- paquet `GS-EXEC-PACKET-001` obligatoire;
-- aucune dépendance canonique à Claude Code, Codex ou un autre fournisseur;
-- TDD, Evidence Bundle, revue indépendante et rollback explicités.
+- prochaine action cohérente avec la PR.
 
-Résultat : `PASS_DOCUMENTARY`.
+### Findings
 
-## Evidence E5 — Seed Suite
+- `AUTH-001` : `02` ne mentionnait pas C/D.
+- `AUTH-002` : corpus compté à 19 au lieu de 20 après ajout du rapport.
+- `AUTH-003` : Repository State indiquait encore une paire C/D pending.
 
-La spécification contient les IDs contigus `GS-SEED-0001` à `GS-SEED-0032`, répartis entre Repair, Evolution, Creation, Intent, Proof, Recovery, Memory, Security et Owner Outcome.
+### Corrections
 
-Résultat : `PASS_DOCUMENTARY`.
+- `00` v0.3.3;
+- `02` v0.3.4;
+- README, Conflict Register et Repository State mis à jour;
+- l’identité exacte de la paire active est déléguée au manifeste pour éviter l’auto-référence.
 
-## Evidence E6 — PR
+### Verdict
 
-```yaml
-number: 1
-state: open
-draft: true
-mergeable: true
-base: main
-base_sha: f69b22d2bd09aa5eae96693acf501b2464c3be25
-head: bootstrap/canonical-corpus-v0.3
-```
+`PASS_AFTER_FIX`.
 
-Résultat : `PASS`.
+## Revue 2 — Recherche et méthode
 
-## Evidence E7 — Branches non ciblées
+### Contrôles
 
-- `main` reste au SHA de base;
-- `hermesclaw-ci` reste à son dernier SHA observé;
-- aucune suppression ou modification de cette branche;
-- aucun force push sur `main`.
+- chaque préprint reste `PILOT` ou `WATCH`;
+- aucune addition naïve de gains;
+- limites et expériences obligatoires présentes;
+- LongCLI, SWE-EVO et MemoryGraft recontrôlés via Consensus puis confrontés aux sources primaires;
+- plan Task 14 prévu pour rendre l’Atlas exécutable.
 
-Résultat : `PASS` sous réserve de la revérification finale avant merge.
+### Finding
 
-## Evidence E8 — Transport
+- `RES-001` : `EVIDENCE_SYNTHESIS` n’était pas un type enregistré.
 
-### Positif
+### Correction
 
-- contenu UTF-8 direct;
-- blobs identifiés;
-- trees et parents explicites;
-- projections construites par réutilisation des blobs sources;
-- comparaison A→B.
+- `RES-P00-030` utilise désormais `EVIDENCE`;
+- la décision `REJECT` et ses limites restent inchangées.
 
-### Négatif
+### Verdict
 
-Des tentatives base64 manuelles ont produit des blobs orphelins divergents. Aucun n’est référencé. Cette voie est interdite.
+`PASS_AFTER_FIX`.
 
-Résultat : `QUALIFIED_FOR_BOOTSTRAP_WITH_EVIDENCE`.
+## Revue 3 — Provenance et transport
 
-## Evidence E9 — Apps et contrôles différés
+### Contrôles
 
-- **Codex Engineering Guardrails :** principes appliqués à la portée, la séparation implémentation/vérification et l’evidence-first.
-- **SonarQube :** non déclenché; aucun code produit à analyser.
-- **Fallow :** non déclenché; aucun graphe TypeScript/JavaScript.
-- **Temporal :** non déclenché; aucun runtime durable implémenté.
-- **Neon Postgres :** non déclenché; le vertical slice M0 prévoit d’abord journal local + CAS.
-- **AMD Skills :** non déclenché; aucun workload GPU ou inference mesuré.
+- parents et trees A/B/C/D;
+- A parent direct de `main`;
+- B parent de A;
+- D parent de C;
+- A→B : six fichiers;
+- C→D : quatre fichiers;
+- les cinq projections de D réutilisent les blobs sources;
+- aucun fichier produit;
+- `main` et `hermesclaw-ci` préservées;
+- blobs orphelins divergents non référencés.
 
-Résultat : `DEFERRED_BY_SCOPE`, pas `UNAVAILABLE`.
+### Finding faible
 
-## Contre-exemples conservés
+- `PROV-001` : commits GitHub non signés.
 
-1. hypothèse `EMPTY_NO_COMMITS` réfutée;
-2. rôle de planificateur attribué à Claude Code corrigé;
-3. manifeste auto-référentiel réfuté;
-4. base64 manuel réfuté;
-5. patch projection synthétique réfuté;
-6. état A/B devenu périmé après ouverture de la PR, corrigé par la paire de clôture C/D.
+### Limite
+
+La réutilisation du même objet Git établit l’identité byte-for-byte dans le repository, mais la future chaîne de provenance produit devra ajouter signatures et digests SHA-256/modernes selon son threat model.
+
+### Verdict
+
+`PASS_WITH_LOW_FINDING`.
+
+## Plan et Seed Suite
+
+- `GS-P00-PLAN-001` v0.4.0 : 22 unités, Task 1 à Task 22, packetisation obligatoire.
+- aucune occurrence active de `Claude Code`, `dontAsk` ou `EXEC-E0` dans le plan maître.
+- `GS-P00-SPEC-001` v0.3.0 : 12 lanes et `GS-SEED-0001..0032`.
+- aucun code ou benchmark runtime exécuté.
+
+Verdict : `PASS_DOCUMENTARY_NOT_EXECUTED`.
+
+## Apps et contrôles proposés par le propriétaire
+
+- **Codex Engineering Guardrails :** appliqué à la portée, au plan et à la vérification.
+- **Consensus :** utilisé pour la contre-vérification académique ciblée; pas autorité primaire.
+- **SonarQube :** différé; aucun code produit à analyser.
+- **Fallow :** différé; aucun graphe TypeScript/JavaScript.
+- **Temporal :** différé; aucun runtime durable implémenté.
+- **Neon Postgres :** différé; M0 commence par journal local + CAS pour mesurer le besoin.
+- **AMD Skills :** différé; aucun workload GPU ou inference mesuré.
+
+Statut : `DEFERRED_BY_SCOPE`, pas `UNAVAILABLE`.
+
+## Indépendance
+
+Les trois revues ont été menées comme rôles séparés, avec relecture fraîche des sources et recherche de contre-exemples. Elles ont produit des findings réels et des corrections. Elles ne sont toutefois pas indépendantes par identité, car le même architecte-modèle a coordonné le travail.
+
+Cette limite interdit le statut `PROVEN`. Le propriétaire peut :
+
+- demander une revue externe supplémentaire;
+- accepter explicitement ce risque limité pour le bootstrap documentaire;
+- refuser le merge.
 
 ## Findings ouverts
 
-- `FINDING-001` : commits GitHub non signés.
-  - Sévérité : faible pour le bootstrap documentaire, à traiter avant chaîne de provenance produit.
-- `FINDING-002` : aucune revue GitHub indépendante distincte soumise.
-  - Sévérité : bloquante pour `PROVEN`.
-- `FINDING-003` : décision propriétaire de merge absente.
-  - Sévérité : bloquante pour le changement d’autorité.
-- `FINDING-004` : aucune preuve runtime de la Foundry.
-  - Sévérité : attendue; bloque seulement Phase 00, pas la PR documentaire.
+- `OPEN-001` : décision propriétaire de merge absente — bloquant.
+- `OPEN-002` : indépendance d’identité absente — bloquant pour `PROVEN`, waivable explicitement pour ce bootstrap documentaire.
+- `OPEN-003` : commits non signés — faible, à traiter avant provenance produit.
+- `OPEN-004` : aucune preuve runtime de Foundry — attendue, non bloquante pour le bootstrap.
 
 ## Conditions de fermeture
 
-1. trois revues indépendantes;
-2. aucun finding matériel ouvert;
-3. acceptation propriétaire;
-4. merge de la PR;
-5. revérification de `hermesclaw-ci`;
-6. remplacement atomique des cinq sources ChatGPT depuis la projection fusionnée;
-7. packetisation de Task 1 depuis le SHA fusionné.
+1. décision propriétaire explicite;
+2. merge ou refus de la PR;
+3. si merge : revérification de `main` et `hermesclaw-ci`;
+4. vérification du manifeste fusionné;
+5. remplacement atomique des cinq sources ChatGPT;
+6. packetisation de Task 1 depuis le SHA fusionné.
 
 ## Conclusion
 
-Le corpus est prêt à être revu. Il n’est pas prêt à être déclaré `PROVEN` ni à déclencher l’implémentation produit.
+La PR est techniquement et documentairement prête pour la décision propriétaire. Elle n’est pas un produit implémenté et ne doit pas être présentée comme Phase 00 terminée.

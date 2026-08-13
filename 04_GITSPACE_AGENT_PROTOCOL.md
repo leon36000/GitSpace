@@ -3,7 +3,7 @@ doc_id: GS-04
 title: GitSpace — Agent Protocol
 authority: OPERATING_PROTOCOL
 status: ACTIVE
-version: 0.3.2
+version: 0.3.3
 updated: 2026-08-13
 read_when: PLANNING_EXECUTION_HANDOFF_OR_MEMORY_UPDATE
 ---
@@ -110,6 +110,8 @@ Peut proposer une décomposition, mais sa sortie reste `QUARANTINED` jusqu’à 
 
 Le reviewer reçoit d’abord l’intention, le diff, les tests et les preuves, pas le récit persuasif de l’implémenteur.
 
+Une revue rôle-séparée par le même modèle est utile mais ne remplace pas une indépendance d’identité. Son niveau d’indépendance est déclaré explicitement.
+
 ## 3. Plan maître et packetisation
 
 Un plan maître fixe décomposition, dépendances et gates. Il n’est pas directement exécutable.
@@ -203,14 +205,14 @@ Les logs bruts sont immuables, les secrets redacted, le commit exact lié et le 
 
 ## 7. Dépôt, transport et publication
 
-Bootstrap exécuté sur une branche dédiée :
-
 ```text
 main@f69b22d...
 → A 488fd399... : canon initial
-→ B 08a38c43... : RAGLite(source_commit=A)
-→ clôture d’état canonique
-→ projection de clôture
+→ B 08a38c43... : projection de A
+→ C 4802c26f... : clôture d’état
+→ D 0c6ed111... : projection de C
+→ correction de revue canonique
+→ projection active identifiée dans le manifeste
 → PR #1 brouillon
 ```
 
@@ -221,7 +223,7 @@ Méthodes acceptées pour ce bootstrap :
 - contenu UTF-8 direct via API GitHub avec hash vérifié;
 - construction de trees à partir de blobs identifiés;
 - réutilisation du blob source pour la projection byte-identical;
-- parent et diff vérifiés après commit.
+- parent, tree et diff vérifiés après commit.
 
 Méthodes interdites :
 
@@ -241,15 +243,40 @@ Le dépôt fusionné est éditable et autoritaire. Le RAGLite est une projection
 Pour chaque génération :
 
 - prendre un commit canonique X;
-- réutiliser ou copier exactement les cinq blobs routés;
+- réutiliser exactement les cinq blobs routés;
 - écrire un manifeste `source_commit = X`;
 - créer un commit projection Y parent de X;
-- comparer les blobs source/projection;
+- comparer les blobs et tailles source/projection;
 - remplacer atomiquement les cinq sources du Projet ChatGPT seulement après acceptation.
 
-Aucune synthèse LLM n’est autorisée dans la génération.
+Le manifeste est l’unique autorité pour l’identité exacte de la paire active. Les sources canoniques ne tentent pas d’inscrire le SHA de leur propre commit.
 
-## 9. Politique de questions
+## 9. Revue du bootstrap
+
+### Autorité/cohérence
+
+- finding : `02` ne mentionnait pas C/D et comptait 19 documents au lieu de 20;
+- correction : état v0.3.4 et décompte corrigés;
+- verdict : `PASS_AFTER_FIX`.
+
+### Recherche/méthode
+
+- vérification ciblée de LongCLI, SWE-EVO et MemoryGraft;
+- finding : type non enregistré `EVIDENCE_SYNTHESIS`;
+- correction : `EVIDENCE`;
+- verdict : `PASS_AFTER_FIX`.
+
+### Provenance/transport
+
+- parents, trees, diff et blobs projection vérifiés;
+- finding faible : commits Git non signés;
+- verdict : `PASS_WITH_LOW_FINDING`.
+
+### Limite
+
+Les trois revues sont rôle-séparées mais pas indépendantes par identité. Le propriétaire reste l’autorité de merge.
+
+## 10. Politique de questions
 
 Ne demander au propriétaire que :
 
@@ -260,7 +287,7 @@ Ne demander au propriétaire que :
 
 Sinon avancer avec une hypothèse explicite, réversible et testable.
 
-## 10. MEMORY_PATCH
+## 11. MEMORY_PATCH
 
 ```yaml
 MEMORY_PATCH:
@@ -280,7 +307,7 @@ MEMORY_PATCH:
 
 Une seule version active. Une sortie d’outil ne devient jamais directement canonique.
 
-## 11. Sessions confirmées
+## 12. Sessions confirmées
 
 - `GS-SESSION-20260811-01` : architecture Forgejo + noyau de preuve; superseded.
 - `GS-SESSION-20260811-02` : conception du Native World Engine.
@@ -291,35 +318,34 @@ Une seule version active. Une sortie d’outil ne devient jamais directement can
 - `GS-SESSION-20260812-05` : correction des rôles; ChatGPT planifie.
 - `GS-SESSION-20260813-01` : conflit HermesClaw découvert; corpus consolidé.
 - `GS-SESSION-20260813-02` : probe de transport; divergences base64 et gate byte-preserving.
-- `GS-SESSION-20260813-03` : transport UTF-8/tree qualifié; commits A/B créés; PR #1 brouillon ouverte et mergeable; aucun code produit.
+- `GS-SESSION-20260813-03` : transport UTF-8/tree qualifié; A/B, C/D et PR #1 créés.
+- `GS-SESSION-20260813-04` : trois revues structurées; findings matériels corrigés; décision propriétaire seule gate de merge.
 
-## 12. Handoff courant
+## 13. Handoff courant
 
 ```yaml
-session_id: GS-SESSION-20260813-03
+session_id: GS-SESSION-20260813-04
 objective: >-
-  Independently review draft PR #1, correct material findings,
-  then obtain the owner's merge decision and synchronize the
-  ChatGPT project sources only after an accepted merge.
+  Obtain the owner's explicit merge or reject decision for PR #1.
+  On acceptance, verify the merged branch and atomically synchronize
+  the five ChatGPT project sources before packetizing Phase-00 Task 1.
 completed:
   - architecture C accepted
   - C0 accepted
-  - canonical commit A created
-  - RAGLite projection commit B created from A
-  - branch isolated from main and hermesclaw-ci
-  - draft PR #1 opened and mergeable
+  - canonical branch and draft PR published
+  - two canon/projection pairs created
+  - active pair delegated to manifest to avoid self-reference
   - 22-unit master plan published
-  - 32-task Seed Suite specification published
-  - base64 transport rejected with negative evidence
+  - 32-task Seed Suite specified
+  - authority review passed after fixes
+  - research review passed after fixes
+  - provenance review passed with low unsigned-commit finding
 phase_status: PARTIALLY_VERIFIED
-transport_status: QUALIFIED_FOR_BOOTSTRAP_WITH_EVIDENCE
 product_code_started: false
-repository_state: DRAFT_PR_OPEN
+repository_state: DRAFT_PR_REVIEWED_AWAITING_OWNER
 pull_request: 1
-canonical_commit_a: 488fd399314ad834881c7c59d78915ed236c9239
-projection_commit_b: 08a38c4360a8e5e83332aa5f8f39917576c20030
+active_pair_source: raglite/RAGLITE-MANIFEST.yaml
+identity_independent_review: false
 next_exact_action: >-
-  Complete three independent reviews of PR #1 and obtain the
-  owner's explicit merge or reject decision. Do not execute
-  Phase-00 Task 1 before the canonical merge and RAGLite sync.
+  Owner reviews PR #1 and explicitly accepts or rejects the merge.
 ```

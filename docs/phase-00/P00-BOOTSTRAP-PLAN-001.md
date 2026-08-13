@@ -1,8 +1,8 @@
 ---
 doc_id: GS-P00-BOOTSTRAP-PLAN-001
 title: GitSpace — Canonical Repository Bootstrap Plan
-status: EXECUTED_PENDING_OWNER_ACCEPTANCE
-version: 0.3.1
+status: REVIEWED_PENDING_OWNER_DECISION
+version: 0.3.2
 updated: 2026-08-13
 planner: CHATGPT_PROJECT_GITSPACE
 target_repository: leon36000/GitSpace
@@ -21,16 +21,16 @@ Publier le corpus canonique de GitSpace sans perdre l’historique de staging, s
 ```text
 main@f69b22d...
   └─ A 488fd399... : corpus canonique initial
-       └─ B 08a38c43... : projection RAGLite de A
-            └─ C : clôture de l’état de publication
-                 └─ D : projection RAGLite de C
+       └─ B 08a38c43... : projection de A
+            └─ C 4802c26f... : clôture d’état
+                 └─ D 0c6ed111... : projection de C
+                      └─ correction de revue canonique
+                           └─ projection active dans le manifeste
 ```
-
-Les SHA C/D sont établis lors de la clôture de cette session. La PR #1 suit la tête de branche.
 
 ## Non-scope respecté
 
-- aucun crate Rust ou package Python;
+- aucun code Rust, Python, TypeScript ou Go;
 - aucun prototype produit;
 - aucun adaptateur ou benchmark;
 - aucune CI produit;
@@ -44,7 +44,7 @@ Les SHA C/D sont établis lors de la clôture de cette session. La PR #1 suit la
 1. Le dépôt fusionné sera l’unique canon éditable.
 2. Le RAGLite est une projection de lecture.
 3. Chaque commit projection référence son parent canonique.
-4. Les cinq projections sont byte-identical aux sources.
+4. Les cinq projections sont les mêmes objets Git que leurs sources.
 5. L’historique de staging reste accessible.
 6. `hermesclaw-ci` reste intacte.
 7. Aucun fichier ne prétend que le produit est implémenté.
@@ -52,7 +52,8 @@ Les SHA C/D sont établis lors de la clôture de cette session. La PR #1 suit la
 9. Les décisions acceptées ont une autorité.
 10. Les préprints non reproduits restent expérimentaux.
 11. Les versions exactes de toolchain attendent Task 1.
-12. Le merge reste une décision propriétaire.
+12. Le manifeste porte l’identité exacte de la paire active.
+13. Le merge reste une décision propriétaire.
 
 ## Résultats par unité
 
@@ -84,19 +85,25 @@ Les SHA C/D sont établis lors de la clôture de cette session. La PR #1 suit la
 
 `PASS` : PR #1 brouillon, ouverte et mergeable.
 
-### B8 — Revue indépendante
+### B8 — Revues
 
-`OPEN` : trois axes de revue et décision propriétaire requis.
+- autorité/cohérence : `PASS_AFTER_FIX`;
+- recherche/méthode : `PASS_AFTER_FIX`;
+- provenance/transport : `PASS_WITH_LOW_FINDING`;
+- indépendance d’identité : `NOT_SATISFIED`.
+
+Findings matériels corrigés : état C/D, décompte documentaire et type épistémique.
 
 ## Critères d’acceptation
 
 Le bootstrap devient `PROVEN` seulement si :
 
-- les revues indépendantes ne trouvent aucun défaut matériel ouvert;
-- le propriétaire accepte le changement de rôle de `main`;
+- une décision propriétaire explicite accepte le merge et le risque résiduel documenté;
 - la PR est fusionnée sans effet sur `hermesclaw-ci`;
 - la projection finale est synchronisée dans le Projet ChatGPT;
 - le SHA fusionné devient la base du premier paquet Phase 00.
+
+Sans cela : `PARTIALLY_VERIFIED`.
 
 ## Rollback
 

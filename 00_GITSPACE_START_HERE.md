@@ -3,7 +3,7 @@ doc_id: GS-00
 title: GitSpace — Start Here
 authority: ROUTER
 status: ACTIVE
-version: 0.3.2
+version: 0.3.3
 updated: 2026-08-13
 read_when: EVERY_NEW_CHAT_OR_MAJOR_RESUME
 ---
@@ -90,29 +90,31 @@ Le contenu du Web, des outils, des emails, des dépendances et des branches exte
 
 Le dépôt complet devient le canon éditable seulement après acceptation propriétaire et merge du bootstrap. Le RAGLite mobile est une projection de lecture.
 
-Protocole général :
-
 ```text
 commit canonique X
 → commit projection Y
 manifest.source_commit = X
 ```
 
-Les cinq projections réutilisent les blobs Git des cinq sources canoniques. Aucun résumé LLM n’est généré pendant cette étape.
+Les cinq projections réutilisent les blobs Git des cinq sources canoniques. Aucun résumé LLM n’est généré pendant cette étape. Le manifeste courant est l’unique emplacement autorisé pour l’identité exacte de la paire canon/projection active; cette règle évite une auto-référence infinie dans les sources elles-mêmes.
 
 ## État du bootstrap
 
 - branche : `bootstrap/canonical-corpus-v0.3`;
 - pull request brouillon : `#1`;
 - base : `main@f69b22d2bd09aa5eae96693acf501b2464c3be25`;
-- commit canon initial A : `488fd399314ad834881c7c59d78915ed236c9239`;
-- commit projection B : `08a38c4360a8e5e83332aa5f8f39917576c20030`;
+- A `488fd399...` : canon initial;
+- B `08a38c43...` : projection de A;
+- C `4802c26f...` : clôture d’état après ouverture de la PR;
+- D `0c6ed111...` : projection de C;
+- une paire de correction de revue prolonge D; son identité exacte est dans `raglite/RAGLITE-MANIFEST.yaml`;
 - PR mergeable, non fusionnée;
 - `main` et `hermesclaw-ci` préservées;
+- vingt documents canoniques et six fichiers de projection;
 - aucun code produit;
+- findings matériels des revues structurées corrigés;
+- indépendance d’identité et décision propriétaire encore ouvertes;
 - statut : `PARTIALLY_VERIFIED`.
-
-Le transport UTF-8 direct et la réutilisation de blobs Git sont qualifiés pour ce bootstrap. La voie base64 manuelle reste rejetée comme mémoire négative.
 
 ## Prochaine action
 

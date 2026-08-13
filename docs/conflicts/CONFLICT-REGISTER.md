@@ -3,7 +3,7 @@ doc_id: GS-CONFLICT-REGISTER
 title: GitSpace — Conflict Register
 authority: CONFLICT_REGISTER
 status: ACTIVE
-version: 0.3.2
+version: 0.3.3
 updated: 2026-08-13
 ---
 
@@ -23,55 +23,64 @@ Un conflit n’est pas résolu en supprimant la source perdante. La source la pl
 
 ### GS-CONFLICT-PLAN-001 — Plan maître versus overlay fournisseur
 
-- **Sources :** plan executor-neutral et overlay Claude Code.
 - **Résolution :** `GS-P00-PLAN-001` v0.4.0 est executor-neutral; le prototype fournisseur est archivé.
 - **Statut : `RESOLVED_WITH_EVIDENCE`**.
 
 ### GS-CONFLICT-REPO-001 — GitSpace versus staging HermesClaw
 
 - **Observation :** `main@f69b22d...` contient un README de staging; `hermesclaw-ci` est une branche distincte et active.
-- **Contrôle :** branche `bootstrap/canonical-corpus-v0.3`, historique préservé, PR #1 brouillon, aucune modification de `hermesclaw-ci`.
+- **Contrôle :** branche bootstrap, historique préservé, PR #1 brouillon, aucune modification de `hermesclaw-ci`.
 - **Reste :** décision propriétaire sur le merge.
 - **Statut : `OPEN_OWNER_DECISION`**.
 
 ### GS-CONFLICT-RAG-001 — Manifeste auto-référentiel
 
 - **Contre-exemple :** un commit ne peut pas contenir son propre SHA stable.
-- **Résolution :** paire canon X / projection Y avec `source_commit=X`.
-- **Evidence :** A `488fd399...` puis B `08a38c43...`.
+- **Résolution :** paire canon X / projection Y; le manifeste porte l’identité exacte de la paire active.
+- **Evidence :** A→B, C→D et paire de correction de revue.
 - **Statut : `CLOSED_WITH_EVIDENCE`**.
 
 ### GS-CONFLICT-TOOLCHAIN-001 — Pins exacts versus qualification fraîche
 
-- **Résolution :** Rust 1.97.1 et Python 3.12 restent candidats; Task 1 verrouille les versions après revalidation.
+- **Résolution :** Rust 1.97.1 et Python 3.12 restent candidats; Task 1 verrouille après revalidation.
 - **Statut : `RESOLVED_AS_PILOT`**.
 
 ### GS-CONFLICT-STATE-001 — Corpus local versus canon publié
 
-- **Résolution partielle :** corpus publié sur la branche et PR #1 ouverte.
+- **Résolution partielle :** corpus publié sur branche et PR #1 ouverte.
 - **Reste :** merge propriétaire et remplacement atomique des sources ChatGPT.
 - **Statut : `PARTIALLY_RESOLVED`**.
 
 ### GS-CONFLICT-TRANSPORT-001 — Transcription manuelle versus intégrité
 
-- **Evidence négative :** plusieurs blobs orphelins ont divergé des fichiers visés; aucune branche ou commit ne les référence.
-- **Résolution :** contenu UTF-8 direct, trees/blobs identifiés et vérification du diff.
-- **Evidence positive :** A/B réels; cinq projections réutilisent exactement les blobs sources.
+- **Evidence négative :** blobs orphelins divergents; aucun tree ou commit ne les référence.
+- **Résolution :** UTF-8 direct, trees/blobs identifiés, projections par réutilisation des blobs sources.
 - **Statut : `CLOSED_FOR_BOOTSTRAP_WITH_EVIDENCE`**.
-- **Mémoire négative :** base64 manuel reste interdit pour toute publication future.
+- **Mémoire négative :** base64 manuel reste interdit.
 
 ### GS-CONFLICT-PATCH-001 — Patch B synthétique versus vrai SHA A
 
-- **Ancienne situation :** le replay local produisait un SHA A synthétique.
 - **Résolution :** le vrai A a été créé, puis B construit avec `source_commit=A`; le patch synthétique n’a pas été utilisé.
 - **Statut : `CLOSED_WITH_EVIDENCE`**.
 
-### GS-CONFLICT-CURRENT-STATE-001 — État prépublication versus PR réelle
+### GS-CONFLICT-CURRENT-STATE-001 — État A/B devenu périmé après publication
 
-- **Situation :** A/B décrivaient correctement la stratégie, mais `00/02/04` indiquaient encore transport bloqué et PR absente.
-- **Résolution :** commit de clôture d’état C puis projection D conformément à TDR-P00-012.
-- **Statut : `RESOLVED_PENDING_C_D_PUBLICATION`**.
+- **Finding :** `00/02/04` décrivaient encore un transport bloqué après ouverture de la PR.
+- **Résolution :** C `4802c26f...`, D `0c6ed111...`, puis paire de correction de revue.
+- **Statut : `CLOSED_WITH_EVIDENCE`**.
 
-## Conflits bloquants restants
+### GS-CONFLICT-COUNT-001 — Décompte 19 versus 20 documents
 
-Un seul choix bloque le changement d’autorité du dépôt : accepter ou refuser le merge de la PR #1. Aucun conflit restant n’autorise le démarrage de Task 1 avant merge.
+- **Finding :** le rapport de vérification ajouté en C portait le corpus canonique à 20 documents, tandis que `02` indiquait encore 19.
+- **Résolution :** `02` v0.3.4 et README corrigés.
+- **Statut : `CLOSED_WITH_EVIDENCE`**.
+
+### GS-CONFLICT-EPISTEMIC-001 — Type `EVIDENCE_SYNTHESIS` non enregistré
+
+- **Finding :** `RES-P00-030` utilisait un type absent du protocole.
+- **Résolution :** remplacement par `EVIDENCE`; la décision `REJECT` reste inchangée.
+- **Statut : `CLOSED_WITH_EVIDENCE`**.
+
+## Conflit bloquant restant
+
+Seule la décision propriétaire sur la PR #1 bloque le changement d’autorité de `main`. Les revues rôle-séparées ne sont pas indépendantes par identité; cette limite ne doit pas être masquée.
