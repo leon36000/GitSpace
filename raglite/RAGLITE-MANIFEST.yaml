@@ -1,0 +1,53 @@
+---
+manifest_id: GS-RAGLITE-MANIFEST
+manifest_version: 0.3.2
+status: PUBLISHED_PROJECTION_CANDIDATE
+source_repository: leon36000/GitSpace
+source_commit: 488fd399314ad834881c7c59d78915ed236c9239
+source_tree: da903750e480beb2806882e0603ab3822dae00bb
+generated_at: 2026-08-13T08:31:00Z
+generation_mode: GIT_BLOB_REUSE_BYTE_IDENTICAL
+requires_regeneration_after_canonical_commit: false
+projection_count: 5
+---
+
+projection_map:
+  - source_path: 00_GITSPACE_START_HERE.md
+    projection_path: raglite/mobile/00_GITSPACE_START_HERE.md
+    git_blob_sha: 071c8a937db0f17a39b07b150d9b6297db6cb59c
+    sha256: 50e7d64ef3c631add21c90576ccd2b41eb18bad0cbda454aa9803d326899a98e
+    bytes: 4738
+  - source_path: 01_GITSPACE_MASTER_CANON.md
+    projection_path: raglite/mobile/01_GITSPACE_MASTER_CANON.md
+    git_blob_sha: b9d73b88182d3d9fb4f44d1ad71f5a800fabdce4
+    sha256: 786d356158c991f5da1c7766a3c984e9a1e92a4124c8f05a0455a484df54d339
+    bytes: 14181
+  - source_path: 02_GITSPACE_NOW_DECISIONS_ROADMAP.md
+    projection_path: raglite/mobile/02_GITSPACE_NOW_DECISIONS_ROADMAP.md
+    git_blob_sha: a7858ba50c1784c86a8a4675a2906a9f8592f791
+    sha256: cd4242f162e544a03f68a9dd0f2c051ad2ca0cf8958db8b3486cf1a94d961196
+    bytes: 10208
+  - source_path: 03_GITSPACE_RESEARCH_ATLAS.md
+    projection_path: raglite/mobile/03_GITSPACE_RESEARCH_ATLAS.md
+    git_blob_sha: 35096033e241415eae64f2ef704a7f9f6101d027
+    sha256: e6530a53c270df60b49f867bc534e4c43b32910e003c0ac58828cb9380a163d9
+    bytes: 17713
+  - source_path: 04_GITSPACE_AGENT_PROTOCOL.md
+    projection_path: raglite/mobile/04_GITSPACE_AGENT_PROTOCOL.md
+    git_blob_sha: e9183682459ecf0a22dc25ef713b9b6192c2de08
+    sha256: bc5d971d7037c1b1104c2ad719f18cbba3beac3f8969c3fc492a4859859b8c70
+    bytes: 11752
+
+invariants:
+  - every_projection_blob_equals_source_blob
+  - source_commit_is_parent_of_projection_commit
+  - no_llm_summarization_in_generation
+  - exactly_one_active_mobile_projection_per_source
+  - canonical_repository_remains_editable_authority
+
+verification:
+  expected_changed_files_from_source_commit: 6
+  expected_projection_files: 5
+  source_and_projection_git_blob_sha_must_match: true
+  source_and_projection_sha256_must_match: true
+  replay_without_model_required: true
