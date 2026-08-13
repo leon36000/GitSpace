@@ -1,4 +1,4 @@
-use gs_canonical_json::{canonical_bytes, canonical_digest, sha256_digest, CanonicalJsonError};
+use gs_canonical_json::{CanonicalJsonError, canonical_bytes, canonical_digest, sha256_digest};
 use serde_json::{Number, Value};
 
 fn parse(input: &str) -> Value {
@@ -35,7 +35,10 @@ fn rfc_numbers_use_jcs_format() {
 #[test]
 fn keys_are_sorted_by_utf16_code_units() {
     let value = parse("{\"\\uE000\":1,\"\\uD800\\uDC00\":2}");
-    assert_eq!(canonical_bytes(&value).unwrap(), "{\"𐀀\":2,\"\":1}".as_bytes());
+    assert_eq!(
+        canonical_bytes(&value).unwrap(),
+        "{\"𐀀\":2,\"\":1}".as_bytes()
+    );
 }
 
 #[test]

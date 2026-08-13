@@ -11,8 +11,12 @@ pub enum CanonicalJsonError {
 impl fmt::Display for CanonicalJsonError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::NegativeZero => f.write_str("negative zero is not accepted at the GitSpace canonical JSON boundary"),
-            Self::Canonicalization(message) => write!(f, "canonical JSON serialization failed: {message}"),
+            Self::NegativeZero => {
+                f.write_str("negative zero is not accepted at the GitSpace canonical JSON boundary")
+            }
+            Self::Canonicalization(message) => {
+                write!(f, "canonical JSON serialization failed: {message}")
+            }
         }
     }
 }
@@ -47,10 +51,11 @@ impl fmt::Display for Digest {
 fn reject_negative_zero(value: &Value) -> Result<(), CanonicalJsonError> {
     match value {
         Value::Number(number) => {
-            if let Some(float) = number.as_f64() {
-                if float == 0.0 && float.is_sign_negative() {
-                    return Err(CanonicalJsonError::NegativeZero);
-                }
+            if let Some(float) = number.as_f64()
+                && float == 0.0
+                && float.is_sign_negative()
+            {
+                return Err(CanonicalJsonError::NegativeZero);
             }
         }
         Value::Array(values) => {
