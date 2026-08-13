@@ -1,0 +1,49 @@
+name: Vendor HermesClaw Dependencies
+
+on:
+  push:
+    branches:
+      - hermesclaw-ci
+    paths:
+      - .github/workflows/vendor-hermesclaw-dependencies.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  vendor:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout staging branch
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.1
+
+      - name: Resolve and vendor dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd vendor-bootstrap
+          cargo generate-lockfile
+          mkdir -p .cargo
+          cargo vendor --locked --versioned-dirs vendor > .cargo/config.toml
+          cargo check --locked
+          tar -czf ../hermesclaw-vendor-bundle.tar.gz Cargo.lock .cargo/config.toml vendor
+          cd ..
+          sha256sum hermesclaw-vendor-bundle.tar.gz > hermesclaw-vendor-bundle.tar.gz.sha256
+
+      - name: Upload vendor bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: hermesclaw-rust-vendor-bundle
+          path: |
+            hermesclaw-vendor-bundle.tar.gz
+            hermesclaw-vendor-bundle.tar.gz.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
