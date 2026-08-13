@@ -1,46 +1,9 @@
----
-manifest_id: GS-RAGLITE-MANIFEST
-manifest_version: 0.4.2
-status: TASK1_STATE_PROJECTION_CORRECTED
-source_repository: leon36000/GitSpace
-source_commit: c026d6d81de0e836a02619834569be21ac3d5b2e
-source_tree: 4d239c3687816adf95482b556425612245a44847
-generated_at: 2026-08-13T20:20:00Z
-generation_mode: GIT_BLOB_REUSE_BYTE_IDENTICAL
-projection_count: 5
-requires_merge_before_project_activation: true
----
-
-projection_map:
-  - source_path: 00_GITSPACE_START_HERE.md
-    projection_path: raglite/mobile/00_GITSPACE_START_HERE.md
-    git_blob_sha: 07450e39c8ade396d0f9c4d252042d5e0a2f63c7
-    bytes: 1908
-  - source_path: 01_GITSPACE_MASTER_CANON.md
-    projection_path: raglite/mobile/01_GITSPACE_MASTER_CANON.md
-    git_blob_sha: b9d73b88182d3d9fb4f44d1ad71f5a800fabdce4
-    bytes: 14181
-  - source_path: 02_GITSPACE_NOW_DECISIONS_ROADMAP.md
-    projection_path: raglite/mobile/02_GITSPACE_NOW_DECISIONS_ROADMAP.md
-    git_blob_sha: b416defa5cab7bd57eafd27d8ab55f9f4e06ff79
-    bytes: 3070
-  - source_path: 03_GITSPACE_RESEARCH_ATLAS.md
-    projection_path: raglite/mobile/03_GITSPACE_RESEARCH_ATLAS.md
-    git_blob_sha: 88e5a8c937dfdaaeedc63d6ebeaf2fe745eb39e1
-    bytes: 18428
-  - source_path: 04_GITSPACE_AGENT_PROTOCOL.md
-    projection_path: raglite/mobile/04_GITSPACE_AGENT_PROTOCOL.md
-    git_blob_sha: 698070a86bb0a377e694772debbcb5e548d27346
-    bytes: 10614
-
-invariants:
-  - every_projection_blob_equals_source_blob
-  - source_commit_is_parent_of_projection_commit
-  - no_llm_summarization_in_generation
-  - full_operating_protocol_is_preserved
-  - repository_main_is_canonical_after_merge
-
-verification:
-  identity_algorithm: SAME_GIT_BLOB_OBJECT_PLUS_SIZE
-  source_and_projection_git_blob_sha_must_match: true
-  source_and_projection_size_must_match: true
+manifest_version: 0.4.3
+source_commit: b0005b07bce68fd51f642dc1e13e0ad615741b25
+source_tree: 9da1575a7dcf5b0229773fbf99a4aab3b6580a59
+projection:
+  00_GITSPACE_START_HERE.md: 54cb826556f1e476b5112331fec6530a0deb4ec6
+  01_GITSPACE_MASTER_CANON.md: b9d73b88182d3d9fb4f44d1ad71f5a800fabdce4
+  02_GITSPACE_NOW_DECISIONS_ROADMAP.md: 106bedef57beb9393f9b189b8376c26a0b0baa7b
+  03_GITSPACE_RESEARCH_ATLAS.md: 88e5a8c937dfdaaeedc63d6ebeaf2fe745eb39e1
+  04_GITSPACE_AGENT_PROTOCOL.md: 698070a86bb0a377e694772debbcb5e548d27346
