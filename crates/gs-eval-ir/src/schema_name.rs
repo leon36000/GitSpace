@@ -3,7 +3,8 @@ use std::{error::Error, fmt};
 const EVAL_TASK_SPEC: &str = include_str!("../../../schemas/v1/eval-task-spec.schema.json");
 const WORLD_FIXTURE: &str = include_str!("../../../schemas/v1/world-fixture.schema.json");
 const ORACLE_BUNDLE: &str = include_str!("../../../schemas/v1/oracle-bundle.schema.json");
-const AGENT_CONFIGURATION: &str = include_str!("../../../schemas/v1/agent-configuration.schema.json");
+const AGENT_CONFIGURATION: &str =
+    include_str!("../../../schemas/v1/agent-configuration.schema.json");
 const EVAL_RUN_MANIFEST: &str = include_str!("../../../schemas/v1/eval-run-manifest.schema.json");
 const RUN_EVENT: &str = include_str!("../../../schemas/v1/run-event.schema.json");
 const EVIDENCE_BUNDLE: &str = include_str!("../../../schemas/v1/evidence-bundle.schema.json");

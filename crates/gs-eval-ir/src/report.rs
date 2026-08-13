@@ -17,20 +17,40 @@ impl ValidationReport {
         &self.issues
     }
 
-    pub(crate) fn single(path: impl Into<String>, code: impl Into<String>, message: impl Into<String>) -> Self {
-        Self { issues: vec![ValidationIssue { path: path.into(), code: code.into(), message: message.into() }] }
+    pub(crate) fn single(
+        path: impl Into<String>,
+        code: impl Into<String>,
+        message: impl Into<String>,
+    ) -> Self {
+        Self {
+            issues: vec![ValidationIssue {
+                path: path.into(),
+                code: code.into(),
+                message: message.into(),
+            }],
+        }
     }
 
     pub(crate) fn type_mismatch() -> Self {
-        Self::single("/", "internal.type_mismatch", "validated schema decoded into the wrong IR variant")
+        Self::single(
+            "/",
+            "internal.type_mismatch",
+            "validated schema decoded into the wrong IR variant",
+        )
     }
 }
 
 impl fmt::Display for ValidationReport {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (index, issue) in self.issues.iter().enumerate() {
-            if index > 0 { formatter.write_str("; ")?; }
-            write!(formatter, "{} [{}]: {}", issue.path, issue.code, issue.message)?;
+            if index > 0 {
+                formatter.write_str("; ")?;
+            }
+            write!(
+                formatter,
+                "{} [{}]: {}",
+                issue.path, issue.code, issue.message
+            )?;
         }
         Ok(())
     }

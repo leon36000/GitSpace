@@ -1,6 +1,4 @@
-use gs_eval_ir::{
-    parse_named_json, validate_named_json, validate_task_json, SchemaName,
-};
+use gs_eval_ir::{SchemaName, parse_named_json, validate_named_json, validate_task_json};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -76,9 +74,7 @@ fn materialize_cases() -> Vec<Case> {
                 let mut value = materialized
                     .get(source_id)
                     .unwrap_or_else(|| {
-                        panic!(
-                            "{case_id}: mutation source must be an earlier case: {source_id}"
-                        )
+                        panic!("{case_id}: mutation source must be an earlier case: {source_id}")
                     })
                     .clone();
                 replace_pointer(
@@ -132,7 +128,11 @@ fn shared_corpus_matches_rust_schema_and_typed_decode() {
         }
     }
 
-    assert_eq!(covered.len(), 8, "shared corpus must cover all eight schemas");
+    assert_eq!(
+        covered.len(),
+        8,
+        "shared corpus must cover all eight schemas"
+    );
 }
 
 #[test]

@@ -66,11 +66,18 @@ fn validator(name: SchemaName) -> Result<Validator, ValidationReport> {
 }
 
 fn normalized_path(path: String) -> String {
-    if path.is_empty() { "/".to_owned() } else { path }
+    if path.is_empty() {
+        "/".to_owned()
+    } else {
+        path
+    }
 }
 
 fn schema_code(schema_path: String) -> String {
-    let keyword = schema_path.rsplit('/').next().filter(|part| !part.is_empty());
+    let keyword = schema_path
+        .rsplit('/')
+        .next()
+        .filter(|part| !part.is_empty());
     format!("schema.{}", keyword.unwrap_or("validation"))
 }
 
@@ -90,20 +97,15 @@ pub fn validate_named_json(name: SchemaName, value: &Value) -> Result<(), Valida
     }
 
     issues.sort_by(|left, right| {
-        (&left.path, &left.code, &left.message).cmp(&(
-            &right.path,
-            &right.code,
-            &right.message,
-        ))
+        (&left.path, &left.code, &left.message).cmp(&(&right.path, &right.code, &right.message))
     });
     Err(ValidationReport { issues })
 }
 
 pub fn parse_named_json(name: SchemaName, value: &Value) -> Result<EvaluationIr, ValidationReport> {
     validate_named_json(name, value)?;
-    let decode = |error: serde_json::Error| {
-        ValidationReport::single("/", "typed.decode", error.to_string())
-    };
+    let decode =
+        |error: serde_json::Error| ValidationReport::single("/", "typed.decode", error.to_string());
 
     match name {
         SchemaName::EvalTaskSpec => serde_json::from_value(value.clone())
