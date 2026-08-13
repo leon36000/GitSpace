@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - Cargo.toml
+      - Cargo.lock
       - crates/gs-canonical-json/**
       - .github/workflows/p00-task-003.yml
       - docs/phase-00/tasks/P00-TASK-003.md
@@ -25,6 +26,8 @@ jobs:
         run: rustc --version | grep -E '^rustc 1\.97\.1 '
       - name: Test canonical JSON crate
         run: cargo test -p gs-canonical-json --all-targets
+      - name: Print generated Cargo.lock
+        run: cat Cargo.lock
       - name: Clippy
         run: cargo clippy -p gs-canonical-json --all-targets -- -D warnings
       - name: Formatting
