@@ -229,6 +229,31 @@ fn symlink_object_is_rejected_even_when_target_bytes_match() {
     ));
 }
 
+#[cfg(unix)]
+#[test]
+fn symlink_shard_is_rejected_without_writing_outside_the_store() {
+    use std::os::unix::fs::symlink;
+
+    let root = TestRoot::new("symlink-shard");
+    let cas = LocalCas::open(root.path()).expect("open local CAS");
+    let bytes = b"must stay inside the CAS namespace";
+    let digest = sha256_digest(bytes);
+    let shard = cas
+        .object_path(&digest)
+        .parent()
+        .expect("object shard")
+        .to_owned();
+    let outside = root.path().join("outside-shard");
+    fs::create_dir_all(&outside).expect("create outside directory");
+    symlink(&outside, &shard).expect("inject symlink shard");
+
+    assert!(matches!(
+        cas.put(bytes),
+        Err(CasError::UnsafePath { path, .. }) if path == shard
+    ));
+    assert_eq!(file_count(&outside), 0);
+}
+
 #[test]
 fn non_regular_object_path_is_rejected() {
     let root = TestRoot::new("non-regular");
