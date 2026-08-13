@@ -1,0 +1,52 @@
+name: P00 Task 001 Toolchain Contract
+
+on:
+  pull_request:
+    paths:
+      - Cargo.toml
+      - rust-toolchain.toml
+      - pyproject.toml
+      - toolchains.lock.json
+      - .gitignore
+      - tests/contracts/test_toolchains.py
+      - .github/workflows/p00-task-001.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact pull request commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Install Python 3.12.13
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12.13'
+
+      - name: Install exact uv
+        run: python -m pip install --disable-pip-version-check --no-cache-dir uv==0.12.0
+
+      - name: Install exact Rust toolchain
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+          rustup override set 1.97.1
+
+      - name: Verify version identities
+        run: |
+          python --version | grep -Fx 'Python 3.12.13'
+          uv --version | grep -Fx 'uv 0.12.0'
+          rustc --version | grep -E '^rustc 1\.97\.1 '
+          cargo --version | grep -E '^cargo 1\.97\.1 '
+
+      - name: Run contract tests
+        run: python -m unittest -v tests/contracts/test_toolchains.py
+
+      - name: Verify empty Cargo workspace
+        run: cargo metadata --no-deps --format-version 1 > /tmp/gitspace-cargo-metadata.json
+
+      - name: Verify task leaves repository clean
+        run: test -z "$(git status --porcelain=v1)"
