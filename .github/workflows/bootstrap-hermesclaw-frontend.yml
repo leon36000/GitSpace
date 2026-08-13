@@ -1,0 +1,52 @@
+name: Bootstrap HermesClaw Frontend
+
+on:
+  push:
+    branches:
+      - hermesclaw-ci
+    paths:
+      - .github/workflows/bootstrap-hermesclaw-frontend.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-frontend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Configure Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: /dev/null
+
+      - name: Create exact dependency lock and install
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir control-center
+          cd control-center
+          npm init -y
+          npm pkg set name=@hermesclaw/control-center private=true type=module
+          npm pkg set 'scripts.dev=vite' 'scripts.build=tsc -b && vite build' 'scripts.test=vitest run' 'scripts.test:watch=vitest' 'scripts.lint=tsc --noEmit'
+          npm install --save-exact react react-dom @tauri-apps/api
+          npm install --save-dev --save-exact typescript vite @vitejs/plugin-react vitest jsdom @testing-library/react @testing-library/jest-dom @testing-library/user-event @types/react @types/react-dom @types/node @tauri-apps/cli
+          npm ci
+          npm test -- --passWithNoTests
+          cd ..
+          tar -czf hermesclaw-frontend-bootstrap.tar.gz control-center/package.json control-center/package-lock.json control-center/node_modules
+          sha256sum hermesclaw-frontend-bootstrap.tar.gz > hermesclaw-frontend-bootstrap.tar.gz.sha256
+
+      - name: Upload frontend bootstrap
+        uses: actions/upload-artifact@v4
+        with:
+          name: hermesclaw-frontend-bootstrap
+          path: |
+            hermesclaw-frontend-bootstrap.tar.gz
+            hermesclaw-frontend-bootstrap.tar.gz.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
