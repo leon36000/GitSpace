@@ -35,21 +35,16 @@ class ToolchainContractTests(unittest.TestCase):
         self.assertEqual(lock["compatibility"]["inspect_evals_min_python"], ">=3.11")
         self.assertEqual(lock["compatibility"]["inspect_evals_preferred_series"], ["3.11", "3.12"])
 
-        self.assertEqual(rust["toolchain"]["channel"], "1.97.1")
+        self.assertEqual(rust["toolchain"]["channel"], lock["rust"]["version"])
         self.assertEqual(rust["toolchain"]["profile"], "minimal")
         self.assertEqual(set(rust["toolchain"]["components"]), {"clippy", "rustfmt"})
-        self.assertEqual(cargo["workspace"]["members"], [])
         self.assertEqual(cargo["workspace"]["resolver"], "3")
-        self.assertEqual(pyproject["project"]["requires-python"], "==3.12.13")
+        self.assertEqual(pyproject["project"]["requires-python"], f"=={lock['python']['version']}")
         self.assertFalse(pyproject["tool"]["uv"]["package"])
-        self.assertEqual(pyproject["tool"]["gitspace"]["uv-version"], "0.12.0")
+        self.assertEqual(pyproject["tool"]["gitspace"]["uv-version"], lock["uv"]["version"])
 
         for item in ("target/", "__pycache__/", ".venv/", ".pytest_cache/", ".ruff_cache/"):
             self.assertIn(item, ignore)
-
-    def test_no_product_packages_exist_in_task1(self) -> None:
-        forbidden = [ROOT / "crates", ROOT / "python" / "gs_eval_adapters", ROOT / "src"]
-        self.assertEqual([str(path.relative_to(ROOT)) for path in forbidden if path.exists()], [])
 
 
 if __name__ == "__main__":
