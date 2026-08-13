@@ -3,7 +3,7 @@ doc_id: GS-00
 title: GitSpace — Start Here
 authority: ROUTER
 status: ACTIVE
-version: 0.4.2
+version: 0.4.3
 updated: 2026-08-13
 ---
 # GitSpace — START HERE
@@ -24,8 +24,7 @@ GitSpace est un **Native Software World Engine pour contributeurs IA**. Architec
 - état courant : `02_GITSPACE_NOW_DECISIONS_ROADMAP.md`;
 - recherche : `03_GITSPACE_RESEARCH_ATLAS.md`;
 - planification/handoff : `04_GITSPACE_AGENT_PROTOCOL.md` + plan Phase 00;
-- preuve Task 1 : `docs/phase-00/evidence/P00-TASK-001-VERDICT.md`;
-- preuve Task 2 : `docs/phase-00/evidence/P00-TASK-002-VERDICT.md`;
+- preuves Task 1–3 : `docs/phase-00/evidence/`;
 - projection mobile : `raglite/RAGLITE-MANIFEST.yaml`.
 
 ## Invariants
@@ -36,13 +35,10 @@ GitSpace est un **Native Software World Engine pour contributeurs IA**. Architec
 - Un agent ne se déclare jamais lui-même `PROVEN`.
 - Test avant code pour tout comportement.
 - Chaque tâche est packetisée depuis un commit frais.
-- Les schémas structurent l’IR; la logique runtime complète reste dans les composants d’autorité correspondants.
 - Faux `DONE = 0`.
 
 ## État
 
-Le bootstrap documentaire, `P00-TASK-001` et `P00-TASK-002` sont fusionnés et prouvés. Task 2 a établi huit contrats Evaluation IR v1 Draft 2020-12 avec identités URN offline, résolution inter-schémas locale, objets structurés fermés, digests stricts et contrôles négatifs. Son merge signé est `7f2b65ae18668b25ff3a7ec2e5582d461d3916c7`.
+`P00-TASK-001`, `P00-TASK-002` et `P00-TASK-003` sont fusionnées et prouvées. Task 3 a ajouté le seam Rust RFC 8785/JCS + SHA-256 avec dépendances verrouillées, 7/7 vecteurs, Clippy, rustfmt et merge GitHub signé `a9217b95c74b7b0e0a4c97c30e4394db3cb04387`.
 
-La prochaine unité est `P00-TASK-003` : canonical JSON et digests. La Phase 00 globale reste `PARTIALLY_VERIFIED`.
-
-Le manifeste RAGLite porte l’identité exacte de la paire canon/projection active.
+La prochaine unité est `P00-TASK-004` : types Rust Evaluation IR et validation/parité avec les schémas. La Phase 00 globale reste `PARTIALLY_VERIFIED`.
