@@ -3,14 +3,14 @@ doc_id: GS-02
 title: GitSpace — Maintenant, décisions et roadmap
 authority: CURRENT_STATE_AND_DECISIONS
 status: ACTIVE
-version: 0.3.3
+version: 0.3.4
 updated: 2026-08-13
 read_when: EVERY_NEW_CHAT_OR_MAJOR_RESUME
 ---
 
 # GitSpace — Maintenant, décisions et roadmap
 
-## État actif [GS-NOW-006]
+## État actif [GS-NOW-007]
 
 - Architecture C — Native Software World Engine : **APPROUVÉE**.
 - C0 — Native Evaluation Foundry hybride : **APPROUVÉE**.
@@ -22,36 +22,33 @@ read_when: EVERY_NEW_CHAT_OR_MAJOR_RESUME
 - Branche préservée : `hermesclaw-ci@91f55525b231116fd431430f46c87667e5c1f140` lors de la dernière vérification.
 - Branche de bootstrap : `bootstrap/canonical-corpus-v0.3`.
 - Pull request : **#1**, brouillon, ouverte et mergeable.
-- Commit A — canon initial : `488fd399314ad834881c7c59d78915ed236c9239`.
-- Tree A : `da903750e480beb2806882e0603ab3822dae00bb`.
-- Commit B — projection RAGLite : `08a38c4360a8e5e83332aa5f8f39917576c20030`.
-- Tree B : `7b6bb98c414cfbd8e81f5c820c75deb3ed9e2879`.
-- A est parent direct de la base `main` observée.
-- B est l’unique descendant de A avant la clôture d’état.
-- Diff A→B : exactement six fichiers, soit le manifeste et les cinq projections.
-- Chaque projection mobile réutilise le même blob Git que sa source canonique.
-- Corpus : 19 documents canoniques + 6 fichiers de projection.
+- A `488fd399314ad834881c7c59d78915ed236c9239` — canon initial, tree `da903750e480beb2806882e0603ab3822dae00bb`.
+- B `08a38c4360a8e5e83332aa5f8f39917576c20030` — projection RAGLite de A.
+- C `4802c26f6ffc8c17d005cb41685bd2244cbd7593` — clôture de l’état après publication.
+- D `0c6ed111dea42efb9b4a27e4c305b5ae5f2d1c25` — projection RAGLite de C, tree `97b302180bd85579c25b28da8fa8b3d339d85465`.
+- La paire active après corrections de revue est identifiée exclusivement dans `raglite/RAGLITE-MANIFEST.yaml`, afin d’éviter toute auto-référence infinie.
+- Corpus proposé : **20 documents canoniques + 6 fichiers de projection**.
 - Plan Phase 00 : `GS-P00-PLAN-001` v0.4.0, 22 unités, executor-neutral, paquet obligatoire.
 - Spécification Phase 00 : `GS-P00-SPEC-001` v0.3.0, 12 lanes et 32 Seed Tasks.
 - Transport : **QUALIFIED_FOR_THIS_BOOTSTRAP_WITH_EVIDENCE**.
-  - contenu UTF-8 direct vérifié;
-  - tree Git construit depuis blobs identifiés;
-  - parents, trees et diff vérifiés;
-  - voie base64 manuelle rejetée après divergences;
-  - les blobs orphelins de probe ne sont référencés par aucun commit.
-- `main` et `hermesclaw-ci` n’ont pas été modifiées par la publication de branche.
+- Revue autorité/cohérence : **PASS après correction**.
+- Revue recherche/méthode : **PASS après remplacement du type non enregistré `EVIDENCE_SYNTHESIS` par `EVIDENCE`**.
+- Revue provenance/transport : **PASS avec finding faible sur les commits Git non signés**.
+- Ces revues sont rôle-séparées et fondées sur des relectures fraîches, mais pas indépendantes par identité; cette limite reste visible.
+- `main` et `hermesclaw-ci` n’ont pas été modifiées.
 - Code produit GitSpace : **non commencé**.
 - Phase active : **Phase 00 — Research Atlas + Benchmark Foundry**.
 - Statut global : `PARTIALLY_VERIFIED`.
-- Prochaine action exacte : **effectuer les trois revues indépendantes de la PR #1, corriger toute contradiction matérielle, puis demander au propriétaire d’accepter ou refuser le merge; ne pas démarrer Task 1 avant un commit canonique fusionné.**
+- Prochaine action exacte : **le propriétaire examine la PR #1 et accepte ou refuse le merge. En cas d’acceptation, fusionner sans modifier `hermesclaw-ci`, remplacer atomiquement les cinq sources du Projet ChatGPT depuis la projection fusionnée, puis packetiser Task 1 depuis le SHA canonique fusionné.**
 
 ## Pourquoi le statut n’est pas PROVEN
 
 - la PR est brouillon et non fusionnée;
 - le propriétaire n’a pas encore accepté que `main` devienne le canon GitSpace;
-- aucune revue humaine ou agentique indépendante distincte n’a encore soumis son verdict GitHub;
+- les revues ne sont pas indépendantes par identité;
+- les commits de bootstrap ne sont pas signés;
 - aucun code produit, benchmark ou replay runtime de Foundry n’a été exécuté;
-- les sources du Projet ChatGPT ne doivent être remplacées par le RAGLite du dépôt qu’après merge accepté.
+- les sources du Projet ChatGPT ne seront remplacées qu’après merge accepté.
 
 ## Décisions acceptées
 
@@ -80,21 +77,23 @@ read_when: EVERY_NEW_CHAT_OR_MAJOR_RESUME
 - **TDR-P00-010** : préserver le staging existant et intégrer le canon par branche + PR.
 - **TDR-P00-011** : transport canonique byte-preserving; base64 manuel interdit.
 - **TDR-P00-012** : toute mise à jour d’état canonique affectant `00/02/04` reçoit une projection RAGLite dérivée de son commit parent.
+- **TDR-P00-013** : les sources canoniques ne contiennent pas le SHA de leur propre paire active; le manifeste projection est l’autorité exacte pour cette identité.
 
 ## Éléments STALE, superseded ou fermés
 
-- `EMPTY_NO_COMMITS` comme état du dépôt — `STALE`.
-- `GS-CC-EXEC-001` comme contrat de planification actif — `STALE_ARCHIVED`.
+- `EMPTY_NO_COMMITS` — `STALE`.
+- Claude Code comme planificateur ou harness imposé — `STALE_ARCHIVED`.
 - `EXEC-E0` comme prochaine action — `STALE`.
-- `P00-TASK-001 READY_NOT_EXECUTED` dérivé avant dépôt canonique — `INVALIDATED`.
-- plans Phase 00 v0.1/v0.2 comme plans actifs — `SUPERSEDED`.
-- Rust 1.97.1/Python 3.12.13 comme pins déjà acceptés — `STALE`, candidats seulement.
+- ancien `P00-TASK-001 READY_NOT_EXECUTED` — `INVALIDATED`.
+- plans Phase 00 v0.1/v0.2 — `SUPERSEDED`.
+- Rust 1.97.1/Python 3.12.13 comme pins acceptés — `STALE`, candidats seulement.
 - manifeste auto-référentiel — `REFUTED`.
-- patch B synthétique comme artefact publiable — `REFUTED`; le vrai B a été généré depuis A.
-- transcription manuelle base64 comme transport — `REFUTED`.
-- `GS-CONFLICT-TRANSPORT-001` — fermé pour le bootstrap par blobs/tree/commits vérifiés; la règle générale reste active.
+- patch B synthétique publiable — `REFUTED`.
+- transcription manuelle base64 — `REFUTED`.
+- `GS-CONFLICT-TRANSPORT-001` — fermé pour le bootstrap, règle générale conservée.
 - `GS-CONFLICT-PATCH-001` — fermé par le vrai couple A/B.
-- `GS-CONFLICT-REPO-001` — ouvert jusqu’au merge ou au refus propriétaire.
+- `GS-CONFLICT-CURRENT-STATE-001` — fermé par C/D puis corrections de revue.
+- `GS-CONFLICT-REPO-001` — ouvert jusqu’au merge ou refus propriétaire.
 
 ## Phase 00 — lots
 
@@ -110,14 +109,13 @@ WP7 Scientific Report
 
 ## Gates immédiats
 
-1. Revue de cohérence/autorité de la PR #1.
-2. Revue recherche/méthode de la PR #1.
-3. Revue provenance/transport de la PR #1.
-4. Correction des défauts matériels trouvés.
-5. Acceptation ou refus propriétaire du merge.
-6. Après merge seulement : remplacement atomique des cinq sources du Projet ChatGPT.
-7. Après synchronisation mémoire : packetisation exacte de Task 1 depuis le SHA fusionné.
-8. Aucun code produit avant ces gates.
+1. Décision propriétaire sur la PR #1.
+2. En cas d’acceptation : merge sans effet sur `hermesclaw-ci`.
+3. Vérification post-merge de `main`, de la branche préservée et du manifeste.
+4. Remplacement atomique des cinq sources du Projet ChatGPT.
+5. Examen mémoire rapide.
+6. Packetisation exacte de Task 1 depuis le SHA fusionné.
+7. Aucun code produit avant ces gates.
 
 ## Roadmap condensée
 
@@ -157,20 +155,28 @@ repository:
   bootstrap_branch: bootstrap/canonical-corpus-v0.3
   pull_request: 1
   pull_request_state: DRAFT_OPEN_MERGEABLE
-  canonical_commit_a: 488fd399314ad834881c7c59d78915ed236c9239
-  projection_commit_b: 08a38c4360a8e5e83332aa5f8f39917576c20030
+  initial_canonical_commit_a: 488fd399314ad834881c7c59d78915ed236c9239
+  initial_projection_commit_b: 08a38c4360a8e5e83332aa5f8f39917576c20030
+  state_closure_commit_c: 4802c26f6ffc8c17d005cb41685bd2244cbd7593
+  state_projection_commit_d: 0c6ed111dea42efb9b4a27e4c305b5ae5f2d1c25
+  active_pair_source: raglite/RAGLITE-MANIFEST.yaml
   preserved_branch:
     name: hermesclaw-ci
     last_observed_sha: 91f55525b231116fd431430f46c87667e5c1f140
+review:
+  authority_coherence: PASS_AFTER_FIX
+  research_method: PASS_AFTER_FIX
+  provenance_transport: PASS_WITH_LOW_FINDING
+  identity_independent: false
 transport:
   status: QUALIFIED_FOR_BOOTSTRAP_WITH_EVIDENCE
   canonical_method: UTF8_CONTENT_PLUS_GIT_BLOB_REUSE
   forbidden_method: MANUAL_BASE64_TRANSCRIPTION
 next_exact_action: >-
-  Independently review PR #1 for authority/coherence,
-  research/method, and provenance/transport; correct material findings;
-  then obtain the owner's merge decision. Do not packetize or execute
-  Phase-00 Task 1 before an accepted canonical merge.
+  Owner reviews PR #1 and explicitly accepts or rejects the merge.
+  On acceptance, merge, verify branches and manifest, atomically
+  replace the five ChatGPT project sources, then packetize Task 1
+  from the merged canonical SHA.
 critical_constraints:
   - architecture_c_is_canonical
   - c0_foundry_is_accepted
@@ -182,8 +188,8 @@ critical_constraints:
   - false_done_target_zero
   - product_code_not_started
   - hermesclaw_branch_preserved
-  - raglite_uses_canonical_parent_provenance
+  - raglite_active_pair_is_manifest_authoritative
   - manual_base64_transport_is_forbidden
 ```
 
-Ce fichier est volatil. Après merge, refus, correction structurante ou démarrage de Task 1, produire une version complète et invalider explicitement la précédente.
+Ce fichier est volatil. Après merge, refus ou démarrage de Task 1, produire une version complète et invalider explicitement la précédente.

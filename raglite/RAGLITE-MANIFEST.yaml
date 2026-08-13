@@ -1,11 +1,11 @@
 ---
 manifest_id: GS-RAGLITE-MANIFEST
-manifest_version: 0.3.3
-status: DRAFT_PR_PROJECTION
+manifest_version: 0.3.4
+status: DRAFT_PR_REVIEWED_PROJECTION
 source_repository: leon36000/GitSpace
-source_commit: 4802c26f6ffc8c17d005cb41685bd2244cbd7593
-source_tree: 77870bdc204c6f3481d4f2c511e7485cd5e53253
-generated_at: 2026-08-13T08:45:00Z
+source_commit: f26df9ce941ade614d29227cf2ee3bc40fd10f71
+source_tree: 519453063d2179a06a5a84f65fd9de755800308e
+generated_at: 2026-08-13T09:03:00Z
 generation_mode: GIT_BLOB_REUSE_BYTE_IDENTICAL
 projection_count: 5
 requires_owner_merge_before_project_activation: true
@@ -14,24 +14,24 @@ requires_owner_merge_before_project_activation: true
 projection_map:
   - source_path: 00_GITSPACE_START_HERE.md
     projection_path: raglite/mobile/00_GITSPACE_START_HERE.md
-    git_blob_sha: dcbf7ad4b1d205b86370d1c56a25202558c38f8b
-    bytes: 4686
+    git_blob_sha: 9c4ac83853e9b38869349e8c9a1db091f8289982
+    bytes: 5040
   - source_path: 01_GITSPACE_MASTER_CANON.md
     projection_path: raglite/mobile/01_GITSPACE_MASTER_CANON.md
     git_blob_sha: b9d73b88182d3d9fb4f44d1ad71f5a800fabdce4
     bytes: 14181
   - source_path: 02_GITSPACE_NOW_DECISIONS_ROADMAP.md
     projection_path: raglite/mobile/02_GITSPACE_NOW_DECISIONS_ROADMAP.md
-    git_blob_sha: b4c2ea9cf385a6a798703b8226dc3dd62367015b
-    bytes: 9214
+    git_blob_sha: d5f3058f9d1af43557a3ce067a0ad624c213034a
+    bytes: 9728
   - source_path: 03_GITSPACE_RESEARCH_ATLAS.md
     projection_path: raglite/mobile/03_GITSPACE_RESEARCH_ATLAS.md
-    git_blob_sha: 35096033e241415eae64f2ef704a7f9f6101d027
-    bytes: 17713
+    git_blob_sha: 88e5a8c937dfdaaeedc63d6ebeaf2fe745eb39e1
+    bytes: 18428
   - source_path: 04_GITSPACE_AGENT_PROTOCOL.md
     projection_path: raglite/mobile/04_GITSPACE_AGENT_PROTOCOL.md
-    git_blob_sha: 79780d8692608ce4436bb136d8b9a5c4e2e2f9e5
-    bytes: 9606
+    git_blob_sha: 698070a86bb0a377e694772debbcb5e548d27346
+    bytes: 10614
 
 invariants:
   - every_projection_blob_equals_source_blob
@@ -41,11 +41,17 @@ invariants:
   - exactly_one_active_mobile_projection_per_source
   - canonical_repository_remains_editable_authority
   - project_activation_requires_accepted_merge
+  - exact_active_pair_identity_lives_only_in_this_manifest
 
 verification:
-  identity_algorithm: GIT_BLOB_SHA1_PLUS_SIZE
+  identity_algorithm: SAME_GIT_BLOB_OBJECT_PLUS_SIZE
   source_and_projection_git_blob_sha_must_match: true
   source_and_projection_size_must_match: true
   replay_without_model_required: true
   expected_projection_paths: 5
   expected_manifest_paths: 1
+  review_status:
+    authority_coherence: PASS_AFTER_FIX
+    research_method: PASS_AFTER_FIX
+    provenance_transport: PASS_WITH_LOW_FINDING
+    identity_independent: false

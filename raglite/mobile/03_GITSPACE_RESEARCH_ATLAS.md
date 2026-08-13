@@ -3,7 +3,7 @@ doc_id: GS-03
 title: GitSpace — Research Atlas
 authority: VERIFIED_RESEARCH_AND_RISK
 status: ACTIVE
-version: 0.3.0
+version: 0.3.1
 updated: 2026-08-13
 evidence_cutoff: 2026-08-13
 ---
@@ -131,11 +131,23 @@ Règles :
 - `RES-P00-027` — [Vibe Code Bench](https://arxiv.org/abs/2603.04601) — `EVIDENCE_PREPRINT` — **PILOT**. 100 spécifications d’apps Web et workflows navigateur pour évaluation fonctionnelle de produits complets. Limite : Ne mesure pas encore la souveraineté du propriétaire ni les évolutions longitudinales.
 - `RES-P00-028` — [Rust 1.97.1](https://blog.rust-lang.org/2026/07/16/Rust-1.97.1/) — `FACT_OFFICIAL` — **PILOT**. Point release stable publiée le 16 juillet 2026 et corrigeant une miscompilation LLVM. Limite : version candidate observée au 2026-08-13; elle doit être revalidée au moment de la packetisation et ne constitue plus un pin accepté par le canon.
 - `RES-P00-029` — [Inspect Evals — Python](https://github.com/UKGovernmentBEIS/inspect_evals) — `FACT_OFFICIAL` — **PILOT**. Inspect Evals recommande Python 3.11 ou 3.12; Python 3.13 est moins testé et Python 3.14 n’est pas supporté pour l’ensemble du catalogue au moment de la vérification. Limite : recommandation d’un projet externe; l’exact patch Python reste à qualifier.
-- `RES-P00-030` — [LLM-as-a-judge unique](https://arxiv.org/abs/2511.21654) — `EVIDENCE_SYNTHESIS` — **REJECT**. Un juge probabiliste peut assister le triage mais ne doit jamais constituer l’unique oracle d’une obligation critique. Limite : Des cas ouverts nécessiteront néanmoins une revue humaine structurée.
+- `RES-P00-030` — [LLM-as-a-judge unique](https://arxiv.org/abs/2511.21654) — `EVIDENCE` — **REJECT**. Un juge probabiliste peut assister le triage mais ne doit jamais constituer l’unique oracle d’une obligation critique. Limite : Des cas ouverts nécessiteront néanmoins une revue humaine structurée.
 - `RES-P00-031` — [Harbor `pyproject.toml`](https://github.com/harbor-framework/harbor/blob/main/pyproject.toml) — `FACT_OFFICIAL` — **PILOT**. Harbor déclare actuellement `requires-python = ">=3.12"`. Limite : branche mouvante; la version importée devra être verrouillée par commit ou release.
 - `RES-P00-032` — [Python 3.12.13](https://www.python.org/downloads/release/python-31213/) — `FACT_OFFICIAL` — **PILOT**. Python 3.12.13, publié le 3 mars 2026, est une release de sécurité source-only de la série 3.12; Python 3.12 n’est plus en phase de bugfix régulier. Limite : l’absence d’installateurs officiels impose de qualifier la reproductibilité des builds et images.
 
-## 5. Expériences GitSpace obligatoires
+## 5. Revue méthodologique du bootstrap
+
+Trois claims chargés ont été recontrôlés le 2026-08-13 via l’index académique Consensus, puis conservés sous leurs sources primaires :
+
+- LongCLI-Bench : 20 tâches, moins de 20 % et blocage fréquent avant 30 %;
+- SWE-EVO : 48 tâches, moyenne de 21 fichiers, 874 tests et 25 % rapportés;
+- MemoryGraft : compromis persistant par expériences empoisonnées récupérées ultérieurement.
+
+Consensus a servi de mécanisme de découverte et de contre-vérification, pas de source d’autorité. Les trois articles restent des préprints et donc `PILOT`.
+
+Finding corrigé : le type non enregistré `EVIDENCE_SYNTHESIS` a été remplacé par `EVIDENCE` pour `RES-P00-030`.
+
+## 6. Expériences GitSpace obligatoires
 
 | ID | Hypothèse | Comparaison | Mesures critiques | Statut |
 |---|---|---|---|---|
@@ -152,7 +164,7 @@ Règles :
 | `EXP-P00-011` | Python 3.12 est l’intersection initiale la plus fiable | 3.12 latest security vs 3.13 supported subset | installability, adapter pass rate, image reproducibility | `PLANNED` |
 | `EXP-P00-012` | Le pin Rust candidat est sûr | stable candidate vs previous stable | build, tests, sanitizer/fuzz smoke, target coverage | `PLANNED` |
 
-## 6. Critères de promotion
+## 7. Critères de promotion
 
 Une technique passe de `PILOT` à `ADOPT` seulement si :
 
@@ -165,7 +177,7 @@ Une technique passe de `PILOT` à `ADOPT` seulement si :
 - les limites sont documentées;
 - les contre-exemples restent visibles.
 
-## 7. Menaces à la validité
+## 8. Menaces à la validité
 
 - contamination des benchmarks;
 - tâches auto-favorables;
@@ -180,7 +192,7 @@ Une technique passe de `PILOT` à `ADOPT` seulement si :
 - juge LLM corrélé à l’implémenteur;
 - absence de participant non-développeur réel.
 
-## 8. Hypothèses actives
+## 9. Hypothèses actives
 
 - Le RAGLite cinq fichiers améliore rappel et fidélité sans créer un second canon.
 - Un Native World Engine bat une forge agentisée sur les tâches longues.
@@ -191,7 +203,7 @@ Une technique passe de `PILOT` à `ADOPT` seulement si :
 - Les composants certifiés augmentent plus sûrement la réussite que la génération intégrale.
 - Les verdicts multidimensionnels réduisent les faux succès par rapport à un score unique.
 
-## 9. Fraîcheur et revalidation
+## 10. Fraîcheur et revalidation
 
 Les claims liés à une version logicielle, une API, une politique ou un classement doivent être revalidés avant packetisation. `checked_at: 2026-08-13` ne garantit pas la validité future.
 
