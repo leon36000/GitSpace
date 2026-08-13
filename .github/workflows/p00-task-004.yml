@@ -10,7 +10,7 @@ on:
       - tests/contracts/test_eval_ir_parity.py
       - .github/workflows/p00-task-004.yml
       - docs/phase-00/tasks/P00-TASK-004.md
-      - docs/phase-00/evidence/P00-TASK-004-VERDICT.md
+      - docs/phase-00/evidence/P00-TASK-004-*.md
   workflow_dispatch:
 
 permissions:
