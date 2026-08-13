@@ -1,11 +1,11 @@
 ---
 manifest_id: GS-RAGLITE-MANIFEST
-manifest_version: 0.4.1
-status: TASK1_STATE_PROJECTION
+manifest_version: 0.4.2
+status: TASK1_STATE_PROJECTION_CORRECTED
 source_repository: leon36000/GitSpace
-source_commit: 28668d8c65843e4d143a54730fed113f9ef0fbe1
-source_tree: 1177c14fe574018f67cdadb54f9d127954033e24
-generated_at: 2026-08-13T20:15:00Z
+source_commit: c026d6d81de0e836a02619834569be21ac3d5b2e
+source_tree: 4d239c3687816adf95482b556425612245a44847
+generated_at: 2026-08-13T20:20:00Z
 generation_mode: GIT_BLOB_REUSE_BYTE_IDENTICAL
 projection_count: 5
 requires_merge_before_project_activation: true
@@ -30,18 +30,17 @@ projection_map:
     bytes: 18428
   - source_path: 04_GITSPACE_AGENT_PROTOCOL.md
     projection_path: raglite/mobile/04_GITSPACE_AGENT_PROTOCOL.md
-    git_blob_sha: 464421c8910fc4ec62a23ca72e654316850a12e1
-    bytes: 2572
+    git_blob_sha: 698070a86bb0a377e694772debbcb5e548d27346
+    bytes: 10614
 
 invariants:
   - every_projection_blob_equals_source_blob
   - source_commit_is_parent_of_projection_commit
   - no_llm_summarization_in_generation
-  - exactly_one_active_mobile_projection_per_source
+  - full_operating_protocol_is_preserved
   - repository_main_is_canonical_after_merge
 
 verification:
   identity_algorithm: SAME_GIT_BLOB_OBJECT_PLUS_SIZE
   source_and_projection_git_blob_sha_must_match: true
   source_and_projection_size_must_match: true
-  replay_without_model_required: true
