@@ -1,0 +1,33 @@
+name: P00 Task 004 Evaluation IR Parity
+
+on:
+  pull_request:
+    paths:
+      - Cargo.toml
+      - Cargo.lock
+      - crates/gs-eval-ir/**
+      - tests/contracts/eval_ir_parity.json
+      - tests/contracts/test_eval_ir_parity.py
+      - .github/workflows/p00-task-004.yml
+      - docs/phase-00/tasks/P00-TASK-004.md
+      - docs/phase-00/evidence/P00-TASK-004-VERDICT.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Install Rust 1.97.1
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal
+          rustup override set 1.97.1
+      - name: Verify Rust identity
+        run: |
+          rustc --version | grep -E '^rustc 1\.97\.1 '
+          cargo --version | grep -E '^cargo 1\.97\.1 '
+      - name: Observe Task 4 contract
+        run: cargo test -p gs-eval-ir --all-targets
