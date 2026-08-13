@@ -3,7 +3,7 @@ doc_id: GS-04
 title: GitSpace — Agent Protocol
 authority: OPERATING_PROTOCOL
 status: ACTIVE
-version: 0.3.1
+version: 0.3.2
 updated: 2026-08-13
 read_when: PLANNING_EXECUTION_HANDOFF_OR_MEMORY_UPDATE
 ---
@@ -32,8 +32,6 @@ RETRIEVE
 
 ### FRAME
 
-Produire :
-
 ```yaml
 objective:
 success_criteria:
@@ -46,31 +44,11 @@ risk_tier:
 
 ### DECOMPOSE
 
-Créer des unités :
-
-- indépendantes;
-- réversibles;
-- testables;
-- attribuables;
-- assez petites pour une revue fraîche;
-- liées à des interfaces explicites.
+Créer des unités indépendantes, réversibles, testables, attribuables et liées à des interfaces explicites.
 
 ### PLAN
 
-Pour chaque unité :
-
-- base exacte;
-- fichiers autorisés;
-- interfaces;
-- dépendances;
-- test RED;
-- résultat GREEN;
-- preuve;
-- rollback;
-- budget;
-- politique;
-- reviewers;
-- conditions d’arrêt.
+Pour chaque unité : base exacte, chemins, interfaces, dépendances, test RED, résultat GREEN, preuve, rollback, budget, politique, reviewers et conditions d’arrêt.
 
 ### EXECUTE
 
@@ -78,36 +56,16 @@ Pour chaque unité :
 - utiliser des outils typés;
 - journaliser les effets;
 - respecter strictement la portée;
-- préférer un petit changement à une réécriture;
+- préférer un petit changement;
 - ne jamais modifier le canon pour contourner un blocage.
 
 ### ADVERSARIAL_VERIFY
 
-Chercher activement :
-
-- contre-exemples;
-- test trop faible;
-- mutation survivante;
-- régression;
-- hardcoding;
-- modification de l’oracle;
-- état résiduel;
-- violation d’autorité;
-- dépendance non déclarée;
-- preuve circulaire;
-- résultat non rejouable.
+Chercher activement : contre-exemples, test trop faible, mutation survivante, régression, hardcoding, modification de l’oracle, état résiduel, violation d’autorité, dépendance non déclarée, preuve circulaire et résultat non rejouable.
 
 ### DECIDE
 
-États permis :
-
-- `PROVEN`;
-- `PARTIALLY_VERIFIED`;
-- `BLOCKED_WITH_EVIDENCE`;
-- `RESEARCH_MODE`;
-- `TASK_INVALID`;
-- `REFUTED`;
-- `SUPERSEDED`.
+États permis : `PROVEN`, `PARTIALLY_VERIFIED`, `BLOCKED_WITH_EVIDENCE`, `RESEARCH_MODE`, `TASK_INVALID`, `REFUTED`, `SUPERSEDED`.
 
 L’implémenteur ne produit jamais seul `PROVEN`.
 
@@ -125,7 +83,7 @@ Décide de l’intention, des valeurs, du budget, du risque irréversible et de 
 
 - maintient le `WORKING_SET`;
 - mène la recherche;
-- produit le canon, les ADR, les risques, les spécifications et les plans;
+- produit canon, ADR, risques, spécifications et plans;
 - résout les choix techniques réversibles par recherche et expérience;
 - prépare les paquets d’exécution;
 - synthétise les preuves;
@@ -133,7 +91,7 @@ Décide de l’intention, des valeurs, du budget, du risque irréversible et de 
 
 ### Agent planificateur auxiliaire
 
-Peut proposer une décomposition, mais ne remplace pas l’autorité de ChatGPT et du canon. Sa sortie est `QUARANTINED` jusqu’à revue.
+Peut proposer une décomposition, mais sa sortie reste `QUARANTINED` jusqu’à revue.
 
 ### Agent d’exécution
 
@@ -144,27 +102,17 @@ Peut proposer une décomposition, mais ne remplace pas l’autorité de ChatGPT 
 - ne change pas la portée;
 - ne choisit pas son propre verdict final.
 
-### Vérificateur de conformité
+### Vérificateurs
 
-Compare le résultat au contrat, au canon et aux interfaces.
+- conformité : contrat, canon, portée et interfaces;
+- technique : comportement, tests, performance, qualité et sécurité;
+- preuve : provenance, commandes, hashes, replay et circularité.
 
-### Vérificateur technique
-
-Cherche bugs, régressions, dette, problèmes de test, performance et sécurité.
-
-### Vérificateur de preuve
-
-Vérifie provenance, commandes, hashes, replay et absence de circularité.
-
-### Propriétaire de décision
-
-Intervient uniquement lorsque le choix touche une valeur, un risque irréversible ou une ambiguïté produit non résoluble efficacement par expérience.
+Le reviewer reçoit d’abord l’intention, le diff, les tests et les preuves, pas le récit persuasif de l’implémenteur.
 
 ## 3. Plan maître et packetisation
 
-Un plan maître décrit la décomposition et les interfaces. Il n’est pas directement exécutable.
-
-Un paquet d’exécution est généré juste avant la tâche depuis l’état frais du dépôt :
+Un plan maître fixe décomposition, dépendances et gates. Il n’est pas directement exécutable.
 
 ```yaml
 packet_schema: GS-EXEC-PACKET-001
@@ -196,18 +144,16 @@ termination_conditions:
 
 Invariants :
 
-1. `base_commit` est obligatoire.
-2. Les chemins autorisés et interdits sont exhaustifs.
-3. Le test RED échoue pour la raison attendue.
-4. Les commandes et résultats attendus sont exacts.
-5. Les secrets restent hors contexte.
-6. L’Evidence Bundle est hors du commit qu’il vérifie.
-7. La tâche suivante n’est pas packetisée avant le verdict frais lorsque son interface dépend de la précédente.
-8. Aucun fournisseur d’agent n’est imposé dans le plan maître.
+1. `base_commit` obligatoire.
+2. Chemins autorisés/interdits exhaustifs.
+3. Test RED observé pour la bonne raison.
+4. Commandes et résultats exacts.
+5. Secrets hors contexte.
+6. Evidence Bundle hors du commit qu’il vérifie.
+7. Tâche dépendante packetisée seulement après verdict frais.
+8. Aucun fournisseur imposé dans le plan maître.
 
 ## 4. Cycle test-first
-
-Pour tout comportement futur :
 
 ```text
 RED
@@ -218,19 +164,9 @@ RED
 → vérification post-commit
 ```
 
-Un test qui passe immédiatement ne démontre pas le nouveau comportement. Un bug corrigé sans test de reproduction reste non prouvé.
-
-Exceptions possibles seulement pour :
-
-- exploration jetable explicitement détruite;
-- artefact purement généré;
-- configuration sans comportement.
-
-Toute exception est inscrite dans le paquet.
+Un bug corrigé sans test de reproduction reste non prouvé. Une exploration jetable doit être détruite avant l’implémentation qualifiée.
 
 ## 5. Evidence Bundle
-
-Structure logique :
 
 ```text
 task.json
@@ -247,120 +183,84 @@ reviews/
 terminal-result.json
 ```
 
-Règles :
+Les logs bruts sont immuables, les secrets redacted, le commit exact lié et le verdict recalculable lorsque les artefacts suffisent.
 
-- les logs bruts sont immuables;
-- les sorties sensibles sont redacted avant partage;
-- le bundle lie le commit exact;
-- le replay ne rappelle pas le modèle lorsque le verdict peut être recalculé;
-- le verdict final cite les obligations fermées et ouvertes;
-- un artefact manquant produit `BLOCKED_WITH_EVIDENCE`.
-
-## 6. Revue indépendante
-
-Séquence par défaut :
-
-1. conformité à la spécification;
-2. qualité code/tests;
-3. sécurité et autorité selon le risque;
-4. intégrité de preuve.
-
-Les reviewers :
-
-- sont en lecture seule lorsqu’ils évaluent;
-- reçoivent d’abord l’intention, le diff, les tests et les preuves;
-- n’acceptent pas automatiquement la justification de l’implémenteur;
-- peuvent classer la tâche `TASK_INVALID`.
-
-## 7. Règles Phase 00
+## 6. Règles Phase 00
 
 1. Publier d’abord le corpus canonique et le plan executor-neutral.
 2. Aucun protocole fournisseur n’est canonique.
-3. Aucun code produit n’est créé pendant le bootstrap documentaire.
+3. Aucun code produit pendant le bootstrap documentaire.
 4. La Foundry possède son IR; les harness externes sont des adaptateurs.
 5. Chaque tâche native active possède QA indépendante et contrôles négatifs.
 6. Sécurité, autorité, intégrité, portée et nettoyage sont non compensables.
-7. Les modèles, harness, contextes, mémoires, outils et budgets sont enregistrés séparément.
-8. Les préprints restent expérimentaux jusqu’à reproduction.
+7. Modèles, harness, contextes, mémoires, outils et budgets sont enregistrés séparément.
+8. Préprints expérimentaux jusqu’à reproduction.
 9. Une tâche défectueuse est `TASK_INVALID`.
 10. Un document cohérent reste `PARTIALLY_VERIFIED` sans preuve runtime.
-11. Les 32 tâches Seed Suite ne sont pas créées avant la validation de leurs schémas et du protocole d’oracle.
-12. Aucun adaptateur n’est qualifié avant le vertical slice natif validate→run→verdict→replay.
+11. Les 32 tâches Seed Suite attendent schémas et protocole d’oracle.
+12. Aucun adaptateur qualifié avant le vertical slice natif.
+13. Neon, Temporal, SonarQube, Fallow et AMD restent différés tant qu’un besoin mesuré ne les rend pas pertinents.
 
-## 8. Dépôt et publication
+## 7. Dépôt, transport et publication
 
-État actuel : le dépôt cible contient un README de staging HermesClaw et une branche séparée. Ne rien supprimer automatiquement.
-
-Protocole de bootstrap proposé :
-
-```text
-base main = f69b22d...
-→ branche bootstrap/canonical-corpus-v0.3
-→ commit A : canon complet
-→ génération RAGLite depuis A
-→ commit B : projection et manifeste(source_commit=A)
-→ revue
-→ pull request
-```
-
-L’auto-référence `manifest.source_commit = SHA_du_commit_qui_contient_le_manifest` est impossible. Elle est interdite.
-
-### Gate de transport
-
-Aucune publication canonique n’est autorisée sans un canal qui lit directement les octets des fichiers locaux et les remet à Git sans transcription par le modèle. Les conditions minimales sont :
+Bootstrap exécuté sur une branche dédiée :
 
 ```text
-checkout local authentifié
-+ HEAD égal au SHA attendu
-+ arbre propre
-+ copie depuis le filesystem
-+ commit A réel
-+ génération de B depuis le SHA A réel
-+ comparaison git hash-object / tree distant
-+ push non forcé
-+ PR brouillon
+main@f69b22d...
+→ A 488fd399... : canon initial
+→ B 08a38c43... : RAGLite(source_commit=A)
+→ clôture d’état canonique
+→ projection de clôture
+→ PR #1 brouillon
 ```
 
-Interdictions :
+### Transport qualifié
 
-- payload base64 recopié manuellement dans un appel d’outil;
-- patch B de replay synthétique utilisé comme publication;
-- branche créée avant vérification de l’intégrité de transport;
+Méthodes acceptées pour ce bootstrap :
+
+- contenu UTF-8 direct via API GitHub avec hash vérifié;
+- construction de trees à partir de blobs identifiés;
+- réutilisation du blob source pour la projection byte-identical;
+- parent et diff vérifiés après commit.
+
+Méthodes interdites :
+
+- payload base64 recopié manuellement;
+- gros contenu recomposé par un modèle;
+- patch synthétique lié au mauvais parent;
 - push direct sur `main`;
-- poursuite après différence d’un seul blob.
+- poursuite après divergence d’un blob;
+- suppression implicite de `hermesclaw-ci`.
 
-En absence de ce canal, le verdict est `BLOCKED_WITH_EVIDENCE`. Les blobs non référencés créés lors d’un probe ne sont ni un commit ni une preuve de publication et ne doivent pas être réutilisés.
+Les blobs orphelins de probe restent une mémoire négative non référencée.
 
-## 9. Politique dépôt ↔ RAGLite
+## 8. Politique dépôt ↔ RAGLite
 
-Le dépôt complet est éditable et autoritaire. Le RAGLite est une projection de lecture.
+Le dépôt fusionné est éditable et autoritaire. Le RAGLite est une projection de lecture.
 
 Pour chaque génération :
 
-- checkout propre du commit source;
-- génération déterministe;
-- normalisation UTF-8/LF;
-- hashes SHA-256;
-- manifeste;
-- comparaison avec la projection précédente;
-- remplacement atomique des cinq sources du Projet ChatGPT.
+- prendre un commit canonique X;
+- réutiliser ou copier exactement les cinq blobs routés;
+- écrire un manifeste `source_commit = X`;
+- créer un commit projection Y parent de X;
+- comparer les blobs source/projection;
+- remplacer atomiquement les cinq sources du Projet ChatGPT seulement après acceptation.
 
-Une projection périmée devient `STALE`; elle ne concurrence jamais le dépôt.
+Aucune synthèse LLM n’est autorisée dans la génération.
 
-## 10. Politique de questions
+## 9. Politique de questions
 
 Ne demander au propriétaire que :
 
-- les choix de valeur;
-- les risques irréversibles;
-- les contraintes externes inconnues;
-- les ambiguïtés qui changent réellement le produit et ne peuvent pas être résolues efficacement par expérience.
+- choix de valeur;
+- risque irréversible;
+- contrainte externe inconnue;
+- ambiguïté produit non résoluble efficacement par expérience.
 
-Une seule question à la fois lorsqu’elle est indispensable. Sinon avancer avec une hypothèse explicite, réversible et testable.
+Sinon avancer avec une hypothèse explicite, réversible et testable.
 
-## 11. MEMORY_PATCH
-
-Format :
+## 10. MEMORY_PATCH
 
 ```yaml
 MEMORY_PATCH:
@@ -378,49 +278,48 @@ MEMORY_PATCH:
   NO_CHANGE: false
 ```
 
-Règles :
+Une seule version active. Une sortie d’outil ne devient jamais directement canonique.
 
-- contenu complet pour tout fichier remplacé;
-- identifiants stables;
-- une seule version active;
-- cause d’invalidation explicite;
-- ne jamais promouvoir une sortie d’outil directement vers le canon.
-
-## 12. Sessions confirmées
+## 11. Sessions confirmées
 
 - `GS-SESSION-20260811-01` : architecture Forgejo + noyau de preuve; superseded.
 - `GS-SESSION-20260811-02` : conception du Native World Engine.
 - `GS-SESSION-20260812-01` : Architecture C approuvée; RAGLite demandé.
-- `GS-SESSION-20260812-02` : C0 approuvée; spécification et plan Phase 00 produits.
-- `GS-SESSION-20260812-03` : prototype Claude Code produit; aucun code produit exécuté.
-- `GS-SESSION-20260812-04` : contrôles statiques du prototype; aucun code produit.
-- `GS-SESSION-20260812-05` : correction des rôles; ChatGPT planifie, exécuteurs en aval.
-- `GS-SESSION-20260813-01` : dépôt réinspecté; conflit HermesClaw découvert; corpus canonique v0.3.0 et plan executor-neutral consolidés localement.
-- `GS-SESSION-20260813-02` : probe de transport; huit blobs non référencés, deux divergences d’octets, aucune branche/commit/PR; corpus v0.3.1 et gate byte-preserving produits.
+- `GS-SESSION-20260812-02` : C0 approuvée; première spécification/plan Phase 00.
+- `GS-SESSION-20260812-03` : prototype Claude Code; aucun code produit.
+- `GS-SESSION-20260812-04` : contrôles statiques du prototype.
+- `GS-SESSION-20260812-05` : correction des rôles; ChatGPT planifie.
+- `GS-SESSION-20260813-01` : conflit HermesClaw découvert; corpus consolidé.
+- `GS-SESSION-20260813-02` : probe de transport; divergences base64 et gate byte-preserving.
+- `GS-SESSION-20260813-03` : transport UTF-8/tree qualifié; commits A/B créés; PR #1 brouillon ouverte et mergeable; aucun code produit.
 
-## 13. Handoff courant
+## 12. Handoff courant
 
 ```yaml
-session_id: GS-SESSION-20260813-02
+session_id: GS-SESSION-20260813-03
 objective: >-
-  Qualify a byte-preserving authenticated Git transport, prepare
-  the two real commits locally, then publish a draft bootstrap PR
-  without altering the active HermesClaw branch.
+  Independently review draft PR #1, correct material findings,
+  then obtain the owner's merge decision and synchronize the
+  ChatGPT project sources only after an accepted merge.
 completed:
   - architecture C accepted
   - C0 accepted
-  - canonical corpus v0.3.1 produced locally
-  - Phase-00 spec refreshed
-  - Phase-00 plan v0.3.0 made executor-neutral
-  - repository conflict recorded
-  - two-commit RAGLite protocol defined
-  - manual transport counterexample captured
-  - reachable remote changes kept at zero
+  - canonical commit A created
+  - RAGLite projection commit B created from A
+  - branch isolated from main and hermesclaw-ci
+  - draft PR #1 opened and mergeable
+  - 22-unit master plan published
+  - 32-task Seed Suite specification published
+  - base64 transport rejected with negative evidence
 phase_status: PARTIALLY_VERIFIED
-transport_status: BLOCKED_WITH_EVIDENCE
+transport_status: QUALIFIED_FOR_BOOTSTRAP_WITH_EVIDENCE
 product_code_started: false
-repository_state: NONEMPTY_UNRELATED_STAGING_PLACEHOLDER
-unreferenced_blobs_created: 8
-reachable_repository_changes: 0
-next_exact_action: P00-BOOTSTRAP-TRANSPORT-001
+repository_state: DRAFT_PR_OPEN
+pull_request: 1
+canonical_commit_a: 488fd399314ad834881c7c59d78915ed236c9239
+projection_commit_b: 08a38c4360a8e5e83332aa5f8f39917576c20030
+next_exact_action: >-
+  Complete three independent reviews of PR #1 and obtain the
+  owner's explicit merge or reject decision. Do not execute
+  Phase-00 Task 1 before the canonical merge and RAGLite sync.
 ```
