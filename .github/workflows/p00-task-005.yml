@@ -25,3 +25,11 @@ jobs:
         run: rustup override set 1.97.1
       - name: Verify Task 5
         run: bash crates/gs-cas/ci.sh
+      - name: Upload generated lockfile
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: p00-task-005-cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
+          retention-days: 1
