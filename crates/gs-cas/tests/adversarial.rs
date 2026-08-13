@@ -49,12 +49,13 @@ impl Drop for TestRoot {
 
 fn make_writable(path: &Path) {
     let mut permissions = fs::metadata(path).expect("object metadata").permissions();
-    permissions.set_readonly(false);
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         permissions.set_mode(0o600);
     }
+    #[cfg(not(unix))]
+    permissions.set_readonly(false);
     fs::set_permissions(path, permissions).expect("make object writable for corruption injection");
 }
 
