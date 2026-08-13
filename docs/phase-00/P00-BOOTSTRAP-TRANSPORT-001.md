@@ -1,8 +1,8 @@
 ---
 doc_id: GS-P00-BOOTSTRAP-TRANSPORT-001
 title: GitSpace — Bootstrap Transport Qualification and Publication Plan
-status: BLOCKED_WITH_EVIDENCE
-version: 0.1.0
+status: PARTIALLY_VERIFIED
+version: 0.2.0
 updated: 2026-08-13
 planner: CHATGPT_PROJECT_GITSPACE
 target_repository: leon36000/GitSpace
@@ -14,172 +14,76 @@ product_code_allowed: false
 
 ## Goal
 
-Qualifier un transport Git authentifié et byte-preserving, préparer les deux commits réels, vérifier leur intégrité, pousser une branche dédiée et ouvrir une pull request brouillon.
+Qualifier un transport Git byte-preserving, produire les commits réels du bootstrap, vérifier leur intégrité, ouvrir une PR brouillon et préserver toutes les branches non ciblées.
 
-## Non-scope
-
-- aucune modification de `main` directe;
-- aucune suppression ou modification de `hermesclaw-ci`;
-- aucun code produit;
-- aucune licence;
-- aucun force push;
-- aucun blob construit par transcription manuelle;
-- aucun merge.
-
-## Préconditions
+## Résultat exécuté
 
 ```yaml
-repository: leon36000/GitSpace
-expected_main: f69b22d2bd09aa5eae96693acf501b2464c3be25
+base_verified: f69b22d2bd09aa5eae96693acf501b2464c3be25
 branch: bootstrap/canonical-corpus-v0.3
-working_tree: clean
-authenticated_transport: required
-byte_preserving_filesystem_access: required
-candidate_validator: PASS
+canonical_commit_a: 488fd399314ad834881c7c59d78915ed236c9239
+canonical_tree_a: da903750e480beb2806882e0603ab3822dae00bb
+projection_commit_b: 08a38c4360a8e5e83332aa5f8f39917576c20030
+projection_tree_b: 7b6bb98c414cfbd8e81f5c820c75deb3ed9e2879
+pull_request: 1
+pull_request_state: DRAFT_OPEN_MERGEABLE
+main_modified: false
+hermesclaw_ci_modified: false
+product_code_added: false
 ```
 
-Si une précondition échoue : `BLOCKED_WITH_EVIDENCE`, zéro écriture additionnelle.
+## Non-scope respecté
 
-## Paquet source
+- aucun push direct sur `main`;
+- aucune suppression/modification de `hermesclaw-ci`;
+- aucun code produit;
+- aucune licence;
+- aucune CI produit;
+- aucun merge;
+- aucun blob divergent référencé.
 
-Utiliser le snapshot `repository/` du pack v0.3.1. Les patches sous `patches/` prouvent le replay local :
+## Méthode qualifiée
 
-- patch 1 : diff canonique réutilisable sous réserve de base exacte;
-- patch 2 : `PROOF_ONLY`, non publiable tel quel.
+1. Branche créée depuis le SHA exact de `main`.
+2. Contenus textuels envoyés en UTF-8 direct.
+3. Inventaire du tree distant.
+4. Commit A créé avec parent et tree explicites.
+5. Cinq projections créées par réutilisation des blobs sources.
+6. Manifeste créé avec `source_commit=A`.
+7. Commit B créé comme unique descendant de A.
+8. Diff A→B vérifié : exactement six fichiers.
+9. PR #1 ouverte en brouillon.
+10. `main` et `hermesclaw-ci` revérifiées.
 
-La méthode préférée est la copie directe depuis `repository/`, suivie de commits locaux, afin de préserver les octets.
+## Contre-exemple et méthode rejetée
 
-## Étapes exactes
+La transcription manuelle d’un payload base64 a produit des blobs divergents. Ces objets sont orphelins et non référencés. La méthode est définitivement rejetée pour les publications canoniques.
 
-### T0 — Qualifier l’environnement
+## Evidence disponible
 
-- vérifier `git --version`;
-- vérifier l’identité Git;
-- vérifier l’authentification au dépôt privé;
-- vérifier la capacité de fetch et push sur une branche non protégée;
-- ne créer aucune branche si la lecture distante échoue.
+- parents et trees A/B;
+- inventaire des blobs;
+- comparaison A→B;
+- identité des cinq couples source/projection;
+- métadonnées de PR;
+- registres de provenance, risques et conflits;
+- rapport `GS-BOOTSTRAP-VERIFICATION-001`.
 
-### T1 — Vérifier la base
+## Étape de clôture
 
-```bash
-git fetch --prune origin
-test "$(git rev-parse origin/main)" = "f69b22d2bd09aa5eae96693acf501b2464c3be25"
-git status --porcelain=v1
-```
+Le commit C met à jour l’état courant après ouverture de la PR. Le commit D projette `00/02/04` depuis C et enregistre `source_commit=C`.
 
-Résultat attendu : SHA exact et sortie status vide.
+## Critères restants
 
-### T2 — Préparer la branche locale
+- trois revues indépendantes;
+- correction de toute finding matérielle;
+- décision propriétaire de merge;
+- merge sans effet sur `hermesclaw-ci`;
+- remplacement atomique des cinq sources du Projet ChatGPT;
+- packetisation de Task 1 depuis le SHA canonique fusionné.
 
-Utiliser le helper du pack :
+## Verdict
 
-```bash
-python3 prepare_bootstrap_branch.py \
-  --checkout /chemin/vers/GitSpace \
-  --candidate-repo /chemin/vers/pack/repository \
-  --expected-base f69b22d2bd09aa5eae96693acf501b2464c3be25 \
-  --branch bootstrap/canonical-corpus-v0.3 \
-  --result /chemin/vers/bootstrap-result.json
-```
+`PARTIALLY_VERIFIED`.
 
-Le helper ne pousse rien. Il doit produire :
-
-```text
-commit A : canon complet
-commit B : RAGLite + manifeste(source_commit=A)
-```
-
-### T3 — Vérifier localement
-
-- validator du corpus candidat `PASS`;
-- commit B touche exactement six fichiers;
-- `manifest.source_commit = A`;
-- les cinq projections égalent byte-for-byte les sources de A;
-- tous les `git hash-object` sont enregistrés;
-- aucun fichier produit;
-- `git diff origin/main..HEAD` ne contient aucune suppression non prévue hors remplacement de `README.md`.
-
-### T4 — Revue pré-push
-
-Un reviewer en lecture seule inspecte :
-
-- parent de A;
-- portée de A;
-- portée de B;
-- hashes;
-- absence de référence aux blobs orphelins;
-- absence d’effet sur `hermesclaw-ci`.
-
-### T5 — Push non forcé
-
-```bash
-git push --set-upstream origin bootstrap/canonical-corpus-v0.3
-```
-
-Aucun `--force`.
-
-### T6 — Vérification distante
-
-- fetch de la branche poussée;
-- comparaison SHA A/B attendus;
-- comparaison `git ls-tree -r` et blobs;
-- vérification que `main` et `hermesclaw-ci` sont inchangés;
-- fermeture immédiate en cas de divergence.
-
-### T7 — Pull request brouillon
-
-Titre :
-
-```text
-docs: bootstrap the canonical GitSpace corpus
-```
-
-Le corps décrit :
-
-- le remplacement du README de staging uniquement sur la branche proposée;
-- la préservation de l’historique;
-- l’absence de code produit;
-- l’absence d’effet sur `hermesclaw-ci`;
-- le protocole deux commits;
-- le statut `PARTIALLY_VERIFIED`;
-- les reviewers requis.
-
-## Evidence Bundle attendu
-
-```text
-transport-environment.json
-remote-before.json
-candidate-validation.json
-commit-a.json
-commit-b.json
-local-blobs.sha256
-remote-after.json
-remote-blob-comparison.json
-branch-diff.txt
-pr.json
-reviews/
-terminal-result.json
-```
-
-## Rollback
-
-Avant push : supprimer uniquement la branche locale.
-
-Après push avant merge : fermer la PR et supprimer uniquement `bootstrap/canonical-corpus-v0.3`.
-
-Ne jamais supprimer `hermesclaw-ci` et ne jamais réécrire `main`.
-
-## Critères de terminaison
-
-`PARTIALLY_VERIFIED` si la branche et la PR existent mais les revues ne sont pas fermées.
-
-`PROVEN` pour le bootstrap seulement si :
-
-- tous les blobs distants égalent les fichiers locaux;
-- A et B respectent leur portée;
-- le manifeste référence le vrai A;
-- les trois revues indépendantes passent;
-- le propriétaire accepte le merge;
-- le RAGLite du Projet ChatGPT est remplacé atomiquement depuis le commit accepté.
-
-Sinon : `BLOCKED_WITH_EVIDENCE`.
+Le transport et la publication de branche sont prouvés pour ce bootstrap. Le changement d’autorité de `main` n’est pas prouvé tant que le propriétaire n’a pas accepté et fusionné la PR.

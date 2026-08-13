@@ -2,8 +2,8 @@
 doc_id: GS-TRANSPORT-STATE-001
 title: GitSpace — Canonical Transport State
 authority: TRANSPORT_EVIDENCE
-status: BLOCKED_WITH_EVIDENCE
-version: 0.1.0
+status: QUALIFIED_WITH_EVIDENCE
+version: 0.2.0
 updated: 2026-08-13
 ---
 
@@ -11,73 +11,82 @@ updated: 2026-08-13
 
 ## Verdict
 
-`BLOCKED_WITH_EVIDENCE`
+`QUALIFIED_FOR_BOOTSTRAP_WITH_EVIDENCE`
 
-Le corpus local est prêt, mais l’environnement de planification ne possède pas de canal sûr pour pousser les fichiers du filesystem vers le dépôt privé.
+Le transport utilisé pour la PR #1 a préservé les octets et l’identité des blobs pour le corpus canonique et sa projection. Cette qualification ne rend pas toute méthode de transport sûre : elle qualifie précisément le chemin UTF-8 direct + Git object tree + vérification distante.
 
-## Evidence
+## Evidence positive
 
 ```yaml
-local_gh_cli: NOT_INSTALLED
-local_git_network: UNAVAILABLE
-connector_local_file_upload_for_git_objects: NOT_AVAILABLE
-manual_blob_probe:
-  unreferenced_blobs_created: 8
-  attempts: 8
-  exact: 6
-  mismatched: 2
-remote_reachable_effects:
-  trees: 0
-  commits: 0
-  refs: 0
-  branches: 0
-  pull_requests: 0
+base_main: f69b22d2bd09aa5eae96693acf501b2464c3be25
+bootstrap_branch: bootstrap/canonical-corpus-v0.3
+pull_request: 1
+canonical_commit_a:
+  sha: 488fd399314ad834881c7c59d78915ed236c9239
+  parent: f69b22d2bd09aa5eae96693acf501b2464c3be25
+  tree: da903750e480beb2806882e0603ab3822dae00bb
+  blobs: 19
+projection_commit_b:
+  sha: 08a38c4360a8e5e83332aa5f8f39917576c20030
+  parent: 488fd399314ad834881c7c59d78915ed236c9239
+  tree: 7b6bb98c414cfbd8e81f5c820c75deb3ed9e2879
+  changed_files: 6
+projection_blob_identity:
+  pairs_checked: 5
+  pairs_equal: 5
+main_writes: 0
+hermesclaw_writes: 0
 ```
 
-Le probe a démontré qu’une transcription manuelle peut produire un blob valide au sens Git mais incorrect au sens du fichier attendu. L’existence d’un SHA ne suffit donc pas à établir l’intégrité.
+Les cinq projections sont les mêmes objets Git que les sources. Cette propriété est plus forte qu’une comparaison textuelle après transfert.
 
-## Propriété requise
+## Evidence négative conservée
+
+```yaml
+manual_encoding_route:
+  status: REJECTED
+  orphan_blobs_created_across_probes: 9
+  known_mismatches: 3
+  reachable_trees: 0
+  reachable_commits: 0
+  reachable_refs: 0
+```
+
+La dernière divergence observée concernait une tentative `AGENTS.md` dont le blob créé ne correspondait pas au hash attendu. Aucun de ces objets n’est référencé.
+
+## Méthode canonique qualifiée
 
 ```text
-BYTE_PRESERVING_TRANSPORT ⇔
-  local filesystem bytes are read directly
-  ∧ authenticated Git creates the commit
-  ∧ local blob hashes are recorded
-  ∧ the remote tree is fetched after push
-  ∧ every remote blob equals its local counterpart
+1. créer ou vérifier la branche dédiée;
+2. envoyer le contenu UTF-8 direct ou lire les octets du filesystem;
+3. vérifier le blob SHA retourné lorsque le contenu est nouveau;
+4. construire le tree depuis des blobs identifiés;
+5. créer un commit avec parent explicite;
+6. relire le commit et le tree;
+7. réutiliser le blob source pour toute projection byte-identical;
+8. comparer le diff attendu;
+9. vérifier les branches non ciblées;
+10. ouvrir une PR brouillon.
 ```
 
-## Canaux acceptables
+## Interdictions permanentes
 
-- checkout local authentifié avec `git push`;
-- agent d’exécution possédant un filesystem et des credentials Git limités à la branche;
-- connecteur futur acceptant un chemin de fichier local comme argument natif et retournant l’arbre créé;
-- archive signée transférée par un mécanisme binaire puis appliquée localement.
-
-## Canaux rejetés
-
-- base64 recopié manuellement dans un appel d’outil;
-- contenu Markdown volumineux recomposé par un modèle;
-- création fichier par fichier sans comparaison des blobs;
+- base64 recopié manuellement par un modèle;
+- gros document recomposé depuis un résumé;
+- création fichier par fichier sans inventaire final du tree;
+- réutilisation d’un blob orphelin non comparé;
+- patch projection généré depuis un parent synthétique;
 - push direct sur `main`;
-- réutilisation des huit blobs orphelins;
-- application du patch B synthétique sans régénération.
+- poursuite après divergence.
 
-## Gate de qualification
+## Limites de la qualification
 
-1. `main` est toujours `f69b22d2bd09aa5eae96693acf501b2464c3be25`.
-2. Le checkout est propre et authentifié.
-3. La branche n’existe pas encore ou son SHA attendu est vérifié.
-4. Le corpus local passe le validator.
-5. Le commit A est créé localement.
-6. Son SHA réel est capturé.
-7. Le commit B est généré depuis A.
-8. Le commit B touche exactement six fichiers.
-9. Les hashes locaux sont comparés avant push.
-10. Après push, les arbres et blobs distants sont relus.
-11. Toute divergence produit un arrêt et une branche rejetée.
-12. La PR reste brouillon jusqu’à revue indépendante.
+- les commits sont non signés au sens GitHub;
+- la PR n’est pas fusionnée;
+- aucune revue GitHub indépendante distincte n’est encore soumise;
+- la qualification porte sur des documents UTF-8, pas sur des artefacts binaires;
+- toute future méthode ou autre dépôt doit être requalifié.
 
 ## Prochaine action
 
-`P00-BOOTSTRAP-TRANSPORT-001`.
+Revue indépendante de la PR #1, puis décision propriétaire de merge. Le transport n’est plus le blocage courant.

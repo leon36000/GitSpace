@@ -2,9 +2,9 @@
 
 RAGLite est la projection cinq fichiers du canon GitSpace destinée au Projet ChatGPT mobile. Il ne constitue jamais un second canon.
 
-## Principe v0.3
+## Principe
 
-La projection n’est plus un résumé réécrit par un modèle. Elle est une **copie byte-for-byte** des cinq documents routés du dépôt :
+La projection est une **copie byte-for-byte** des cinq documents routés :
 
 ```text
 00_GITSPACE_START_HERE.md
@@ -14,39 +14,47 @@ La projection n’est plus un résumé réécrit par un modèle. Elle est une **
 04_GITSPACE_AGENT_PROTOCOL.md
 ```
 
-Le nombre de fichiers reste faible, tandis que le contenu autoritaire reste identique. Cette règle supprime une classe entière de dérive entre résumé mobile et canon.
+La génération préfère la réutilisation directe du blob Git source. Elle ne résume, ne reformule et ne corrige aucun contenu.
 
-## Publication sans auto-référence
-
-Un commit ne peut pas contenir son propre SHA stable. La publication utilise :
+## Paire canon/projection
 
 ```text
-commit A : documents canoniques complets
-commit B : copies RAGLite + manifeste
-manifest.source_commit = A
+commit canonique X
+→ commit projection Y
+manifest.source_commit = X
 ```
 
-## Génération déterministe
+Le bootstrap initial utilise :
+
+- A : corpus initial;
+- B : projection de A;
+- C : clôture d’état après ouverture de la PR;
+- D : projection finale de C.
+
+Cette deuxième paire évite que le RAGLite final conserve l’ancien état « transport bloqué » après une publication réussie.
+
+## Vérification déterministe
 
 Pour chaque entrée de `projection_map` :
 
-1. checkout propre de `source_commit`;
-2. copier les octets du fichier source vers `raglite/mobile/<même_nom>`;
-3. vérifier que les SHA-256 source et projection sont identiques;
-4. écrire le manifeste;
-5. répéter dans un second répertoire;
-6. comparer bit-à-bit.
+1. lire le blob source dans `source_commit`;
+2. vérifier le SHA Git annoncé;
+3. placer le même blob sous `raglite/mobile/`;
+4. vérifier la taille et le SHA-256;
+5. comparer le tree distant;
+6. confirmer que le commit projection a `source_commit` pour parent.
 
-Aucune synthèse LLM n’est utilisée dans cette étape.
+Aucune synthèse LLM n’est utilisée.
 
 ## Remplacement dans le Projet ChatGPT
+
+Après merge accepté seulement :
 
 - supprimer les cinq anciennes sources;
 - importer les cinq fichiers de `raglite/mobile/`;
 - ne conserver qu’une version active;
 - vérifier `source_commit` et les digests;
-- lancer l’examen mémoire rapide.
+- lancer l’examen mémoire rapide;
+- confirmer architecture C, Phase 00 et prochaine action.
 
-## Statut du pack local
-
-Le manifeste local est `PRECOMMIT_PREVIEW`. Après création du commit A réel, les copies et le manifeste doivent être régénérés avant le commit B.
+Une PR ouverte ou un commit de branche ne suffit pas à promouvoir la projection vers le Projet ChatGPT.

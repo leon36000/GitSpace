@@ -3,53 +3,55 @@ doc_id: GS-02
 title: GitSpace — Maintenant, décisions et roadmap
 authority: CURRENT_STATE_AND_DECISIONS
 status: ACTIVE
-version: 0.3.2
+version: 0.3.3
 updated: 2026-08-13
 read_when: EVERY_NEW_CHAT_OR_MAJOR_RESUME
 ---
 
 # GitSpace — Maintenant, décisions et roadmap
 
-## État actif [GS-NOW-005]
+## État actif [GS-NOW-006]
 
 - Architecture C — Native Software World Engine : **APPROUVÉE**.
 - C0 — Native Evaluation Foundry hybride : **APPROUVÉE**.
-- Nom : GitSpace.
 - Propriétaire souverain : humain.
 - Architecte-chercheur et auteur des plans : ChatGPT dans le Projet GitSpace.
-- Exécuteurs techniques : agents remplaçables, choisis au moment du handoff.
-- Dépôt cible : `leon36000/GitSpace`, public, branche par défaut `main`.
-- État observé le 2026-08-13 :
-  - `main` pointe vers `f69b22d2bd09aa5eae96693acf501b2464c3be25`;
-  - le seul fichier observé sur `main` est un README décrivant un dépôt de staging CI privé pour HermesClaw;
-  - la branche `hermesclaw-ci` pointe vers `91f55525b231116fd431430f46c87667e5c1f140` lors de la dernière vérification;
-  - son dernier commit observé est `ci: remove abandoned HermesClaw proof manifest`;
-  - cette branche a avancé plusieurs fois pendant la consolidation, confirmant qu’elle est active et mouvante;
-  - cet état contredit l’hypothèse documentaire précédente `EMPTY_NO_COMMITS`.
-- Classification du dépôt actuel : `QUARANTINED_EXTERNAL_STATE`.
-- Conflit de dépôt : `GS-CONFLICT-REPO-001`.
-- Corpus canonique commit-ready v0.3.1 : **PRODUIT LOCALEMENT, NON PUBLIÉ**.
-- Spécification Phase 00 : `GS-P00-SPEC-001` v0.2.1, executor-neutral.
-- Plan Phase 00 : `GS-P00-PLAN-001` v0.3.0, executor-neutral et non exécutable sans paquet frais.
-- Plan de bootstrap : `P00-BOOTSTRAP-PLAN-001` v0.3.0, révisé avec un gate de transport.
-- RAGLite : projection preview v0.3.1 générée byte-for-byte depuis le corpus local; le manifeste porte un digest d’arbre, pas un faux SHA de commit.
-- Transport distant : **`BLOCKED_WITH_EVIDENCE`**.
-  - `gh` n’est pas installé dans l’environnement de planification;
-  - le conteneur ne dispose pas d’un transport Git réseau utilisable;
-  - un probe du connecteur a créé huit blobs Git non référencés;
-  - six blobs correspondaient exactement aux fichiers locaux;
-  - deux blobs ont divergé, démontrant que la transcription manuelle d’un gros payload encodé n’est pas une voie sûre;
-  - aucun tree, commit, ref, branche ou pull request n’a été créé;
-  - `reachable_repository_changes: 0`.
-- Conflits actifs : `GS-CONFLICT-TRANSPORT-001` et `GS-CONFLICT-PATCH-001`.
-- Le second patch du replay local est une **preuve de reproductibilité**, pas un patch de publication : il référence le SHA synthétique de son commit A local et doit être régénéré après le vrai commit A distant.
+- Exécuteurs techniques : agents remplaçables choisis au handoff.
+- Dépôt : `leon36000/GitSpace`, public, branche par défaut `main`.
+- Base préservée : `main@f69b22d2bd09aa5eae96693acf501b2464c3be25`.
+- Branche préservée : `hermesclaw-ci@91f55525b231116fd431430f46c87667e5c1f140` lors de la dernière vérification.
+- Branche de bootstrap : `bootstrap/canonical-corpus-v0.3`.
+- Pull request : **#1**, brouillon, ouverte et mergeable.
+- Commit A — canon initial : `488fd399314ad834881c7c59d78915ed236c9239`.
+- Tree A : `da903750e480beb2806882e0603ab3822dae00bb`.
+- Commit B — projection RAGLite : `08a38c4360a8e5e83332aa5f8f39917576c20030`.
+- Tree B : `7b6bb98c414cfbd8e81f5c820c75deb3ed9e2879`.
+- A est parent direct de la base `main` observée.
+- B est l’unique descendant de A avant la clôture d’état.
+- Diff A→B : exactement six fichiers, soit le manifeste et les cinq projections.
+- Chaque projection mobile réutilise le même blob Git que sa source canonique.
+- Corpus : 19 documents canoniques + 6 fichiers de projection.
+- Plan Phase 00 : `GS-P00-PLAN-001` v0.4.0, 22 unités, executor-neutral, paquet obligatoire.
+- Spécification Phase 00 : `GS-P00-SPEC-001` v0.3.0, 12 lanes et 32 Seed Tasks.
+- Transport : **QUALIFIED_FOR_THIS_BOOTSTRAP_WITH_EVIDENCE**.
+  - contenu UTF-8 direct vérifié;
+  - tree Git construit depuis blobs identifiés;
+  - parents, trees et diff vérifiés;
+  - voie base64 manuelle rejetée après divergences;
+  - les blobs orphelins de probe ne sont référencés par aucun commit.
+- `main` et `hermesclaw-ci` n’ont pas été modifiées par la publication de branche.
 - Code produit GitSpace : **non commencé**.
-- Code de gouvernance dans le dépôt cible : **non publié**.
 - Phase active : **Phase 00 — Research Atlas + Benchmark Foundry**.
 - Statut global : `PARTIALLY_VERIFIED`.
-- Prochaine action exacte : **`P00-BOOTSTRAP-TRANSPORT-001` — provisionner un transport Git authentifié et byte-preserving depuis un checkout local, vérifier le SHA de `main`, préparer localement les commits A et B avec le vrai SHA A, comparer les blobs, puis pousser la branche et ouvrir une pull request brouillon sans modifier ni supprimer `hermesclaw-ci`.**
+- Prochaine action exacte : **effectuer les trois revues indépendantes de la PR #1, corriger toute contradiction matérielle, puis demander au propriétaire d’accepter ou refuser le merge; ne pas démarrer Task 1 avant un commit canonique fusionné.**
 
-Aucune nouvelle tentative de transfert manuel de base64 ou de contenu volumineux via un argument de modèle n’est autorisée.
+## Pourquoi le statut n’est pas PROVEN
+
+- la PR est brouillon et non fusionnée;
+- le propriétaire n’a pas encore accepté que `main` devienne le canon GitSpace;
+- aucune revue humaine ou agentique indépendante distincte n’a encore soumis son verdict GitHub;
+- aucun code produit, benchmark ou replay runtime de Foundry n’a été exécuté;
+- les sources du Projet ChatGPT ne doivent être remplacées par le RAGLite du dépôt qu’après merge accepté.
 
 ## Décisions acceptées
 
@@ -61,39 +63,38 @@ Aucune nouvelle tentative de transfert manuel de base64 ou de contenu volumineux
 - **ADR-0006** : mémoire hiérarchique, quarantinée, traçable et révoquable.
 - **ADR-0007** : transformations sémantiques avant patches textuels, direction à qualifier.
 - **ADR-0008** : RAGLite Markdown pour la mémoire du Projet ChatGPT.
-- **ADR-0009** : C0 — IR d’évaluation GitSpace souverain, adaptateurs externes remplaçables et Seed Suite initiale de 32 tâches.
-- **ADR-0010** : ChatGPT produit et maintient recherche, architecture et plans; les agents d’exécution consomment des paquets acceptés.
+- **ADR-0009** : C0 — IR d’évaluation GitSpace souverain, adaptateurs remplaçables et Seed Suite initiale de 32 tâches.
+- **ADR-0010** : ChatGPT produit et maintient recherche, architecture et plans; les agents consomment des paquets acceptés.
 
 ## Décisions techniques actives
 
-- **TDR-P00-001-AMENDED** : Rust pour les composants d’autorité et Python pour les adaptateurs; les versions exactes sont sélectionnées et verrouillées par un dossier de qualification frais.
-- **TDR-P00-002** : sécurité, autorité, intégrité, portée et nettoyage sont non compensables.
-- **TDR-P00-003** : QA indépendante obligatoire pour toute tâche native active.
-- **TDR-P00-004** : journal append-only local + CAS pour le premier vertical slice, à qualifier.
-- **TDR-P00-005-AMENDED** : aucun harness d’agent n’est canonique; Claude Code reste un exécuteur aval possible.
-- **TDR-P00-006** : `leon36000/GitSpace` est le dépôt cible du corpus complet.
-- **TDR-P00-007-AMENDED** : le RAGLite est une projection du dépôt et doit porter provenance et digests.
-- **TDR-P00-008** : publication RAGLite en deux commits pour éviter l’auto-référence du SHA.
-- **TDR-P00-009** : une tâche du plan maître n’est exécutable qu’après packetisation depuis un commit de base frais.
-- **TDR-P00-010-PROPOSED** : préserver le staging existant, publier le canon sur une branche dédiée et intégrer par pull request.
-- **TDR-P00-011** : toute publication canonique exige un transport byte-preserving avec comparaison des hashes Git source/distant; la transcription manuelle de contenu encodé est interdite.
+- **TDR-P00-001-AMENDED** : Rust pour l’autorité et Python pour les adaptateurs; versions exactes après qualification fraîche.
+- **TDR-P00-002** : sécurité, autorité, intégrité, portée et nettoyage non compensables.
+- **TDR-P00-003** : QA indépendante obligatoire.
+- **TDR-P00-004** : journal local + CAS pour M0, à qualifier.
+- **TDR-P00-005-AMENDED** : aucun harness d’agent n’est canonique.
+- **TDR-P00-006** : `leon36000/GitSpace` est le dépôt cible.
+- **TDR-P00-007-AMENDED** : le RAGLite est une projection avec provenance et digests.
+- **TDR-P00-008** : publication RAGLite par paire canon/projection.
+- **TDR-P00-009** : une tâche n’est exécutable qu’après packetisation depuis un commit frais.
+- **TDR-P00-010** : préserver le staging existant et intégrer le canon par branche + PR.
+- **TDR-P00-011** : transport canonique byte-preserving; base64 manuel interdit.
+- **TDR-P00-012** : toute mise à jour d’état canonique affectant `00/02/04` reçoit une projection RAGLite dérivée de son commit parent.
 
-Les TDR sont réversibles. Elles ne redéfinissent pas le canon produit.
+## Éléments STALE, superseded ou fermés
 
-## Éléments STALE ou superseded
-
-- `EMPTY_NO_COMMITS` comme état du dépôt.
-- `GS-CC-EXEC-001` comme contrat de planification actif.
-- `EXEC-E0` comme prochaine action.
-- `P00-TASK-001 READY_NOT_EXECUTED` comme unité immédiatement exécutable.
-- `GS-P00-PLAN-001` v0.1 et v0.2 comme plans actifs.
-- Rust `1.97.1` et Python `3.12.13` comme pins déjà acceptés.
-- tout manifeste RAGLite tentant de contenir le SHA du commit qui le contient.
-- `P00-BOOTSTRAP-PUBLISH-001` comme action directement exécutable dans l’environnement de planification actuel.
-- le second patch local comme patch publiable sans régénération.
-- la transmission manuelle de gros payloads base64 comme transport fiable.
-
-Ces éléments sont conservés dans l’historique et les registres de conflits; ils ne sont pas supprimés de la mémoire négative.
+- `EMPTY_NO_COMMITS` comme état du dépôt — `STALE`.
+- `GS-CC-EXEC-001` comme contrat de planification actif — `STALE_ARCHIVED`.
+- `EXEC-E0` comme prochaine action — `STALE`.
+- `P00-TASK-001 READY_NOT_EXECUTED` dérivé avant dépôt canonique — `INVALIDATED`.
+- plans Phase 00 v0.1/v0.2 comme plans actifs — `SUPERSEDED`.
+- Rust 1.97.1/Python 3.12.13 comme pins déjà acceptés — `STALE`, candidats seulement.
+- manifeste auto-référentiel — `REFUTED`.
+- patch B synthétique comme artefact publiable — `REFUTED`; le vrai B a été généré depuis A.
+- transcription manuelle base64 comme transport — `REFUTED`.
+- `GS-CONFLICT-TRANSPORT-001` — fermé pour le bootstrap par blobs/tree/commits vérifiés; la règle générale reste active.
+- `GS-CONFLICT-PATCH-001` — fermé par le vrai couple A/B.
+- `GS-CONFLICT-REPO-001` — ouvert jusqu’au merge ou au refus propriétaire.
 
 ## Phase 00 — lots
 
@@ -109,15 +110,14 @@ WP7 Scientific Report
 
 ## Gates immédiats
 
-1. Un transport authentifié byte-preserving est disponible et qualifié.
-2. Le bootstrap canonique est préparé en deux commits locaux depuis le SHA distant attendu.
-3. Les blobs locaux et distants du commit A sont identiques.
-4. Le manifeste du commit B référence le vrai SHA du commit A.
-5. Le conflit de dépôt est conservé et résolu sans perte d’historique.
-6. Le plan Phase 00 ne dépend d’aucun fournisseur d’agent.
-7. Chaque claim de recherche possède provenance, niveau de preuve, limites et expérience.
-8. Le premier paquet produit est dérivé après le merge du bootstrap, pas avant.
-9. Aucun état documentaire n’est présenté comme preuve runtime.
+1. Revue de cohérence/autorité de la PR #1.
+2. Revue recherche/méthode de la PR #1.
+3. Revue provenance/transport de la PR #1.
+4. Correction des défauts matériels trouvés.
+5. Acceptation ou refus propriétaire du merge.
+6. Après merge seulement : remplacement atomique des cinq sources du Projet ChatGPT.
+7. Après synchronisation mémoire : packetisation exacte de Task 1 depuis le SHA fusionné.
+8. Aucun code produit avant ces gates.
 
 ## Roadmap condensée
 
@@ -128,15 +128,17 @@ WP7 Scientific Report
 - harness d’exécution initial;
 - Restate versus Temporal;
 - Cedar versus Policy IR;
+- Postgres local versus Neon pour un environnement partagé;
 - gVisor versus Firecracker versus Kata;
 - worktree Git versus Jujutsu;
 - Dagger/Nix;
+- SonarQube et Fallow comme couches de contrôle du code produit;
+- optimisation AMD pour workloads mesurés;
 - framework UI;
 - licence;
-- stratégie de branchement définitive;
 - architecture d’hébergement.
 
-Elles seront tranchées par recherche, prototype ou benchmark.
+Ces choix seront activés uniquement lorsqu’un besoin ou une expérience les rend pertinents.
 
 ## Handoff
 
@@ -144,7 +146,6 @@ Elles seront tranchées par recherche, prototype ou benchmark.
 active_phase: PHASE-00
 active_deliverable: P00-CANONICAL-REPOSITORY-BOOTSTRAP
 phase_status: PARTIALLY_VERIFIED
-transport_status: BLOCKED_WITH_EVIDENCE
 planner: CHATGPT_PROJECT_GITSPACE
 execution_harness: DEFERRED_REPLACEABLE
 product_code_started: false
@@ -152,32 +153,24 @@ repository:
   full_name: leon36000/GitSpace
   visibility: public
   default_branch: main
-  observed_main_sha: f69b22d2bd09aa5eae96693acf501b2464c3be25
-  observed_state: NONEMPTY_UNRELATED_STAGING_PLACEHOLDER
+  base_sha: f69b22d2bd09aa5eae96693acf501b2464c3be25
+  bootstrap_branch: bootstrap/canonical-corpus-v0.3
+  pull_request: 1
+  pull_request_state: DRAFT_OPEN_MERGEABLE
+  canonical_commit_a: 488fd399314ad834881c7c59d78915ed236c9239
+  projection_commit_b: 08a38c4360a8e5e83332aa5f8f39917576c20030
   preserved_branch:
     name: hermesclaw-ci
     last_observed_sha: 91f55525b231116fd431430f46c87667e5c1f140
-    moving_branch_recheck_required: true
-  conflict_id: GS-CONFLICT-REPO-001
-transport_probe:
-  unreferenced_blobs_created: 8
-  exact_blobs: 6
-  mismatched_blobs: 2
-  trees_created: 0
-  commits_created: 0
-  refs_created: 0
-  branches_created: 0
-  pull_requests_created: 0
-  reachable_repository_changes: 0
-local_candidate:
-  version: 0.3.1
-  status: COMMIT_READY_TRANSPORT_BLOCKED
+transport:
+  status: QUALIFIED_FOR_BOOTSTRAP_WITH_EVIDENCE
+  canonical_method: UTF8_CONTENT_PLUS_GIT_BLOB_REUSE
+  forbidden_method: MANUAL_BASE64_TRANSCRIPTION
 next_exact_action: >-
-  P00-BOOTSTRAP-TRANSPORT-001 — provision an authenticated,
-  byte-preserving local Git transport; verify main at
-  f69b22d2bd09aa5eae96693acf501b2464c3be25; prepare commit A,
-  regenerate commit B from the real A SHA, verify blob equality,
-  then push the bootstrap branch and open a draft pull request.
+  Independently review PR #1 for authority/coherence,
+  research/method, and provenance/transport; correct material findings;
+  then obtain the owner's merge decision. Do not packetize or execute
+  Phase-00 Task 1 before an accepted canonical merge.
 critical_constraints:
   - architecture_c_is_canonical
   - c0_foundry_is_accepted
@@ -188,10 +181,9 @@ critical_constraints:
   - human_is_intent_sovereign
   - false_done_target_zero
   - product_code_not_started
-  - current_repository_state_is_quarantined
-  - raglite_uses_two_commit_provenance
-  - canonical_transport_is_byte_preserving
+  - hermesclaw_branch_preserved
+  - raglite_uses_canonical_parent_provenance
   - manual_base64_transport_is_forbidden
 ```
 
-Ce fichier est volatil. Après publication ou décision structurante, produire une version complète et invalider explicitement la précédente.
+Ce fichier est volatil. Après merge, refus, correction structurante ou démarrage de Task 1, produire une version complète et invalider explicitement la précédente.

@@ -3,7 +3,7 @@ doc_id: GS-ADR-REGISTER
 title: GitSpace — Architecture Decision Register
 authority: DECISION_REGISTER
 status: ACTIVE
-version: 0.3.0
+version: 0.3.1
 updated: 2026-08-13
 ---
 
@@ -13,7 +13,7 @@ updated: 2026-08-13
 
 - Une décision est `ACCEPTED` seulement après approbation propriétaire explicite ou inscription canonique autorisée.
 - Une décision réversible de pilote utilise `TDR`, pas `ADR`.
-- Une entrée superseded reste dans le registre.
+- Une entrée superseded reste visible.
 - Les conséquences négatives sont conservées.
 - Aucun agent d’exécution ne modifie le statut d’une ADR.
 
@@ -22,99 +22,62 @@ updated: 2026-08-13
 ### ADR-0001 — Native Software World Engine
 
 - **Statut : `ACCEPTED_OWNER`**
-- **Date : 2026-08-11**
 - **Décision :** GitSpace possède un modèle du monde logiciel natif. Git et les forges sont des périphéries.
-- **Alternatives rejetées :** fork profond de Forgejo; plan de contrôle uniquement autour de Git.
-- **Conséquences positives :** primitives réellement agent-native; état durable; changement sémantique.
-- **Coûts/risques :** nouveau modèle d’objets; compatibilité à construire.
-- **Preuve requise :** Phase 00 doit comparer l’approche native à une forge agentisée.
+- **Alternative rejetée :** forge agentisée comme noyau.
+- **Preuve future :** comparer l’approche native à une forge agentisée.
 
 ### ADR-0002 — Rust principal, sans mono-langage dogmatique
 
 - **Statut : `ACCEPTED_OWNER`**
-- **Date : 2026-08-11**
-- **Décision :** Rust est le langage principal du noyau de confiance.
-- **Utilisations prévues :** état, politiques, capacités, changement, preuve, protocole, indexation performante.
-- **Exceptions :** TypeScript pour UI; Python pour adaptateurs et recherche; autres langages si mieux adaptés.
-- **Risque :** complexité d’intégration et disponibilité de bibliothèques.
-- **Preuve requise :** frontière Rust/Python qualifiée en Phase 00.
+- **Décision :** Rust porte principalement le noyau de confiance; TypeScript, Python et d’autres langages restent possibles aux frontières appropriées.
+- **Preuve future :** qualifier la frontière Rust/Python.
 
 ### ADR-0003 — Souveraineté humaine
 
 - **Statut : `ACCEPTED_OWNER`**
-- **Date : 2026-08-11**
 - **Décision :** l’humain conserve intention, valeurs, budget, risque irréversible et acceptation comportementale.
-- **Conséquence :** les questions techniques réversibles sont résolues par recherche et expérience.
-- **Interdit :** forcer le propriétaire à vérifier du code.
 
-### ADR-0004 — AgentProcess comme contributeur natif
+### ADR-0004 — AgentProcess contributeur natif
 
 - **Statut : `ACCEPTED_OWNER`**
-- **Date : 2026-08-11**
 - **Décision :** les contributeurs techniques natifs sont des processus agentiques avec identité, contexte, capabilities, budget et état durable.
-- **Conséquence :** aucun compte humain simulé n’est nécessaire dans le noyau.
 
 ### ADR-0005 — Faux DONE cible zéro
 
 - **Statut : `ACCEPTED_OWNER`**
-- **Date : 2026-08-11**
-- **Décision :** un agent ne se déclare pas lui-même terminé.
-- **Conséquence :** terminaison par obligations, preuves, replay et vérification indépendante.
-- **Échec acceptable :** `BLOCKED_WITH_EVIDENCE`.
-- **Échec interdit :** réussite supposée faute de preuve.
+- **Décision :** un agent ne se déclare pas lui-même terminé; terminaison par obligations, preuves, replay et vérification indépendante.
 
 ### ADR-0006 — Mémoire hiérarchique et quarantinée
 
 - **Statut : `ACCEPTED_OWNER`**
-- **Date : 2026-08-11**
-- **Décision :** toute mémoire possède type, provenance, portée, fraîcheur et statut.
-- **Cycle :** `RAW → QUARANTINED → VERIFIED → ACCEPTED → STALE/REVOKED`.
-- **Interdit :** mémoire vectorielle comme vérité ou capability.
+- **Décision :** toute mémoire possède type, provenance, portée, fraîcheur et statut; une base vectorielle n’est pas la vérité.
 
 ### ADR-0007 — Transformations sémantiques avant patches textuels
 
 - **Statut : `ACCEPTED_DIRECTION_REQUIRES_QUALIFICATION`**
-- **Date : 2026-08-11**
-- **Décision :** privilégier symboles, AST et opérations typées.
-- **Compatibilité :** patch textuel conservé comme mode dégradé.
-- **Preuve requise :** expériences multilingues Phase 00/03.
+- **Décision :** privilégier symboles, AST et opérations typées; conserver le patch textuel comme compatibilité.
 
-### ADR-0008 — RAGLite Markdown pour le Projet ChatGPT
+### ADR-0008 — RAGLite Markdown
 
 - **Statut : `ACCEPTED_OWNER`**
-- **Date : 2026-08-12**
-- **Décision :** cinq fichiers compacts servent de mémoire projet mobile.
-- **Conséquence :** mémoire chaude limitée et routage documentaire.
-- **Contrainte :** le RAGLite devient une projection du dépôt après bootstrap.
+- **Décision :** cinq fichiers servent de mémoire mobile; après bootstrap ils sont une projection du dépôt.
 
 ### ADR-0009 — C0 Native Evaluation Foundry hybride
 
 - **Statut : `ACCEPTED_OWNER`**
-- **Date : 2026-08-12**
-- **Décision :**
-  - Evaluation IR GitSpace souverain;
-  - adaptateurs externes remplaçables;
-  - Seed Suite native initiale de 32 tâches.
-- **Alternatives rejetées :** simple agrégation de benchmarks; suite uniquement propriétaire.
-- **Gate :** quinze critères de sortie Phase 00.
+- **Décision :** Evaluation IR GitSpace souverain, adaptateurs externes remplaçables et Seed Suite native initiale de 32 tâches.
 
-### ADR-0010 — ChatGPT planifie; les exécuteurs restent en aval
+### ADR-0010 — ChatGPT planifie; exécuteurs en aval
 
 - **Statut : `ACCEPTED_OWNER`**
-- **Date : 2026-08-12**
-- **Décision :** ChatGPT dans le Projet GitSpace est l’architecte-chercheur, le mainteneur du canon et l’auteur des plans.
-- **Conséquence :** Claude Code, Codex ou tout autre agent peuvent exécuter, mais ne sont ni le planificateur canonique ni la mémoire.
-- **Interdit :** coupler le plan maître à un fournisseur.
+- **Décision :** ChatGPT dans le Projet GitSpace maintient recherche, canon et plans; Claude Code, Codex et autres agents restent des exécuteurs remplaçables.
 
 ## Technical decisions — Phase 00
 
 ### TDR-P00-001-AMENDED — Frontière Rust/Python et toolchains
 
 - **Statut : `PILOT_ACCEPTED`**
-- **Décision :** Rust pour l’autorité; Python pour les adaptateurs.
-- **Amendement :** aucune version exacte n’est canonique avant qualification fraîche.
-- **Candidats observés :** Rust 1.97.1; Python 3.12.
-- **Expériences :** `EXP-P00-010`, `EXP-P00-011`, `EXP-P00-012`.
+- **Décision :** Rust pour l’autorité; Python pour les adaptateurs. Les versions exactes sont verrouillées après qualification fraîche.
 
 ### TDR-P00-002 — Dimensions non compensables
 
@@ -130,45 +93,62 @@ updated: 2026-08-13
 
 - **Statut : `PILOT_ACCEPTED`**
 - **Décision :** premier vertical slice avec journal append-only et CAS local reconstructible.
-- **Risque :** extension ultérieure vers un stockage distribué.
 
-### TDR-P00-005-AMENDED — Harness d’exécution remplaçable
+### TDR-P00-005-AMENDED — Harness remplaçable
 
 - **Statut : `PILOT_ACCEPTED`**
-- **Décision :** aucun fournisseur n’est canonique. Le harness est choisi et enregistré par paquet.
-- **Supersedes :** Claude Code comme harness initial imposé.
+- **Décision :** aucun fournisseur n’est canonique; le harness est choisi et enregistré par paquet.
 
 ### TDR-P00-006 — Dépôt cible
 
 - **Statut : `PILOT_ACCEPTED`**
 - **Décision :** `leon36000/GitSpace` reçoit le canon complet.
-- **État :** conflit de staging enregistré dans `GS-CONFLICT-REPO-001`.
 
 ### TDR-P00-007-AMENDED — Provenance RAGLite
 
 - **Statut : `PILOT_ACCEPTED`**
-- **Décision :** la projection porte commit source, digests et date.
+- **Décision :** chaque projection porte commit source, digests et mapping source/projection.
 
-### TDR-P00-008 — Publication RAGLite en deux commits
+### TDR-P00-008 — Paire canon/projection
 
 - **Statut : `PILOT_ACCEPTED`**
-- **Date : 2026-08-13**
-- **Décision :**
-  1. commit A contient le canon;
-  2. commit B contient la projection et référence A.
-- **Raison :** éviter l’auto-référence impossible d’un commit vers son propre SHA.
-- **Test :** régénérer la projection depuis A et comparer bit-à-bit à B.
+- **Décision :** un commit canonique X est suivi d’un commit projection Y avec `manifest.source_commit = X`.
+- **Raison :** éviter toute auto-référence impossible.
 
 ### TDR-P00-009 — Packetisation juste-à-temps
 
 - **Statut : `PILOT_ACCEPTED`**
-- **Date : 2026-08-13**
-- **Décision :** le plan maître n’est pas exécutable. Chaque tâche reçoit un paquet exact depuis un commit frais.
-- **Raison :** éviter les chemins, versions et interfaces spéculatifs.
+- **Décision :** le plan maître n’est pas exécutable; chaque tâche reçoit un paquet exact depuis un commit frais.
 
 ### TDR-P00-010 — Résolution sûre du dépôt de staging
 
-- **Statut : `PROPOSED_SAFE_RESOLUTION`**
-- **Date : 2026-08-13**
-- **Décision proposée :** branche dédiée, deux commits, pull request; préserver `hermesclaw-ci` et l’historique.
-- **Interdit sans décision :** supprimer la branche ou réécrire l’historique.
+- **Statut : `EXECUTED_PENDING_OWNER_ACCEPTANCE`**
+- **Décision :** branche dédiée et PR; préserver `hermesclaw-ci` et l’historique.
+- **Evidence :** PR #1, base `f69b22d...`, A `488fd399...`, B `08a38c43...`.
+- **Reste à fermer :** décision propriétaire de merge.
+
+### TDR-P00-011 — Transport canonique byte-preserving
+
+- **Statut : `PILOT_ACCEPTED_WITH_EVIDENCE`**
+- **Décision :** publier par contenu UTF-8 direct ou filesystem authentifié, trees/blobs vérifiés et comparaison distante; interdire la transcription manuelle base64.
+- **Evidence négative :** plusieurs blobs orphelins divergents pendant les probes.
+- **Evidence positive :** A/B construits depuis blobs identifiés; cinq projections réutilisent les blobs sources.
+
+### TDR-P00-012 — Projection après clôture d’état
+
+- **Statut : `PILOT_ACCEPTED`**
+- **Décision :** lorsqu’une publication change l’état canonique `00/02/04`, créer un commit de clôture C puis un commit de projection D avec `source_commit = C`.
+- **Raison :** la projection finale doit refléter l’état de la PR, pas seulement l’état prépublication.
+
+## Décisions différées
+
+- Temporal versus moteur durable alternatif;
+- Neon versus Postgres local/auto-hébergé;
+- SonarQube et Fallow pour le code produit;
+- AMD optimizations;
+- moteur de politique;
+- sandbox;
+- backend workspace;
+- licence.
+
+Elles seront décidées par dossier de recherche et expérience, pas par préférence implicite.
