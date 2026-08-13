@@ -3,7 +3,7 @@ doc_id: GS-00
 title: GitSpace — Start Here
 authority: ROUTER
 status: ACTIVE
-version: 0.4.1
+version: 0.4.2
 updated: 2026-08-13
 ---
 # GitSpace — START HERE
@@ -25,6 +25,7 @@ GitSpace est un **Native Software World Engine pour contributeurs IA**. Architec
 - recherche : `03_GITSPACE_RESEARCH_ATLAS.md`;
 - planification/handoff : `04_GITSPACE_AGENT_PROTOCOL.md` + plan Phase 00;
 - preuve Task 1 : `docs/phase-00/evidence/P00-TASK-001-VERDICT.md`;
+- preuve Task 2 : `docs/phase-00/evidence/P00-TASK-002-VERDICT.md`;
 - projection mobile : `raglite/RAGLITE-MANIFEST.yaml`.
 
 ## Invariants
@@ -35,10 +36,13 @@ GitSpace est un **Native Software World Engine pour contributeurs IA**. Architec
 - Un agent ne se déclare jamais lui-même `PROVEN`.
 - Test avant code pour tout comportement.
 - Chaque tâche est packetisée depuis un commit frais.
+- Les schémas structurent l’IR; la logique runtime complète reste dans les composants d’autorité correspondants.
 - Faux `DONE = 0`.
 
 ## État
 
-Le bootstrap documentaire est fusionné. `P00-TASK-001` est fusionnée et prouvée sur `main` par CI externe, revue adversariale et merge signé `61d37de161bedd6fa18232c240dff7df3a9db155`. La prochaine unité est `P00-TASK-002` : schémas Evaluation IR v1. La Phase 00 globale reste `PARTIALLY_VERIFIED`.
+Le bootstrap documentaire, `P00-TASK-001` et `P00-TASK-002` sont fusionnés et prouvés. Task 2 a établi huit contrats Evaluation IR v1 Draft 2020-12 avec identités URN offline, résolution inter-schémas locale, objets structurés fermés, digests stricts et contrôles négatifs. Son merge signé est `7f2b65ae18668b25ff3a7ec2e5582d461d3916c7`.
+
+La prochaine unité est `P00-TASK-003` : canonical JSON et digests. La Phase 00 globale reste `PARTIALLY_VERIFIED`.
 
 Le manifeste RAGLite porte l’identité exacte de la paire canon/projection active.
