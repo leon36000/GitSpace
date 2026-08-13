@@ -1,5 +1,15 @@
 name: P00 Task 001 Toolchain Contract
-on: [pull_request, workflow_dispatch]
+on:
+  pull_request:
+    paths:
+      - Cargo.toml
+      - rust-toolchain.toml
+      - pyproject.toml
+      - toolchains.lock.json
+      - .gitignore
+      - tests/contracts/test_toolchains.py
+      - .github/workflows/p00-task-001.yml
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -26,7 +36,7 @@ jobs:
         run: |
           rustup show active-toolchain | grep -E '^1\.97\.1-'
           rustc --version | grep -E '^rustc 1\.97\.1 '
-          cargo --version
+          cargo --version | grep -E '^cargo 1\.97\.1 '
       - name: Contract tests
         run: python -m unittest -v tests/contracts/test_toolchains.py
       - name: Cargo metadata
