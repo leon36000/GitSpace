@@ -1,57 +1,47 @@
 ---
 manifest_id: GS-RAGLITE-MANIFEST
-manifest_version: 0.3.4
-status: DRAFT_PR_REVIEWED_PROJECTION
+manifest_version: 0.4.1
+status: TASK1_STATE_PROJECTION
 source_repository: leon36000/GitSpace
-source_commit: f26df9ce941ade614d29227cf2ee3bc40fd10f71
-source_tree: 519453063d2179a06a5a84f65fd9de755800308e
-generated_at: 2026-08-13T09:03:00Z
+source_commit: 28668d8c65843e4d143a54730fed113f9ef0fbe1
+source_tree: 1177c14fe574018f67cdadb54f9d127954033e24
+generated_at: 2026-08-13T20:15:00Z
 generation_mode: GIT_BLOB_REUSE_BYTE_IDENTICAL
 projection_count: 5
-requires_owner_merge_before_project_activation: true
+requires_merge_before_project_activation: true
 ---
 
 projection_map:
   - source_path: 00_GITSPACE_START_HERE.md
     projection_path: raglite/mobile/00_GITSPACE_START_HERE.md
-    git_blob_sha: 9c4ac83853e9b38869349e8c9a1db091f8289982
-    bytes: 5040
+    git_blob_sha: 07450e39c8ade396d0f9c4d252042d5e0a2f63c7
+    bytes: 1908
   - source_path: 01_GITSPACE_MASTER_CANON.md
     projection_path: raglite/mobile/01_GITSPACE_MASTER_CANON.md
     git_blob_sha: b9d73b88182d3d9fb4f44d1ad71f5a800fabdce4
     bytes: 14181
   - source_path: 02_GITSPACE_NOW_DECISIONS_ROADMAP.md
     projection_path: raglite/mobile/02_GITSPACE_NOW_DECISIONS_ROADMAP.md
-    git_blob_sha: d5f3058f9d1af43557a3ce067a0ad624c213034a
-    bytes: 9728
+    git_blob_sha: b416defa5cab7bd57eafd27d8ab55f9f4e06ff79
+    bytes: 3070
   - source_path: 03_GITSPACE_RESEARCH_ATLAS.md
     projection_path: raglite/mobile/03_GITSPACE_RESEARCH_ATLAS.md
     git_blob_sha: 88e5a8c937dfdaaeedc63d6ebeaf2fe745eb39e1
     bytes: 18428
   - source_path: 04_GITSPACE_AGENT_PROTOCOL.md
     projection_path: raglite/mobile/04_GITSPACE_AGENT_PROTOCOL.md
-    git_blob_sha: 698070a86bb0a377e694772debbcb5e548d27346
-    bytes: 10614
+    git_blob_sha: 464421c8910fc4ec62a23ca72e654316850a12e1
+    bytes: 2572
 
 invariants:
   - every_projection_blob_equals_source_blob
   - source_commit_is_parent_of_projection_commit
-  - source_tree_is_fetched_and_recorded
   - no_llm_summarization_in_generation
   - exactly_one_active_mobile_projection_per_source
-  - canonical_repository_remains_editable_authority
-  - project_activation_requires_accepted_merge
-  - exact_active_pair_identity_lives_only_in_this_manifest
+  - repository_main_is_canonical_after_merge
 
 verification:
   identity_algorithm: SAME_GIT_BLOB_OBJECT_PLUS_SIZE
   source_and_projection_git_blob_sha_must_match: true
   source_and_projection_size_must_match: true
   replay_without_model_required: true
-  expected_projection_paths: 5
-  expected_manifest_paths: 1
-  review_status:
-    authority_coherence: PASS_AFTER_FIX
-    research_method: PASS_AFTER_FIX
-    provenance_transport: PASS_WITH_LOW_FINDING
-    identity_independent: false
