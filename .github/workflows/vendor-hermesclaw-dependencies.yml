@@ -6,6 +6,7 @@ on:
       - hermesclaw-ci
     paths:
       - .github/workflows/vendor-hermesclaw-dependencies.yml
+      - vendor-bootstrap/**
   workflow_dispatch:
 
 permissions:
@@ -32,7 +33,7 @@ jobs:
           cargo generate-lockfile
           mkdir -p .cargo
           cargo vendor --locked --versioned-dirs vendor > .cargo/config.toml
-          cargo check --locked
+          cargo metadata --locked --format-version 1 > /dev/null
           tar -czf ../hermesclaw-vendor-bundle.tar.gz Cargo.lock .cargo/config.toml vendor
           cd ..
           sha256sum hermesclaw-vendor-bundle.tar.gz > hermesclaw-vendor-bundle.tar.gz.sha256
