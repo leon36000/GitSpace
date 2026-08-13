@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 jobs:
-  verify:
+  generate:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
@@ -40,17 +40,21 @@ jobs:
         run: |
           rustc --version | grep -E '^rustc 1\.97\.1 '
           cargo --version | grep -E '^cargo 1\.97\.1 '
-      - name: Build Task 4 dependency graph
-        run: cargo metadata --no-deps --format-version 1 > /tmp/gitspace-cargo-metadata.json
-      - name: Test shared corpus with Rust
-        run: cargo test -p gs-eval-ir --all-targets
-      - name: Export candidate Cargo.lock
+      - name: Generate dependency lock and format with qualified toolchain
         run: |
-          echo CARGO_LOCK_BASE64_START
-          base64 -w0 Cargo.lock
-          echo
-          echo CARGO_LOCK_BASE64_END
-      - name: Clippy
-        run: cargo clippy -p gs-eval-ir --all-targets -- -D warnings
-      - name: Formatting
-        run: cargo fmt --all -- --check
+          cargo generate-lockfile
+          cargo fmt --all
+      - name: Test generated state
+        run: cargo test --locked -p gs-eval-ir --all-targets
+      - name: Clippy generated state
+        run: cargo clippy --locked -p gs-eval-ir --all-targets -- -D warnings
+      - name: Upload exact generated files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: p00-task-004-generated
+          if-no-files-found: error
+          retention-days: 1
+          path: |
+            Cargo.lock
+            crates/gs-eval-ir/src
+            crates/gs-eval-ir/tests/parity.rs
