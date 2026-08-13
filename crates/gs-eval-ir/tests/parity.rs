@@ -1,5 +1,5 @@
 use gs_eval_ir::{SchemaName, parse_named_json, validate_named_json, validate_task_json};
-use serde_json::Value;
+use serde_json::{Number, Value};
 use std::collections::{BTreeMap, BTreeSet};
 
 const CORPUS: &str = include_str!("../../../tests/contracts/eval_ir_parity.json");
@@ -151,4 +151,25 @@ fn required_task_seam_returns_stable_structured_issue_fields() {
 
     assert_eq!(issue.code, "schema.pattern");
     assert!(!issue.message.is_empty());
+}
+
+#[test]
+fn schema_valid_maximum_json_integer_seed_decodes() {
+    let mut run = materialize_cases()
+        .into_iter()
+        .find(|case| case.id == "run-valid")
+        .expect("run-valid case");
+    replace_pointer(
+        &mut run.value,
+        "/execution/seed",
+        Value::Number(Number::from(u64::MAX)),
+    );
+
+    validate_named_json(SchemaName::EvalRunManifest, &run.value)
+        .expect("u64::MAX is a schema-valid JSON integer seed");
+    let parsed = parse_named_json(SchemaName::EvalRunManifest, &run.value);
+    assert!(
+        parsed.is_ok(),
+        "schema-valid maximum JSON integer seed failed typed decode: {parsed:?}"
+    );
 }
