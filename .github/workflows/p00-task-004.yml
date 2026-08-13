@@ -14,13 +14,15 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12.13'
@@ -48,13 +50,16 @@ jobs:
         run: cargo test --locked -p gs-eval-ir --all-targets
       - name: Clippy generated state
         run: cargo clippy --locked -p gs-eval-ir --all-targets -- -D warnings
-      - name: Upload exact generated files
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: p00-task-004-generated
-          if-no-files-found: error
-          retention-days: 1
-          path: |
-            Cargo.lock
-            crates/gs-eval-ir/src
-            crates/gs-eval-ir/tests/parity.rs
+      - name: Commit exact generated files to PR branch
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add Cargo.lock crates/gs-eval-ir/src crates/gs-eval-ir/tests/parity.rs
+          if git diff --cached --quiet; then
+            echo "No generated changes"
+          else
+            git commit -m "build: lock and format Task 4"
+            git push origin HEAD:"${HEAD_REF}"
+          fi
