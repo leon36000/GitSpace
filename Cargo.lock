@@ -220,6 +220,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "gs-cas"
+version = "0.1.0"
+dependencies = [
+ "gs-canonical-json",
+]
+
+[[package]]
 name = "gs-eval-ir"
 version = "0.1.0"
 dependencies = [
