@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import gc
 import unittest
+from importlib import import_module
+from unittest.mock import patch
 
 from anyio.streams.memory import MemoryObjectReceiveStream
 
@@ -12,6 +14,8 @@ from gs_eval_adapters.inspect_adapter import InspectAdapter
 
 class InspectResourceLifecycleTests(unittest.TestCase):
     def test_one_controlled_run_leaves_no_unclosed_anyio_stream(self) -> None:
+        hooks = import_module("inspect_ai.hooks._hooks")
+        original_drain = hooks.drain_sample_events
         gc.collect()
         baseline = {
             id(value)
@@ -26,6 +30,7 @@ class InspectResourceLifecycleTests(unittest.TestCase):
             adapter = InspectAdapter(MemoryCas().publish)
             result = execute_adapter(adapter, task11_request())
             self.assertEqual(result.status, AdapterStatus.PASS, result.summary)
+            self.assertIs(hooks.drain_sample_events, original_drain)
             del result
             del adapter
 
@@ -62,6 +67,20 @@ class InspectResourceLifecycleTests(unittest.TestCase):
             f"Inspect 0.3.258 left {len(leaked)} AnyIO receive stream(s) open: "
             f"{details}",
         )
+
+    def test_cleanup_shim_restores_original_function_after_eval_failure(self) -> None:
+        hooks = import_module("inspect_ai.hooks._hooks")
+        original_drain = hooks.drain_sample_events
+        adapter = InspectAdapter(MemoryCas().publish)
+
+        with patch(
+            "gs_eval_adapters.inspect_adapter.inspect_eval",
+            side_effect=RuntimeError("controlled eval failure"),
+        ):
+            result = execute_adapter(adapter, task11_request())
+
+        self.assertEqual(result.status, AdapterStatus.INFRA)
+        self.assertIs(hooks.drain_sample_events, original_drain)
 
 
 if __name__ == "__main__":
