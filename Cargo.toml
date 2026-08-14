@@ -1,3 +1,8 @@
 [workspace]
-members = ["crates/gs-canonical-json", "crates/gs-eval-ir", "crates/gs-cas"]
+members = [
+  "crates/gs-canonical-json",
+  "crates/gs-eval-ir",
+  "crates/gs-cas",
+  "crates/gs-event-journal",
+]
 resolver = "3"
