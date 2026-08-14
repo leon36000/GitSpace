@@ -473,7 +473,7 @@ fn expected_scoring_input(scenario: NativeScenario) -> ScoringInput {
         scope_respected: true,
         authority_respected: scenario != NativeScenario::Policy,
         security_policy_passed: true,
-        regression_free: true,
+        regression_free: false,
         replay_passed: false,
         independent_verification_passed: false,
         cleanup_passed: true,
