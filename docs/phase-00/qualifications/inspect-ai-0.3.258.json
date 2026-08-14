@@ -1,7 +1,7 @@
 {
   "schema": "GS-FRAMEWORK-QUALIFICATION-001",
   "framework": "inspect-ai",
-  "status": "PINNED_FOR_TASK_011",
+  "status": "GREEN_VERIFIED_PRE_REVIEW",
   "version": "0.3.258",
   "tag": "0.3.258",
   "source_repository": "https://github.com/UKGovernmentBEIS/inspect_ai",
@@ -33,6 +33,36 @@
     },
     "network": "forbidden"
   },
+  "compatibility": {
+    "required": true,
+    "scope": "inspect-ai==0.3.258 only",
+    "upstream_function": "inspect_ai.hooks._hooks.drain_sample_events",
+    "finding": "The pinned function closes the sample event sender, waits for the emitter and drains the receiver, but clears the receiver reference without closing the MemoryObjectReceiveStream.",
+    "observed_state": {
+      "unclosed_receive_streams_per_controlled_run": 1,
+      "buffered_items": 0,
+      "open_send_streams": 0,
+      "open_receive_streams": 1,
+      "tasks_waiting_send": 0,
+      "tasks_waiting_receive": 0
+    },
+    "gitspace_shim": {
+      "strategy": "serialized temporary replacement of the exact pinned private drain function",
+      "behavior": "mirror the official drain lifecycle and add await receive.aclose() before clearing the reference",
+      "restoration": "restore the original function after success or exception",
+      "global_lock": true,
+      "distribution_modified": false
+    },
+    "negative_tests": [
+      "drop-event-receiver-close",
+      "drop-cleanup-shim-restore"
+    ],
+    "limits": [
+      "private Inspect API usage is accepted only for the exact pinned release",
+      "concurrent direct Inspect eval calls outside the GitSpace adapter are outside the qualified contract",
+      "the shim must be requalified or removed for every future Inspect release"
+    ]
+  },
   "qualification_scope": [
     "one in-process Inspect Task",
     "one deterministic mockllm sample",
@@ -40,7 +70,8 @@
     "exact text match scorer",
     "EvalLog projection",
     "content-addressed log and normalized-record artifacts",
-    "replay and rescore without importing Inspect"
+    "replay and rescore without importing Inspect",
+    "explicit closure of the pinned release sample-event receiver"
   ],
   "non_scope": [
     "external model providers",
@@ -51,8 +82,23 @@
     "model-graded scoring",
     "Inspect agents",
     "Inspect approval policies",
+    "direct concurrent Inspect eval outside the serialized adapter",
     "all other Inspect releases"
   ],
+  "evidence": {
+    "valid_red": {
+      "head": "5c3ba0e74c214b478e539936e3bef335e4187bde",
+      "workflow_run": 31838641477,
+      "workflow_job": 94890506040
+    },
+    "pre_documentation_green": {
+      "head": "134f110f4917b137ef1151ba2ad77345a8d75cb0",
+      "workflow_run": 31843227076,
+      "workflow_job": 94904335561,
+      "mutations_killed": 24,
+      "mutations_survived": 0
+    }
+  },
   "sources": [
     {
       "kind": "official_package_metadata",
@@ -62,6 +108,11 @@
     {
       "kind": "official_git_tag",
       "url": "https://github.com/UKGovernmentBEIS/inspect_ai/tree/0.3.258",
+      "verified_at": "2026-08-14"
+    },
+    {
+      "kind": "official_source",
+      "url": "https://github.com/UKGovernmentBEIS/inspect_ai/blob/0.3.258/src/inspect_ai/hooks/_hooks.py",
       "verified_at": "2026-08-14"
     }
   ]
