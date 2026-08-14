@@ -1,0 +1,38 @@
+name: P00 Task 008 RED Contract
+
+"on":
+  pull_request:
+    paths:
+      - Cargo.toml
+      - crates/gs-local-runner/**
+      - .github/workflows/p00-task-008-red.yml
+      - docs/phase-00/tasks/P00-TASK-008.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  observe-red:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Install Rust 1.97.1
+        run: rustup toolchain install 1.97.1 --profile minimal
+      - name: Select Rust 1.97.1
+        run: rustup override set 1.97.1
+      - name: Generate temporary RED lock graph
+        run: cargo generate-lockfile
+      - name: Observe missing Task 8 runner API
+        shell: bash
+        run: |
+          set +e
+          cargo test -p gs-local-runner --test contract > task8-red.log 2>&1
+          status=$?
+          set -e
+          cat task8-red.log
+          test "$status" -ne 0
+          grep -E "unresolved imports|no .*LocalRunner.* in the root|could not find" task8-red.log
+      - name: Verify RED branch contains no production implementation
+        run: |
+          test "$(grep -cv '^\s*\($\|//\|#!\)' crates/gs-local-runner/src/lib.rs)" -eq 0
