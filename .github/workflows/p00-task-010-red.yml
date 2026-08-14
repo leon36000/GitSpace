@@ -1,0 +1,40 @@
+name: P00 Task 010 RED Adapter SDK Contract
+
+on:
+  pull_request:
+    paths:
+      - python/gs_eval_adapters/**
+      - tests/adapters/**
+      - .github/workflows/p00-task-010-red.yml
+      - docs/phase-00/tasks/P00-TASK-010.md
+      - docs/phase-00/evidence/P00-TASK-010-RED.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  observe-red:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12.13'
+      - name: Verify Python identity
+        run: python --version | grep -Fx 'Python 3.12.13'
+      - name: Observe missing Task 10 production package
+        shell: bash
+        run: |
+          test ! -e python/gs_eval_adapters
+          set +e
+          PYTHONPATH=python python tests/adapters/test_contract.py > task10-red.log 2>&1
+          status=$?
+          set -e
+          cat task10-red.log
+          test "$status" -ne 0
+          grep -F "ModuleNotFoundError: No module named 'gs_eval_adapters'" task10-red.log
+      - name: Verify RED branch contains no production implementation
+        run: test ! -e python/gs_eval_adapters
+      - name: Verify repository clean
+        run: test -z "$(git status --porcelain=v1)"
