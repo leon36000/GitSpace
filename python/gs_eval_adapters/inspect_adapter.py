@@ -3,11 +3,9 @@ from __future__ import annotations
 import hashlib
 import json
 import tempfile
-from contextlib import contextmanager
 from importlib import import_module, metadata
 from pathlib import Path
-from threading import Lock
-from typing import Callable, Iterator
+from typing import Callable
 
 from inspect_ai import Task, eval as inspect_eval
 from inspect_ai.dataset import Sample
@@ -16,6 +14,7 @@ from inspect_ai.scorer import match
 from inspect_ai.solver import generate
 
 from .errors import AdapterContractError, JsonBoundaryError
+from .inspect_cleanup import inspect_event_stream_cleanup
 from .inspect_replay import (
     INSPECT_COMMIT,
     INSPECT_VERSION,
@@ -29,11 +28,12 @@ from .inspect_replay import (
 from .json_boundary import JsonObject, JsonValue, clone_object, validate_cas_uri
 from .model import AdapterDescriptor, AdapterStatus
 
+_CAS_URI_PREFIX = "cas://sha256/"
+_MODEL_NAME = "mockllm/model"
 _MODEL_OUTPUT = "Default output from mockllm/model"
 _TASK_NAME = "gitspace_inspect_controlled"
 _SAMPLE_ID = "GS-SAMPLE-000011"
 _OPTIONS: JsonObject = {"location": "exact", "ignore_case": True, "numeric": False}
-_INSPECT_EVAL_LOCK = Lock()
 
 
 class InspectAdapter:
@@ -55,8 +55,8 @@ class InspectAdapter:
         agent = clone_object(canonical.get("agent"), path="$/canonical_request/agent")
         if task.get("id") != "GS-TASK-000011":
             raise AdapterContractError("Inspect adapter requires GS-TASK-000011")
-        if agent.get("model") != "mockllm/model":
-            raise AdapterContractError("Inspect adapter requires mockllm/model")
+        if agent.get("model") != _MODEL_NAME:
+            raise AdapterContractError(f"Inspect adapter requires {_MODEL_NAME}")
         intent = clone_object(task.get("intent"), path="$/canonical_request/task/intent")
         input_text = intent.get("owner_outcome")
         if type(input_text) is not str or not input_text:
@@ -72,7 +72,7 @@ class InspectAdapter:
                 "sample_id": _SAMPLE_ID,
                 "input": input_text,
                 "target": _MODEL_OUTPUT,
-                "model": "mockllm/model",
+                "model": _MODEL_NAME,
                 "solver": "generate",
                 "scorer": "match",
                 "scorer_options": dict(_OPTIONS),
@@ -114,34 +114,31 @@ class InspectAdapter:
             ],
             solver=generate(),
             scorer=match(location="exact", ignore_case=True, numeric=False),
-            model="mockllm/model",
+            model=_MODEL_NAME,
             name=_TASK_NAME,
             version=1,
             metadata=task_metadata,
             epochs=1,
         )
-        with _INSPECT_EVAL_LOCK:
-            with _inspect_0_3_258_event_stream_cleanup():
-                with tempfile.TemporaryDirectory(
-                    prefix="gitspace-inspect-"
-                ) as log_dir:
-                    logs = inspect_eval(
-                        task,
-                        model="mockllm/model",
-                        display="none",
-                        log_dir=log_dir,
-                        log_format="json",
-                        limit=1,
-                        epochs=1,
-                        fail_on_error=True,
-                        max_samples=1,
-                        log_model_api=True,
-                        log_realtime=False,
-                        acp_server=False,
-                        ctl_server=False,
-                        notification=False,
-                        trace=False,
-                    )
+        with inspect_event_stream_cleanup():
+            with tempfile.TemporaryDirectory(prefix="gitspace-inspect-") as log_dir:
+                logs = inspect_eval(
+                    task,
+                    model=_MODEL_NAME,
+                    display="none",
+                    log_dir=log_dir,
+                    log_format="json",
+                    limit=1,
+                    epochs=1,
+                    fail_on_error=True,
+                    max_samples=1,
+                    log_model_api=True,
+                    log_realtime=False,
+                    acp_server=False,
+                    ctl_server=False,
+                    notification=False,
+                    trace=False,
+                )
         log = _single_eval_log(logs)
         log_value = log.model_dump(mode="json", exclude_none=True)
         log_bytes = _json_bytes(log_value)
@@ -171,7 +168,7 @@ class InspectAdapter:
         if log_uri != record.log_uri:
             raise AdapterContractError("Inspect record and raw log URI disagree")
         expected_record_uri = (
-            "cas://sha256/"
+            _CAS_URI_PREFIX
             + hashlib.sha256(canonical_record_bytes(record)).hexdigest()
         )
         if record_uri != expected_record_uri:
@@ -213,7 +210,7 @@ class InspectAdapter:
     @staticmethod
     def record_from_projection_for_test(projection: object) -> InspectReplayRecord:
         log_bytes = _json_bytes(projection)
-        log_uri = "cas://sha256/" + hashlib.sha256(log_bytes).hexdigest()
+        log_uri = _CAS_URI_PREFIX + hashlib.sha256(log_bytes).hexdigest()
         return build_replay_record(projection, log_bytes=log_bytes, log_uri=log_uri)
 
     @staticmethod
@@ -237,7 +234,7 @@ class InspectAdapter:
             )
         except JsonBoundaryError as error:
             raise AdapterContractError(str(error)) from error
-        expected = "cas://sha256/" + hashlib.sha256(value).hexdigest()
+        expected = _CAS_URI_PREFIX + hashlib.sha256(value).hexdigest()
         if uri != expected:
             raise AdapterContractError("artifact URI digest does not match published bytes")
         return uri
@@ -252,7 +249,7 @@ class InspectAdapter:
             "task_name": _TASK_NAME,
             "sample_id": _SAMPLE_ID,
             "target": _MODEL_OUTPUT,
-            "model": "mockllm/model",
+            "model": _MODEL_NAME,
             "solver": "generate",
             "scorer": "match",
             "scorer_options": _OPTIONS,
@@ -264,86 +261,6 @@ class InspectAdapter:
             raise AdapterContractError("Inspect framework input is invalid")
         if set(value) != set(expected) | {"input"}:
             raise AdapterContractError("Inspect framework request fields differ")
-
-
-@contextmanager
-def _inspect_0_3_258_event_stream_cleanup() -> Iterator[None]:
-    """Close the drained event receiver that Inspect 0.3.258 leaves open.
-
-    The pinned release closes the sender, waits for the background emitter,
-    drains remaining events, then clears the receiver reference without closing
-    the receiver. This temporary, serialized compatibility shim mirrors the
-    official function and adds only the missing receiver close. The original
-    private function is restored even when eval fails.
-    """
-
-    try:
-        hooks = import_module("inspect_ai.hooks._hooks")
-        original = getattr(hooks, "drain_sample_events")
-        sample_active = getattr(hooks, "sample_active")
-        anyio = getattr(hooks, "anyio")
-        emit_to_all = getattr(hooks, "_emit_to_all")
-        logger = getattr(hooks, "logger")
-    except (ImportError, AttributeError) as error:
-        raise AdapterContractError(
-            "Inspect 0.3.258 hook cleanup API is unavailable"
-        ) from error
-
-    async def drain_sample_events_with_receiver_close() -> None:
-        active = sample_active()
-        if active is None:
-            return
-
-        receive = active.event_receive
-        try:
-            if active.event_send is not None:
-                await active.event_send.aclose()
-
-            if active.event_done is not None:
-                with anyio.move_on_after(5):
-                    await active.event_done.wait()
-                if not active.event_done.is_set():
-                    logger.warning(
-                        "Timed out waiting for sample event emitter to drain"
-                    )
-
-            if receive is not None:
-                try:
-                    while True:
-                        data = receive.receive_nowait()
-
-                        async def emit_event(
-                            hook: object, event: object = data
-                        ) -> None:
-                            await hook.on_sample_event(event)
-
-                        await emit_to_all(emit_event)
-                except (
-                    anyio.WouldBlock,
-                    anyio.EndOfStream,
-                    anyio.ClosedResourceError,
-                ):
-                    pass
-        except Exception as error:
-            logger.warning(f"Exception draining sample events: {error}")
-        finally:
-            if receive is not None:
-                try:
-                    await receive.aclose()
-                except (
-                    anyio.ClosedResourceError,
-                    anyio.BrokenResourceError,
-                ):
-                    pass
-            active.event_send = None
-            active.event_receive = None
-            active.event_done = None
-
-    setattr(hooks, "drain_sample_events", drain_sample_events_with_receiver_close)
-    try:
-        yield
-    finally:
-        setattr(hooks, "drain_sample_events", original)
 
 
 def _single_eval_log(logs: object) -> EvalLog:
@@ -386,5 +303,5 @@ def _json_bytes(value: object) -> bytes:
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")
-    except (TypeError, ValueError, UnicodeError) as error:
+    except (TypeError, ValueError) as error:
         raise AdapterContractError("Inspect value is not canonical JSON") from error
