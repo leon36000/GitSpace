@@ -17,6 +17,11 @@ use gs_verdict::issue_verdict;
 impl NativeFoundry {
     pub fn replay(&self, receipt: &RunReceipt) -> Result<ReplayReport, FoundryError> {
         validate_receipt_shape(receipt)?;
+        if receipt.source_commit != self.source_commit() {
+            return Err(FoundryError::InvalidReceipt(
+                "receipt source commit does not match the opened Foundry".to_owned(),
+            ));
+        }
         let cas = LocalCas::open(self.cas_root())?;
 
         let task_bytes = get_bytes(&cas, &receipt.task_uri)?;
@@ -135,6 +140,8 @@ impl NativeFoundry {
             manifest_uri: receipt.manifest_uri.clone(),
             evidence_uri: receipt.evidence_uri.clone(),
             journal_event_count: records.len() as u64,
+            replay_verified: true,
+            evidence_verified: true,
         })
     }
 }
