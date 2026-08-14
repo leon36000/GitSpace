@@ -9,6 +9,7 @@ use std::{
 };
 
 static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
+const SECOND_SOURCE_COMMIT: &str = "ffffffffffffffffffffffffffffffffffffffff";
 
 struct TestDir(PathBuf);
 
@@ -38,18 +39,22 @@ impl Drop for TestDir {
 #[test]
 fn one_deterministic_run_id_cannot_alias_two_source_commits() {
     let root = TestDir::new();
-    let first_foundry = NativeFoundry::open(root.path(), source_commit()).unwrap();
+    let first_source_commit = source_commit();
+    let first_foundry = NativeFoundry::open(root.path(), &first_source_commit).unwrap();
     let first_receipt = first_foundry.run(NativeScenario::Pass).unwrap();
 
-    let second_foundry = NativeFoundry::open(
-        root.path(),
-        "ffffffffffffffffffffffffffffffffffffffff",
-    )
-    .unwrap();
-    assert!(
-        second_foundry.run(NativeScenario::Pass).is_err(),
-        "the same deterministic run ID accepted two source commits"
+    let second_foundry = NativeFoundry::open(root.path(), SECOND_SOURCE_COMMIT).unwrap();
+    let second_receipt = second_foundry.run(NativeScenario::Pass).unwrap();
+
+    assert_ne!(
+        first_receipt.run_id, second_receipt.run_id,
+        "two source commits aliased one deterministic run ID"
     );
+    assert_eq!(first_receipt.source_commit, first_source_commit);
+    assert_eq!(second_receipt.source_commit, SECOND_SOURCE_COMMIT);
 
     first_foundry.replay(&first_receipt).unwrap();
+    second_foundry.replay(&second_receipt).unwrap();
+    assert!(first_foundry.replay(&second_receipt).is_err());
+    assert!(second_foundry.replay(&first_receipt).is_err());
 }
