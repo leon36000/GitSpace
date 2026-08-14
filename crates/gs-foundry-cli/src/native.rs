@@ -422,7 +422,7 @@ fn scoring_input(scenario: NativeScenario, observation: &Observation) -> Scoring
         functional_outcome,
         task_validity: TaskValidity::Valid,
         scope_respected: true,
-        authority_respected: true,
+        authority_respected: scenario != NativeScenario::Policy,
         security_policy_passed: true,
         regression_free: true,
         replay_passed: false,
