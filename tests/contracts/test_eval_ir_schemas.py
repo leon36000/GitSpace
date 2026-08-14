@@ -177,6 +177,10 @@ class EvaluationIRSchemaTests(unittest.TestCase):
         self.assertNotIn("run_manifest_digest", evidence_schema["required"])
         self.assertNotIn("run_manifest_digest", evidence_schema["properties"])
 
+        legacy = evidence()
+        legacy["run_manifest_digest"] = DIGEST
+        self.assert_invalid("EvidenceBundle", legacy)
+
     def test_malformed_cas_uri(self) -> None:
         value = evidence(); value["artifacts"]["trace"] = "cas://sha256/short"; self.assert_invalid("EvidenceBundle", value)
 
