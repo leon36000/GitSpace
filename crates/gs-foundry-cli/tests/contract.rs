@@ -1,3 +1,6 @@
+mod common;
+
+use common::source_commit;
 use gs_canonical_json::Digest;
 use gs_cas::{Cas, LocalCas};
 use gs_foundry_cli::{
@@ -11,7 +14,6 @@ use std::{
 };
 
 static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
-const SOURCE_COMMIT: &str = "7cc65f670dfd7a682c77d3cc8cda656fe9c30ccd";
 
 struct TestDir(PathBuf);
 
@@ -37,7 +39,7 @@ impl Drop for TestDir {
 }
 
 fn open_foundry(root: &TestDir) -> NativeFoundry {
-    NativeFoundry::open(root.path(), SOURCE_COMMIT).expect("open native foundry")
+    NativeFoundry::open(root.path(), source_commit()).expect("open native foundry")
 }
 
 fn assert_cas_uri(value: &str) {
@@ -61,6 +63,7 @@ fn five_native_scenarios_have_expected_classifications_and_verdicts() {
         let receipt = foundry.run(scenario).expect("run deterministic scenario");
         assert_eq!(receipt.scenario, scenario);
         assert_eq!(receipt.classification, expected);
+        assert_eq!(receipt.source_commit, source_commit());
         for uri in [
             &receipt.task_uri,
             &receipt.plan_uri,
