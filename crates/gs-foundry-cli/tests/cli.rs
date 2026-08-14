@@ -11,6 +11,8 @@ const SOURCE_COMMIT: &str = "7cc65f670dfd7a682c77d3cc8cda656fe9c30ccd";
 
 #[test]
 fn cli_run_and_replay_emit_json_that_matches_the_library_contract() {
+    let expected_source_commit = std::env::var("GITSPACE_TEST_SOURCE_COMMIT")
+        .expect("ci.sh must bind tests to the executed commit");
     let serial = NEXT_TEMP.fetch_add(1, Ordering::Relaxed);
     let root = std::env::temp_dir().join(format!(
         "gitspace-task9-cli-{}-{serial}",
@@ -38,6 +40,7 @@ fn cli_run_and_replay_emit_json_that_matches_the_library_contract() {
     );
     let receipt: RunReceipt = serde_json::from_slice(&run.stdout).unwrap();
     assert_eq!(receipt.classification, ObservedClassification::Pass);
+    assert_eq!(receipt.source_commit, expected_source_commit);
 
     let receipt_path: PathBuf = root.join("receipt.json");
     fs::write(&receipt_path, &run.stdout).unwrap();
