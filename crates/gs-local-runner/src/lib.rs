@@ -8,7 +8,7 @@ mod snapshot;
 
 pub use error::RunnerError;
 pub use model::{
-    AgentOperation, Capability, Effect, EffectKind, FixtureFile, OracleCheck, OracleFile,
-    RunPlan, RunResult, RunStatus, WorkspaceArtifact,
+    AgentOperation, Capability, Effect, EffectKind, FixtureFile, OracleCheck, OracleFile, RunPlan,
+    RunResult, RunStatus, WorkspaceArtifact,
 };
 pub use runner::LocalRunner;

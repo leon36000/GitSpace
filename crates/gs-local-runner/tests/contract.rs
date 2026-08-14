@@ -39,7 +39,11 @@ impl Drop for TestDir {
 
 fn runner(root: &TestDir) -> (LocalRunner<LocalCas>, LocalCas) {
     let cas = LocalCas::open(root.path().join("cas")).unwrap();
-    let runner = LocalRunner::open(root.path().join("runs"), LocalCas::open(root.path().join("cas")).unwrap()).unwrap();
+    let runner = LocalRunner::open(
+        root.path().join("runs"),
+        LocalCas::open(root.path().join("cas")).unwrap(),
+    )
+    .unwrap();
     (runner, cas)
 }
 
@@ -161,10 +165,13 @@ fn oracle_read_and_write_traversal_are_policy_blocked_before_effects() {
         let mut plan = base_plan("GS-RUN-TASK8-ORACLE-DENY");
         plan.capability.readable_prefixes = vec![String::new()];
         plan.capability.writable_prefixes = vec![String::new()];
-        plan.operations = vec![operation, AgentOperation::Write {
-            path: "output/after.txt".to_owned(),
-            bytes: b"must-not-run".to_vec(),
-        }];
+        plan.operations = vec![
+            operation,
+            AgentOperation::Write {
+                path: "output/after.txt".to_owned(),
+                bytes: b"must-not-run".to_vec(),
+            },
+        ];
 
         let result = runner.execute(&plan).unwrap();
         assert_eq!(result.status, RunStatus::PolicyBlocked);

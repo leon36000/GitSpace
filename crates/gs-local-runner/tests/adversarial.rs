@@ -71,7 +71,14 @@ fn plan(run_id: &str) -> RunPlan {
 
 #[test]
 fn unsafe_operation_paths_are_policy_blocked_without_effects() {
-    let unsafe_paths = ["", ".", "../escape", "/absolute", "safe/../escape", "nul\0byte"];
+    let unsafe_paths = [
+        "",
+        ".",
+        "../escape",
+        "/absolute",
+        "safe/../escape",
+        "nul\0byte",
+    ];
 
     for (index, path) in unsafe_paths.into_iter().enumerate() {
         let root = TestDir::new(&format!("unsafe-{index}"));
@@ -138,8 +145,8 @@ fn symlink_authority_root_is_rejected() {
     let link = root.path().join("link");
     symlink(&real, &link).unwrap();
 
-    let error = LocalRunner::open(link, LocalCas::open(root.path().join("cas")).unwrap())
-        .unwrap_err();
+    let error =
+        LocalRunner::open(link, LocalCas::open(root.path().join("cas")).unwrap()).unwrap_err();
     assert!(matches!(error, RunnerError::UnsafePath { .. }));
 }
 
@@ -163,7 +170,11 @@ fn effect_indices_are_contiguous_and_follow_operation_order() {
     ];
     let result = runner.execute(&plan).unwrap();
     assert_eq!(
-        result.effects.iter().map(|effect| effect.index).collect::<Vec<_>>(),
+        result
+            .effects
+            .iter()
+            .map(|effect| effect.index)
+            .collect::<Vec<_>>(),
         vec![0, 1, 2]
     );
 }

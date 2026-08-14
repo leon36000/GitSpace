@@ -131,7 +131,8 @@ pub(crate) fn validate_authority_root(path: &Path) -> Result<PathBuf, RunnerErro
         Err(source) => return Err(RunnerError::io("inspect authority root", path, source)),
     }
 
-    fs::canonicalize(path).map_err(|source| RunnerError::io("canonicalize authority root", path, source))
+    fs::canonicalize(path)
+        .map_err(|source| RunnerError::io("canonicalize authority root", path, source))
 }
 
 pub(crate) fn ensure_parent_directories(
@@ -166,7 +167,11 @@ pub(crate) fn ensure_parent_directories(
                 })?;
             }
             Err(source) => {
-                return Err(RunnerError::io("inspect workspace parent", &current, source));
+                return Err(RunnerError::io(
+                    "inspect workspace parent",
+                    &current,
+                    source,
+                ));
             }
         }
     }

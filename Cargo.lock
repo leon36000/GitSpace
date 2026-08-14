@@ -247,6 +247,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "gs-local-runner"
+version = "0.1.0"
+dependencies = [
+ "gs-canonical-json",
+ "gs-cas",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "gs-verdict"
 version = "0.1.0"
 dependencies = [

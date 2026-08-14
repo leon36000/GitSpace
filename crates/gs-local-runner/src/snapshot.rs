@@ -67,10 +67,12 @@ fn collect_files<C: Cas>(
         let bytes = fs::read(&path)
             .map_err(|source| RunnerError::io("read workspace snapshot file", &path, source))?;
         let digest = cas.put(&bytes)?;
-        let relative = path.strip_prefix(workspace).map_err(|_| RunnerError::UnsafePath {
-            path: path.display().to_string(),
-            reason: "workspace snapshot path escaped its root",
-        })?;
+        let relative = path
+            .strip_prefix(workspace)
+            .map_err(|_| RunnerError::UnsafePath {
+                path: path.display().to_string(),
+                reason: "workspace snapshot path escaped its root",
+            })?;
         artifacts.push(WorkspaceArtifact {
             path: relative_path_string(relative)?,
             digest,

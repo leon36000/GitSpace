@@ -116,8 +116,14 @@ impl<C: Cas> LocalRunner<C> {
         fs::create_dir(&oracle)
             .map_err(|source| RunnerError::io("create oracle", &oracle, source))?;
 
-        materialize_files(&workspace, plan.fixture.iter().map(|file| (&file.path, &file.bytes)))?;
-        materialize_files(&oracle, plan.oracle.iter().map(|file| (&file.path, &file.bytes)))?;
+        materialize_files(
+            &workspace,
+            plan.fixture.iter().map(|file| (&file.path, &file.bytes)),
+        )?;
+        materialize_files(
+            &oracle,
+            plan.oracle.iter().map(|file| (&file.path, &file.bytes)),
+        )?;
 
         let started = Instant::now();
         let mut status = RunStatus::Completed;
@@ -154,8 +160,9 @@ impl<C: Cas> LocalRunner<C> {
                         }
                         Err(error) => return Err(error),
                     };
-                    let bytes = fs::read(&resolved)
-                        .map_err(|source| RunnerError::io("read workspace file", &resolved, source))?;
+                    let bytes = fs::read(&resolved).map_err(|source| {
+                        RunnerError::io("read workspace file", &resolved, source)
+                    })?;
                     let digest = self.cas.put(&bytes)?;
                     effects.push(Effect {
                         index: effects.len() as u64,
@@ -190,8 +197,9 @@ impl<C: Cas> LocalRunner<C> {
                         }
                         Err(error) => return Err(error),
                     };
-                    fs::write(&resolved, bytes)
-                        .map_err(|source| RunnerError::io("write workspace file", &resolved, source))?;
+                    fs::write(&resolved, bytes).map_err(|source| {
+                        RunnerError::io("write workspace file", &resolved, source)
+                    })?;
                     let digest = self.cas.put(bytes)?;
                     effects.push(Effect {
                         index: effects.len() as u64,
@@ -229,7 +237,10 @@ fn validate_plan(plan: &RunPlan) -> Result<ValidatedCapability, RunnerError> {
         return Err(RunnerError::UnsafeRunId);
     }
 
-    validate_unique_paths("fixture", plan.fixture.iter().map(|file| file.path.as_str()))?;
+    validate_unique_paths(
+        "fixture",
+        plan.fixture.iter().map(|file| file.path.as_str()),
+    )?;
     validate_unique_paths("oracle", plan.oracle.iter().map(|file| file.path.as_str()))?;
     for check in &plan.oracle_checks {
         match check {

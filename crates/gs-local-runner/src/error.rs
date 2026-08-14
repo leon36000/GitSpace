@@ -31,11 +31,7 @@ pub enum RunnerError {
 }
 
 impl RunnerError {
-    pub(crate) fn io(
-        operation: &'static str,
-        path: impl Into<PathBuf>,
-        source: io::Error,
-    ) -> Self {
+    pub(crate) fn io(operation: &'static str, path: impl Into<PathBuf>, source: io::Error) -> Self {
         Self::Io {
             operation,
             path: path.into(),
@@ -69,10 +65,18 @@ impl fmt::Display for RunnerError {
             }
             Self::UnsafeRunId => formatter.write_str("unsafe or empty local runner run_id"),
             Self::RunAlreadyExists { path } => {
-                write!(formatter, "run directory already exists: {}", path.display())
+                write!(
+                    formatter,
+                    "run directory already exists: {}",
+                    path.display()
+                )
             }
             Self::Cleanup { path, source } => {
-                write!(formatter, "run cleanup failed for {}: {source}", path.display())
+                write!(
+                    formatter,
+                    "run cleanup failed for {}: {source}",
+                    path.display()
+                )
             }
         }
     }
