@@ -21,15 +21,23 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12.13'
-      - name: Verify Python identity
-        run: python --version | grep -Fx 'Python 3.12.13'
+      - name: Install exact uv and frozen Task 10 dependencies
+        run: |
+          python -m pip install --disable-pip-version-check --no-cache-dir uv==0.12.0
+          uv lock --check --python 3.12.13
+          uv sync --frozen
+      - name: Verify Python and uv identities
+        run: |
+          python --version | grep -Fx 'Python 3.12.13'
+          python -c "import importlib.metadata as m; assert m.version('uv') == '0.12.0'"
+          uv run --frozen python -c "import importlib.metadata as m; assert m.version('jsonschema') == '4.26.0'"
       - name: Observe absent Inspect adapter production API
         shell: bash
         run: |
           test ! -e python/gs_eval_adapters/inspect_adapter.py
           test ! -e python/gs_eval_adapters/inspect_replay.py
           set +e
-          PYTHONPATH=python:tests/adapters/inspect python tests/adapters/inspect/test_contract.py > /tmp/task11-red.log 2>&1
+          PYTHONPATH=python:tests/adapters/inspect uv run --frozen python tests/adapters/inspect/test_contract.py > /tmp/task11-red.log 2>&1
           status=$?
           set -e
           cat /tmp/task11-red.log
