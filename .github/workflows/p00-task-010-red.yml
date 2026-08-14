@@ -28,12 +28,12 @@ jobs:
         run: |
           test ! -e python/gs_eval_adapters
           set +e
-          PYTHONPATH=python python tests/adapters/test_contract.py > task10-red.log 2>&1
+          PYTHONPATH=python python tests/adapters/test_contract.py > /tmp/task10-red.log 2>&1
           status=$?
           set -e
-          cat task10-red.log
+          cat /tmp/task10-red.log
           test "$status" -ne 0
-          grep -F "ModuleNotFoundError: No module named 'gs_eval_adapters'" task10-red.log
+          grep -F "ModuleNotFoundError: No module named 'gs_eval_adapters'" /tmp/task10-red.log
       - name: Verify RED branch contains no production implementation
         run: test ! -e python/gs_eval_adapters
       - name: Verify repository clean
