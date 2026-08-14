@@ -9,38 +9,32 @@ name: P00 Task 009 Native Foundry
       - .github/workflows/p00-task-009.yml
       - docs/phase-00/tasks/P00-TASK-009.md
       - docs/phase-00/evidence/P00-TASK-009-*.md
+  push:
+    branches:
+      - main
+    paths:
+      - Cargo.toml
+      - Cargo.lock
+      - crates/gs-foundry-cli/**
+      - .github/workflows/p00-task-009.yml
+      - docs/phase-00/tasks/P00-TASK-009.md
+      - docs/phase-00/evidence/P00-TASK-009-*.md
   workflow_dispatch:
 
-# Temporary bootstrap permission: Cargo may add only the new local package
-# entry and rustfmt may commit mechanical Task 9 changes. This workflow is
-# replaced by read-only --locked verification before final review and merge.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
-          ref: ${{ github.head_ref || github.ref_name }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - name: Install Rust 1.97.1
         run: rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
       - name: Select Rust 1.97.1
         run: rustup override set 1.97.1
-      - name: Resolve local package and apply mechanical formatting
-        shell: bash
-        run: |
-          cargo check -p gs-foundry-cli
-          cargo fmt --all
-          if ! git diff --quiet -- Cargo.lock crates/gs-foundry-cli; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add Cargo.lock crates/gs-foundry-cli
-            git commit -m "build: lock and format Task 9 native Foundry"
-            git push origin "HEAD:${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
-          fi
-      - name: Verify Task 9
+      - name: Verify Task 9 from the committed lock graph
         run: bash crates/gs-foundry-cli/ci.sh
