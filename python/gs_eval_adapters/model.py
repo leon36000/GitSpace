@@ -112,39 +112,50 @@ class AdapterResult:
 
         artifacts: dict[str, str] = {}
         for name, uri in self.artifacts.items():
-            try:
-                validated_name = validate_name(name, path=f"$/artifacts/{name}")
-                artifacts[validated_name] = validate_cas_uri(
-                    uri,
-                    path=f"$/artifacts/{name}",
+            if type(name) is not str:
+                name_type = type(name)
+                raise AdapterContractError(
+                    "$/artifacts: key type "
+                    f"{name_type.__module__}.{name_type.__qualname__} "
+                    "is not an exact string"
                 )
+            path = f"$/artifacts/{name}"
+            try:
+                validated_name = validate_name(name, path=path)
+                artifacts[validated_name] = validate_cas_uri(uri, path=path)
             except JsonBoundaryError as error:
                 raise AdapterContractError(str(error)) from error
 
         metrics: dict[str, int | float] = {}
         for name, metric in self.metrics.items():
+            if type(name) is not str:
+                name_type = type(name)
+                raise AdapterContractError(
+                    "$/metrics: key type "
+                    f"{name_type.__module__}.{name_type.__qualname__} "
+                    "is not an exact string"
+                )
+            path = f"$/metrics/{name}"
             try:
-                validated_name = validate_name(name, path=f"$/metrics/{name}")
+                validated_name = validate_name(name, path=path)
             except JsonBoundaryError as error:
                 raise AdapterContractError(str(error)) from error
             if type(metric) not in (int, float):
                 raise AdapterContractError(
-                    f"$/metrics/{name}: expected exact non-bool number"
+                    f"{path}: expected exact non-bool number"
                 )
             if type(metric) is int and not -SAFE_INTEGER <= metric <= SAFE_INTEGER:
                 raise AdapterContractError(
-                    f"$/metrics/{name}: unsafe interoperable integer"
+                    f"{path}: unsafe interoperable integer"
                 )
             if type(metric) is float and not math.isfinite(metric):
-                raise AdapterContractError(f"$/metrics/{name}: non-finite metric")
+                raise AdapterContractError(f"{path}: non-finite metric")
             if (
                 type(metric) is float
                 and metric == 0.0
                 and math.copysign(1.0, metric) < 0.0
             ):
-                raise AdapterContractError(
-                    f"$/metrics/{name}: negative zero is forbidden"
-                )
+                raise AdapterContractError(f"{path}: negative zero is forbidden")
             metrics[validated_name] = metric
 
         try:
