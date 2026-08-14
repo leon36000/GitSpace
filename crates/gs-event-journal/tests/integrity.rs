@@ -165,20 +165,10 @@ fn independent_handles_serialize_an_identical_retry() {
     let journal_root = root.path().join("journal");
     let cas_root = root.path().join("cas");
     let first = Arc::new(
-        LocalEventJournal::open(
-            &journal_root,
-            LocalCas::open(&cas_root).unwrap(),
-            RUN_5,
-        )
-        .unwrap(),
+        LocalEventJournal::open(&journal_root, LocalCas::open(&cas_root).unwrap(), RUN_5).unwrap(),
     );
     let second = Arc::new(
-        LocalEventJournal::open(
-            &journal_root,
-            LocalCas::open(&cas_root).unwrap(),
-            RUN_5,
-        )
-        .unwrap(),
+        LocalEventJournal::open(&journal_root, LocalCas::open(&cas_root).unwrap(), RUN_5).unwrap(),
     );
     let event = event(RUN_5, 0, "RUN_STARTED");
     let barrier = Arc::new(Barrier::new(3));
