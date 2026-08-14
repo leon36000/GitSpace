@@ -91,9 +91,10 @@ fn state_after_substitution_fails_closed() {
     let mut receipt = foundry.run(NativeScenario::Pass).unwrap();
     let cas = LocalCas::open(foundry.cas_root()).unwrap();
     let mut state: Value = get_json(&cas, &receipt.state_after_uri);
-    state.as_array_mut().unwrap().retain(|entry| {
-        entry.get("path").and_then(Value::as_str) != Some("output/result.txt")
-    });
+    state
+        .as_array_mut()
+        .unwrap()
+        .retain(|entry| entry.get("path").and_then(Value::as_str) != Some("output/result.txt"));
     let uri = put_json(&cas, &state);
     replace_artifact(&cas, &mut receipt, "state_after", uri);
 
@@ -141,7 +142,11 @@ fn evidence_environment_substitution_fails_closed() {
     evidence.environment_digest = sha256_digest(b"wrong environment").to_string();
     replace_evidence(&cas, &mut receipt, evidence);
 
-    assert_replay_rejects(&foundry, &receipt, "EvidenceBundle environment substitution");
+    assert_replay_rejects(
+        &foundry,
+        &receipt,
+        "EvidenceBundle environment substitution",
+    );
 }
 
 #[test]
@@ -209,10 +214,7 @@ fn open_foundry(root: &TestDir) -> NativeFoundry {
 }
 
 fn assert_replay_rejects(foundry: &NativeFoundry, receipt: &RunReceipt, label: &str) {
-    assert!(
-        foundry.replay(receipt).is_err(),
-        "replay accepted {label}"
-    );
+    assert!(foundry.replay(receipt).is_err(), "replay accepted {label}");
 }
 
 fn replace_artifact(cas: &LocalCas, receipt: &mut RunReceipt, name: &str, uri: String) {
@@ -293,5 +295,7 @@ fn hex_nibble(byte: u8) -> u8 {
 fn journal_path(root: &Path, run_id: &str) -> PathBuf {
     let digest = sha256_digest(run_id.as_bytes()).to_string();
     let hex = digest.strip_prefix("sha256:").expect("digest prefix");
-    root.join("journal").join("runs").join(format!("{hex}.gsej"))
+    root.join("journal")
+        .join("runs")
+        .join(format!("{hex}.gsej"))
 }
