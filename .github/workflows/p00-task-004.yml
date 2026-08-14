@@ -46,6 +46,8 @@ jobs:
         run: cargo metadata --locked --no-deps --format-version 1 > /tmp/gitspace-cargo-metadata.json
       - name: Test shared corpus with Rust
         run: cargo test --locked -p gs-eval-ir --all-targets
+      - name: Test complete workspace against the revised IR
+        run: cargo test --locked --workspace --all-targets
       - name: Clippy
         run: cargo clippy --locked -p gs-eval-ir --all-targets -- -D warnings
       - name: Formatting
