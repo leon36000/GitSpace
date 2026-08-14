@@ -1,0 +1,103 @@
+name: P00 Task 011 Inspect Adapter
+
+on:
+  pull_request:
+    paths:
+      - pyproject.toml
+      - uv.lock
+      - python/gs_eval_adapters/inspect_adapter.py
+      - python/gs_eval_adapters/inspect_replay.py
+      - tests/adapters/inspect/**
+      - docs/phase-00/qualifications/inspect-ai-0.3.258.json
+      - docs/phase-00/tasks/P00-TASK-011.md
+      - docs/phase-00/evidence/P00-TASK-011-*.md
+      - .github/workflows/p00-task-011.yml
+  push:
+    branches:
+      - main
+    paths:
+      - pyproject.toml
+      - uv.lock
+      - python/gs_eval_adapters/inspect_adapter.py
+      - python/gs_eval_adapters/inspect_replay.py
+      - tests/adapters/inspect/**
+      - docs/phase-00/qualifications/inspect-ai-0.3.258.json
+      - docs/phase-00/tasks/P00-TASK-011.md
+      - docs/phase-00/evidence/P00-TASK-011-*.md
+      - .github/workflows/p00-task-011.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Record exact checked-out head
+        run: git rev-parse HEAD
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12.13'
+      - name: Install exact uv
+        run: python -m pip install --disable-pip-version-check --no-cache-dir uv==0.12.0
+      - name: Verify Python and uv identities
+        run: |
+          python --version | grep -Fx 'Python 3.12.13'
+          python -c "import importlib.metadata as m; assert m.version('uv') == '0.12.0'"
+      - name: Verify committed Inspect dependency graph
+        run: uv lock --check --python 3.12.13
+      - name: Sync frozen Python environment
+        run: uv sync --frozen
+      - name: Verify exact qualified distributions
+        run: |
+          uv run --frozen python -c "import importlib.metadata as m; assert m.version('inspect-ai') == '0.3.258'"
+          uv run --frozen python -c "import importlib.metadata as m; assert m.version('jsonschema') == '4.26.0'"
+      - name: Test Inspect adapter contract
+        run: PYTHONPATH=python:tests/adapters/inspect uv run --frozen python -m unittest discover -s tests/adapters/inspect -p 'test_*.py' -v
+      - name: Kill critical Inspect adapter mutations
+        run: PYTHONPATH=python:tests/adapters/inspect uv run --frozen python tests/adapters/inspect/run_mutations.py
+      - name: Replay provider-neutral SDK contract
+        run: PYTHONPATH=python:tests/adapters uv run --frozen python -m unittest discover -s tests/adapters -p 'test_*.py' -v
+      - name: Compile Python adapter boundary
+        run: PYTHONPATH=python uv run --frozen python -m compileall -q python/gs_eval_adapters tests/adapters/inspect
+      - name: Replay Python toolchain contract
+        run: uv run --frozen python -m unittest -v tests/contracts/test_toolchains.py
+      - name: Replay sovereign schema contract
+        run: uv run --frozen python -m unittest -v tests/contracts/test_eval_ir_schemas.py
+      - name: Replay Task 11 from a clean archive
+        shell: bash
+        run: |
+          archive_dir="$(mktemp -d)"
+          git archive HEAD | tar -x -C "$archive_dir"
+          (
+            cd "$archive_dir"
+            uv lock --check --python 3.12.13
+            uv sync --frozen
+            uv run --frozen python -c "import importlib.metadata as m; assert m.version('inspect-ai') == '0.3.258'"
+            PYTHONPATH=python:tests/adapters/inspect uv run --frozen python -m unittest discover -s tests/adapters/inspect -p 'test_*.py' -v
+            PYTHONPATH=python:tests/adapters uv run --frozen python -m unittest discover -s tests/adapters -p 'test_*.py' -v
+            PYTHONPATH=python uv run --frozen python -m compileall -q python/gs_eval_adapters tests/adapters/inspect
+            uv run --frozen python -m unittest -v tests/contracts/test_toolchains.py
+            uv run --frozen python -m unittest -v tests/contracts/test_eval_ir_schemas.py
+          )
+          rm -rf "$archive_dir"
+      - name: Install Rust 1.97.1
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+          rustup override set 1.97.1
+      - name: Verify locked Rust graph
+        run: cargo metadata --locked --no-deps --format-version 1 > /tmp/gitspace-cargo-metadata.json
+      - name: Test complete Rust workspace
+        run: cargo test --locked --workspace --all-targets
+      - name: Clippy complete Rust workspace
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - name: Rust formatting
+        run: cargo fmt --all -- --check
+      - name: Verify repository clean
+        run: test -z "$(git status --porcelain=v1)"
