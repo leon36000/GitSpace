@@ -204,9 +204,10 @@ impl<C: Cas> EventSource for LocalEventJournal<C> {
 
     fn read_from(&self, start: EventOffset) -> Result<Vec<JournalRecord>, EventError> {
         let index = self.read_index_shared()?;
+        let start_index = usize::try_from(start.get()).unwrap_or(usize::MAX);
         index
             .into_iter()
-            .skip(start.get() as usize)
+            .skip(start_index)
             .map(|record| self.read_event(record))
             .collect()
     }
