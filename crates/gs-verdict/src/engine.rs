@@ -116,10 +116,21 @@ fn coverage(field: &'static str, count: CoverageCount) -> Result<(f64, bool), Ve
         return Ok((0.0, false));
     }
 
-    Ok((
-        count.closed as f64 / count.total as f64,
-        count.closed == count.total,
-    ))
+    let complete = count.closed == count.total;
+    if complete {
+        return Ok((1.0, true));
+    }
+    if count.closed == 0 {
+        return Ok((0.0, false));
+    }
+
+    let raw = count.closed as f64 / count.total as f64;
+    let strictly_incomplete = if raw >= 1.0 {
+        f64::from_bits(1.0_f64.to_bits() - 1)
+    } else {
+        raw
+    };
+    Ok((strictly_incomplete, false))
 }
 
 struct NormalizedRisks {
