@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import unittest
 
 from fixtures import IMPLEMENTATION_DIGEST, request_values
@@ -11,6 +12,7 @@ from gs_eval_adapters import (
     AdapterStatus,
     JsonBoundaryError,
     RegistrationError,
+    SchemaValidationError,
     execute_adapter,
 )
 
@@ -33,6 +35,14 @@ class IntegerSubclass(int):
 
 class FloatSubclass(float):
     pass
+
+
+class ReprTrap:
+    def __hash__(self) -> int:
+        return 1
+
+    def __repr__(self) -> str:
+        raise RuntimeError("repr trap")
 
 
 class BaseAdapter:
@@ -88,6 +98,16 @@ class DescriptorTrap:
         return {}
 
 
+class CountingDescriptorAdapter(BaseAdapter):
+    def __init__(self) -> None:
+        self.descriptor_accesses = 0
+
+    @property
+    def descriptor(self) -> AdapterDescriptor:
+        self.descriptor_accesses += 1
+        return BaseAdapter.descriptor
+
+
 def request_with(value: object) -> AdapterRequest:
     task, agent = request_values()
     return AdapterRequest(
@@ -113,6 +133,16 @@ class BoundaryHardeningTests(unittest.TestCase):
                 with self.assertRaises(JsonBoundaryError):
                     execute_adapter(BaseAdapter(), request_with(value))
 
+    def test_negative_zero_and_lone_surrogates_do_not_cross(self) -> None:
+        for value in (-0.0, "\ud800", "\udfff"):
+            with self.subTest(value=ascii(value)):
+                with self.assertRaises(JsonBoundaryError):
+                    execute_adapter(BaseAdapter(), request_with(value))
+
+    def test_hostile_dictionary_key_repr_cannot_escape_boundary_error(self) -> None:
+        with self.assertRaises(JsonBoundaryError):
+            execute_adapter(BaseAdapter(), request_with({ReprTrap(): "value"}))
+
     def test_descriptor_fields_require_exact_builtin_types(self) -> None:
         with self.assertRaises(AdapterContractError):
             AdapterDescriptor(
@@ -128,6 +158,18 @@ class BoundaryHardeningTests(unittest.TestCase):
                 protocol_version=True,
                 implementation_digest=IMPLEMENTATION_DIGEST,
             )
+
+    def test_schema_validation_precedes_external_descriptor_access(self) -> None:
+        task, agent = request_values()
+        task["id"] = "not-a-task"
+        adapter = CountingDescriptorAdapter()
+
+        with self.assertRaises(SchemaValidationError):
+            execute_adapter(
+                adapter,
+                AdapterRequest(task=task, agent=agent, seed=0, extensions={}),
+            )
+        self.assertEqual(adapter.descriptor_accesses, 0)
 
     def test_exception_with_unprintable_message_is_still_normalized(self) -> None:
         result = execute_adapter(HostileExceptionAdapter(), request_with("ok"))
