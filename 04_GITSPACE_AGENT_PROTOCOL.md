@@ -3,7 +3,7 @@ doc_id: GS-04
 title: GitSpace — Agent Protocol
 authority: OPERATING_PROTOCOL
 status: ACTIVE
-version: 0.4.2
+version: 0.4.3
 updated: 2026-08-14
 read_when: PLANNING_EXECUTION_HANDOFF_OR_MEMORY_UPDATE
 ---
@@ -135,12 +135,16 @@ Les logs bruts sont immuables; les secrets sont redacted; modèle, harness, outi
 - Evaluation IR GitSpace reste souverain; les frameworks externes sont des adaptateurs.
 - Sécurité, autorité, intégrité, portée et nettoyage sont non compensables.
 - Le verdict engine recalcule `safe_success` et `false_done`; ces champs ne sont jamais acceptés depuis un score, une confiance ou un consensus.
+- Un run ne pré-déclare jamais `replay_passed`, `independent_verification_passed` ou `regression_free` sans artefact attribué disponible au moment du verdict.
 - Les oracles protégés restent hors du workspace agent.
 - Le runner M0 n’exécute que des opérations typées. Il ne constitue pas un sandbox de shell, code natif ou WASM non fiable.
-- CAS, journal et runner locaux sont des pilotes M0, pas des décisions de stockage ou d’orchestration distribuée.
+- Le replay Foundry vérifie les artefacts et références sans réexécuter le runner ou le modèle et sans créer, réparer ou muter le store.
+- Une identité dérivée sert au routage; le commit source complet reste la preuve de provenance.
+- CAS, journal, runner et Foundry locaux sont des pilotes M0, pas des décisions de stockage ou d’orchestration distribuée.
 - Un préprint non reproduit reste expérimental.
 - Neon, Temporal, SonarQube, Fallow et AMD sont activés seulement lorsqu’un besoin mesuré les rend pertinents.
 - Une CI verte ne suffit pas sans revue, merge signé et preuve post-merge.
+- Une revue rôle-séparée ne ferme pas la gate d’identité indépendante du milestone M0.
 - Faux `DONE = 0`.
 
 ## 7. Mémoire et RAGLite
@@ -210,36 +214,44 @@ proven_tasks:
   - P00-TASK-006
   - P00-TASK-007
   - P00-TASK-008
-active_task: P00-TASK-009
+  - P00-TASK-009
+active_task: P00-TASK-010
 active_task_status: NOT_PACKETIZED
+m0_status: PARTIALLY_VERIFIED
+m0_blocker: IDENTITY_INDEPENDENT_REPRODUCTION_MISSING
 phase_status: PARTIALLY_VERIFIED
 ```
 
 Preuves récentes :
 
-- Task 7 verdict : merge signé `453b7a1e33daac5d485ad176608225403b2ba5dc`, post-merge `31767376709` / `94665911378`.
 - Task 8 runner : merge signé `69e39f77c902a2560bed39314bf8b8fffad8f3f7`, post-merge `31777434678` / `94695722915`.
+- Task 9 Foundry : merge signé `b15a2b74f16e8fa6bf1d88832c9191eab44f2a25`, tree `0104defea61adab4f1ef250d5eabfa8851bbb369`, post-merge `31824037711` / `94843810930`.
 
 ## 11. Handoff courant
 
 ```yaml
-session_id: GS-SESSION-20260814-TASK008
+session_id: GS-SESSION-20260814-TASK009
 objective: >-
-  Merge Task 8 state and its byte-identical RAGLite projection,
-  then packetize P00-TASK-009 from the resulting canonical main SHA.
+  Merge Task 9 state and its byte-identical RAGLite projection,
+  then packetize P00-TASK-010 from the resulting canonical main SHA.
 completed:
   - bounded local CAS proven
   - bounded local append-only journal proven
   - deterministic non-compensable verdict engine proven
   - bounded tool-mediated local runner proven
-  - timeout overrun counterexample captured and fixed
-  - cleanup verified against filesystem state
-  - signed Task 8 merge
-  - fresh successful main workflow
+  - deterministic native Foundry vertical slice proven
+  - five classifications reproduced
+  - semantic CAS substitutions rejected
+  - source-derived run identities qualified
+  - read-only replay without store mutation qualified
+  - historical proof gates kept open until evidence exists
+  - signed Task 9 merge
+  - fresh successful main replay
 blocked:
-  - P00-TASK-009 until state and RAGLite merges
-  - P00-TASK-010 until Task 9 proof
+  - milestone M0 identity-independent reproduction
+  - P00-TASK-010 until state and RAGLite merges
+  - P00-TASK-011 until Task 10 proof
 next_exact_action: >-
   Merge this state synchronization, project 00/02/04 byte-identically,
-  then produce the exact Task 9 execution packet from new main.
+  then produce the exact Task 10 execution packet from new main.
 ```
