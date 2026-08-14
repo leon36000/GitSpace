@@ -37,7 +37,7 @@ def task11_request() -> AdapterRequest:
         "version": 1,
         "lane": "L01",
         "origin": {
-            "kind": "adapted",
+            "kind": "imported",
             "source": "inspect-ai@0.3.258",
             "license": "MIT",
             "contamination_risk": "low",
