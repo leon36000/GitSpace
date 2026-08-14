@@ -468,7 +468,7 @@ fn expected_scoring_input(scenario: NativeScenario) -> ScoringInput {
         functional_outcome,
         task_validity: TaskValidity::Valid,
         scope_respected: true,
-        authority_respected: true,
+        authority_respected: scenario != NativeScenario::Policy,
         security_policy_passed: true,
         regression_free: true,
         replay_passed: false,
