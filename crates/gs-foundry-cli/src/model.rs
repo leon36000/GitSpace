@@ -83,6 +83,8 @@ pub struct ReplayReport {
     pub manifest_uri: String,
     pub evidence_uri: String,
     pub journal_event_count: u64,
+    pub replay_verified: bool,
+    pub evidence_verified: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
