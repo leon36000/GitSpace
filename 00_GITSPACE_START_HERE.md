@@ -3,7 +3,7 @@ doc_id: GS-00
 title: GitSpace — Start Here
 authority: ROUTER
 status: ACTIVE
-version: 0.4.7
+version: 0.4.8
 updated: 2026-08-14
 ---
 # GitSpace — START HERE
@@ -24,8 +24,8 @@ GitSpace est un **Native Software World Engine pour contributeurs IA**. Architec
 - état courant : `02_GITSPACE_NOW_DECISIONS_ROADMAP.md`;
 - recherche : `03_GITSPACE_RESEARCH_ATLAS.md`;
 - planification/handoff : `04_GITSPACE_AGENT_PROTOCOL.md` + plan Phase 00;
-- preuves Tasks 1–7 : `docs/phase-00/evidence/`;
-- preuve Task 7 post-merge : `docs/phase-00/evidence/P00-TASK-007-POSTMERGE.md`;
+- preuves Tasks 1–8 : `docs/phase-00/evidence/`;
+- preuve Task 8 post-merge : `docs/phase-00/evidence/P00-TASK-008-POSTMERGE.md`;
 - projection mobile : `raglite/RAGLITE-MANIFEST.yaml`.
 
 ## Invariants
@@ -40,12 +40,13 @@ GitSpace est un **Native Software World Engine pour contributeurs IA**. Architec
 - CAS local : objets immuables adressés par SHA-256, lecture re-hashée et aucun overwrite silencieux.
 - Journal local : événements canoniques dans le CAS, pointeurs append-only, offsets contigus, chaîne SHA-256 et projections reconstruisibles.
 - Verdict : `safe_success` et `false_done` sont recalculés par gates non compensables; aucun score ou consensus ne peut les fournir.
+- Runner M0 : opérations typées seulement; workspace et oracle séparés; capabilities strictes; effets et snapshot CAS; timeout coopératif; cleanup vérifié. Ce runner n’est pas un sandbox de code natif arbitraire.
 - Faux `DONE = 0`.
 
 ## État
 
-`P00-TASK-001` à `P00-TASK-007` sont fusionnées et prouvées dans leurs contrats bornés.
+`P00-TASK-001` à `P00-TASK-008` sont fusionnées et prouvées dans leurs contrats bornés.
 
-Task 7 a ajouté le verdict engine déterministe : couvertures dérivées de comptes entiers, ensembles vides non vacuement complets, dix-sept mutations indépendantes de gates, table de vérité des 256 combinaisons booléennes, durcissement numérique près de `u64::MAX`, explication machine des gates et validation finale contre le schéma `EvalVerdict` v1. Son merge GitHub signé est `453b7a1e33daac5d485ad176608225403b2ba5dc`; la reproduction post-merge fraîche est le run `31767376709`, job `94665911378`.
+Task 8 a ajouté le premier runner local tool-mediated : chemins relatifs stricts, capabilities composant-par-composant, workspace/oracle séparés, effets ordonnés et CAS-backed, timeout monotone, oracle protégé, snapshot workspace canonique et cleanup vérifié contre le filesystem. Un contre-exemple a révélé qu’un `Delay` de 500 ms sous budget 10 ms pouvait initialement durer `501.896168ms`; le test a échoué avant correction et le sommeil est désormais borné par le budget restant. Son merge GitHub signé est `69e39f77c902a2560bed39314bf8b8fffad8f3f7`; la reproduction post-merge fraîche est le run `31777434678`, job `94695722915`.
 
-La prochaine unité est `P00-TASK-008` : runner local et isolation d’oracle. La Phase 00 globale reste `PARTIALLY_VERIFIED`.
+La prochaine unité est `P00-TASK-009` : vertical slice CLI et replay. La Phase 00 globale reste `PARTIALLY_VERIFIED`.
