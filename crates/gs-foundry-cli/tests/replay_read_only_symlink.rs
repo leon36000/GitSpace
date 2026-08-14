@@ -3,7 +3,7 @@
 mod common;
 
 use common::source_commit;
-use gs_foundry_cli::NativeFoundry;
+use gs_foundry_cli::{NativeFoundry, NativeScenario};
 use std::{
     fs,
     os::unix::fs::symlink,
@@ -80,7 +80,8 @@ fn read_only_open_rejects_a_symlinked_cas_layout_component() {
 fn read_only_open_rejects_a_symlinked_journal_layout_component() {
     let root = TestDir::new("journal-runs");
     let store = root.path().join("store");
-    NativeFoundry::open(&store, source_commit()).unwrap();
+    let foundry = NativeFoundry::open(&store, source_commit()).unwrap();
+    foundry.run(NativeScenario::Pass).unwrap();
 
     let runs_root = store.join("journal").join("runs");
     fs::remove_dir_all(&runs_root).unwrap();
