@@ -72,11 +72,8 @@ fn source_commit_mismatch_fails_closed_before_replay() {
     let root = TestDir::new("source-commit-mismatch");
     let foundry = open_foundry(&root);
     let receipt = foundry.run(NativeScenario::Pass).unwrap();
-    let mismatched = NativeFoundry::open(
-        root.path(),
-        "ffffffffffffffffffffffffffffffffffffffff",
-    )
-    .unwrap();
+    let mismatched =
+        NativeFoundry::open(root.path(), "ffffffffffffffffffffffffffffffffffffffff").unwrap();
 
     let error = mismatched.replay(&receipt).unwrap_err();
     assert!(matches!(error, FoundryError::InvalidReceipt(_)));
