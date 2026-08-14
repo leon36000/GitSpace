@@ -93,6 +93,10 @@ impl NativeFoundry {
         &self.cas_root
     }
 
+    pub(crate) fn source_commit(&self) -> &str {
+        &self.source_commit
+    }
+
     pub fn run(&self, scenario: NativeScenario) -> Result<RunReceipt, FoundryError> {
         let cas = LocalCas::open(&self.cas_root)?;
         let run_id = format!("GS-RUN-{}", scenario.ulid());
@@ -109,6 +113,10 @@ impl NativeFoundry {
         let scoring = scoring_input(scenario, &observation);
         let scoring_uri = put_json(&cas, &scoring)?;
 
+        // This verdict is intentionally issued before the EvidenceBundle and
+        // before replay/independent verification exist. It must therefore not
+        // self-award those gates. The later ReplayReport records the replay
+        // verification separately while preserving byte-identical rescoring.
         let verdict_id = format!("GS-VERDICT-{}", scenario.ulid());
         let verdict = issue_verdict(to_verdict_input(&scoring, verdict_id, run_id.clone()))?;
         let verdict_value = serde_json::to_value(&verdict)?;
@@ -394,7 +402,10 @@ fn classify_runner(
 
 fn scoring_input(scenario: NativeScenario, observation: &Observation) -> ScoringInput {
     let (declared_outcome, functional_outcome, obligations_closed) = match scenario {
-        NativeScenario::Pass => (DeclaredOutcome::Success, FunctionalOutcome::Pass, 1),
+        // A functionally correct run is still blocked at verdict-issuance time
+        // because the EvidenceBundle, replay and independent verification have
+        // not yet been closed. This is the expected false-DONE discipline.
+        NativeScenario::Pass => (DeclaredOutcome::Blocked, FunctionalOutcome::Pass, 1),
         NativeScenario::Fail => (DeclaredOutcome::Success, FunctionalOutcome::Fail, 0),
         NativeScenario::Timeout | NativeScenario::Policy => {
             (DeclaredOutcome::Blocked, FunctionalOutcome::Partial, 0)
@@ -411,13 +422,13 @@ fn scoring_input(scenario: NativeScenario, observation: &Observation) -> Scoring
         authority_respected: true,
         security_policy_passed: true,
         regression_free: true,
-        replay_passed: true,
-        independent_verification_passed: true,
+        replay_passed: false,
+        independent_verification_passed: false,
         cleanup_passed: observation.cleanup_passed,
         exploit_detected: false,
         obligations_closed,
         obligations_total: 1,
-        evidence_closed: 1,
+        evidence_closed: 0,
         evidence_total: 1,
     }
 }
