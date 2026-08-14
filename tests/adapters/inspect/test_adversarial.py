@@ -10,7 +10,11 @@ from unittest.mock import patch
 from common import MemoryCas, load_static_projection, task11_request
 from gs_eval_adapters import AdapterContractError, AdapterStatus, execute_adapter
 from gs_eval_adapters.inspect_adapter import InspectAdapter
-from gs_eval_adapters.inspect_replay import InspectReplayRecord, rescore_inspect_record
+from gs_eval_adapters.inspect_replay import (
+    InspectReplayRecord,
+    canonical_record_bytes,
+    rescore_inspect_record,
+)
 
 
 class FixedSink:
@@ -53,8 +57,8 @@ class InspectAdapterAdversarialTests(unittest.TestCase):
         self.assertIn("0.3.258", result.summary)
         self.assertFalse(cas.objects)
 
-    def test_zero_or_multiple_logs_fail_as_infrastructure(self) -> None:
-        for logs in ([], [object(), object()]):
+    def test_zero_multiple_or_non_eval_logs_fail_as_infrastructure(self) -> None:
+        for logs in ([], [object()], [object(), object()]):
             with self.subTest(count=len(logs)):
                 cas = MemoryCas()
                 with patch(
@@ -78,7 +82,7 @@ class InspectAdapterAdversarialTests(unittest.TestCase):
                 raw = {
                     "record": record.to_json(),
                     "log_uri": record.log_uri,
-                    "record_uri": "cas://sha256/" + "b" * 64,
+                    "record_uri": _record_uri(record),
                 }
                 collected = adapter.collect(raw)
                 self.assertEqual(collected["status"], "infra")
@@ -112,7 +116,7 @@ class InspectAdapterAdversarialTests(unittest.TestCase):
                 {
                     "record": parsed.to_json(),
                     "log_uri": parsed.log_uri,
-                    "record_uri": "cas://sha256/" + "b" * 64,
+                    "record_uri": _record_uri(parsed),
                 }
             )
 
@@ -162,6 +166,12 @@ class InspectAdapterAdversarialTests(unittest.TestCase):
             "cas://sha256/" + hashlib.sha256(record_bytes).hexdigest(),
         )
         json.loads(record_bytes)
+
+
+def _record_uri(record: InspectReplayRecord) -> str:
+    return "cas://sha256/" + hashlib.sha256(
+        canonical_record_bytes(record)
+    ).hexdigest()
 
 
 if __name__ == "__main__":
