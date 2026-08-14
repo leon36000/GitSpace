@@ -1,7 +1,6 @@
 use crate::{
     FoundryError, NativeFoundry, NativeScenario, ObservedClassification, ReplayReport, RunReceipt,
-    ScoringInput, artifacts::get_bytes, native::to_verdict_input,
-    store::validate_replay_layout,
+    ScoringInput, artifacts::get_bytes, native::to_verdict_input, store::validate_replay_layout,
 };
 use gs_canonical_json::{canonical_bytes, canonical_digest, sha256_digest};
 use gs_cas::{Cas, LocalCas};
