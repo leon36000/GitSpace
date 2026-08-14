@@ -12,9 +12,9 @@ name: P00 Task 006 Event Journal
       - docs/phase-00/evidence/P00-TASK-006-*.md
   workflow_dispatch:
 
-# Temporary bootstrap permission: this workflow may write only the generated
-# Cargo.lock to its same-repository head branch. It is replaced by read-only
-# verification before final review and merge.
+# Temporary bootstrap permission: Cargo resolves from the existing lockfile and
+# may commit only the new local package entry. This workflow is replaced by
+# read-only --locked verification before final review and merge.
 permissions:
   contents: write
 
@@ -31,15 +31,15 @@ jobs:
         run: rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
       - name: Select Rust 1.97.1
         run: rustup override set 1.97.1
-      - name: Generate and commit exact Task 6 lock graph when required
+      - name: Resolve only the new local Task 6 package into Cargo.lock
         shell: bash
         run: |
-          cargo generate-lockfile
+          cargo check -p gs-event-journal
           if ! git diff --quiet -- Cargo.lock; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add Cargo.lock
-            git commit -m "build: lock Task 6 dependency graph"
+            git commit -m "build: minimally lock Task 6 local package"
             git push origin "HEAD:${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
           fi
       - name: Verify Task 6

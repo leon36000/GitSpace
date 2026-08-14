@@ -1,5 +1,5 @@
 use gs_canonical_json::canonical_digest;
-use gs_cas::{Cas, LocalCas};
+use gs_cas::LocalCas;
 use gs_eval_ir::{Extensions, RunEvent};
 use gs_event_journal::{EventError, EventOffset, EventSink, EventSource, LocalEventJournal};
 use serde_json::Value;
