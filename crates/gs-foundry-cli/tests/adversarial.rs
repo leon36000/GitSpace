@@ -1,9 +1,9 @@
 mod common;
 
 use common::source_commit;
-use gs_canonical_json::Digest;
+use gs_canonical_json::{Digest, sha256_digest};
 use gs_cas::LocalCas;
-use gs_foundry_cli::{FoundryError, NativeFoundry, NativeScenario};
+use gs_foundry_cli::{FoundryError, NativeFoundry, NativeScenario, RunReceipt};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -38,24 +38,102 @@ fn open_foundry(root: &TestDir) -> NativeFoundry {
     NativeFoundry::open(root.path(), source_commit()).expect("open native Foundry")
 }
 
-#[test]
-fn missing_required_cas_artifact_fails_replay_without_repair() {
-    let root = TestDir::new("missing-artifact");
-    let foundry = open_foundry(&root);
-    let receipt = foundry.run(NativeScenario::Pass).unwrap();
-    let cas = LocalCas::open(foundry.cas_root()).unwrap();
-    let before = count_objects(cas.root());
-    let digest = digest_from_uri(&receipt.verdict_uri);
-    fs::remove_file(cas.object_path(&digest)).unwrap();
-    let after_delete = count_objects(cas.root());
+#[derive(Clone, Copy)]
+enum RequiredObject {
+    Task,
+    Plan,
+    Scoring,
+    Verdict,
+    Evidence,
+    Manifest,
+    Trace,
+    StateBefore,
+    StateAfter,
+    Patch,
+    FixtureInput,
+    WorkspaceOutput,
+}
 
-    assert!(foundry.replay(&receipt).is_err());
-    assert_eq!(
-        count_objects(cas.root()),
-        after_delete,
-        "replay repaired a missing CAS object"
-    );
-    assert_eq!(before, after_delete + 1);
+impl RequiredObject {
+    const ALL: [Self; 12] = [
+        Self::Task,
+        Self::Plan,
+        Self::Scoring,
+        Self::Verdict,
+        Self::Evidence,
+        Self::Manifest,
+        Self::Trace,
+        Self::StateBefore,
+        Self::StateAfter,
+        Self::Patch,
+        Self::FixtureInput,
+        Self::WorkspaceOutput,
+    ];
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Task => "task",
+            Self::Plan => "plan",
+            Self::Scoring => "scoring",
+            Self::Verdict => "verdict",
+            Self::Evidence => "evidence",
+            Self::Manifest => "manifest",
+            Self::Trace => "trace",
+            Self::StateBefore => "state-before",
+            Self::StateAfter => "state-after",
+            Self::Patch => "patch",
+            Self::FixtureInput => "fixture-input",
+            Self::WorkspaceOutput => "workspace-output",
+        }
+    }
+
+    fn digest(self, receipt: &RunReceipt) -> Digest {
+        match self {
+            Self::Task => digest_from_uri(&receipt.task_uri),
+            Self::Plan => digest_from_uri(&receipt.plan_uri),
+            Self::Scoring => digest_from_uri(&receipt.scoring_uri),
+            Self::Verdict => digest_from_uri(&receipt.verdict_uri),
+            Self::Evidence => digest_from_uri(&receipt.evidence_uri),
+            Self::Manifest => digest_from_uri(&receipt.manifest_uri),
+            Self::Trace => digest_from_uri(&receipt.trace_uri),
+            Self::StateBefore => digest_from_uri(&receipt.state_before_uri),
+            Self::StateAfter => digest_from_uri(&receipt.state_after_uri),
+            Self::Patch => digest_from_uri(&receipt.patch_uri),
+            Self::FixtureInput => sha256_digest(b"hello"),
+            Self::WorkspaceOutput => sha256_digest(b"done"),
+        }
+    }
+}
+
+#[test]
+fn every_required_cas_object_fails_replay_without_repair_when_missing() {
+    for object in RequiredObject::ALL {
+        let root = TestDir::new(object.label());
+        let foundry = open_foundry(&root);
+        let receipt = foundry.run(NativeScenario::Pass).unwrap();
+        let cas = LocalCas::open(foundry.cas_root()).unwrap();
+        let before = count_objects(cas.root());
+        fs::remove_file(cas.object_path(&object.digest(&receipt))).unwrap();
+        let after_delete = count_objects(cas.root());
+
+        assert!(
+            foundry.replay(&receipt).is_err(),
+            "replay accepted missing {} object",
+            object.label()
+        );
+        assert_eq!(
+            count_objects(cas.root()),
+            after_delete,
+            "replay repaired missing {} object",
+            object.label()
+        );
+        assert_eq!(
+            before,
+            after_delete + 1,
+            "test did not remove exactly one {} object",
+            object.label()
+        );
+    }
 }
 
 #[test]
@@ -93,6 +171,23 @@ fn missing_journal_blocks_replay_and_is_not_recreated() {
         !journal.exists(),
         "read-only replay recreated a missing journal"
     );
+}
+
+#[test]
+fn corrupt_journal_blocks_replay_without_repair() {
+    let root = TestDir::new("corrupt-journal");
+    let foundry = open_foundry(&root);
+    let receipt = foundry.run(NativeScenario::Pass).unwrap();
+    let journal = journal_path(root.path(), &receipt.run_id);
+    let mut corrupted = fs::read(&journal).unwrap();
+    corrupted[0] ^= 0xff;
+    fs::write(&journal, &corrupted).unwrap();
+    let cas = LocalCas::open(foundry.cas_root()).unwrap();
+    let before_count = count_objects(cas.root());
+
+    assert!(foundry.replay(&receipt).is_err());
+    assert_eq!(fs::read(&journal).unwrap(), corrupted);
+    assert_eq!(count_objects(cas.root()), before_count);
 }
 
 #[test]
@@ -156,7 +251,7 @@ fn count_objects(root: &Path) -> usize {
 }
 
 fn journal_path(root: &Path, run_id: &str) -> PathBuf {
-    let digest = gs_canonical_json::sha256_digest(run_id.as_bytes()).to_string();
+    let digest = sha256_digest(run_id.as_bytes()).to_string();
     root.join("journal")
         .join("runs")
         .join(format!("{}.gsej", digest.strip_prefix("sha256:").unwrap()))
