@@ -1,3 +1,6 @@
+mod common;
+
+use common::source_commit;
 use gs_canonical_json::Digest;
 use gs_cas::LocalCas;
 use gs_foundry_cli::{FoundryError, NativeFoundry, NativeScenario};
@@ -8,7 +11,6 @@ use std::{
 };
 
 static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
-const SOURCE_COMMIT: &str = "7cc65f670dfd7a682c77d3cc8cda656fe9c30ccd";
 
 struct TestDir(PathBuf);
 impl TestDir {
@@ -32,10 +34,14 @@ impl Drop for TestDir {
     }
 }
 
+fn open_foundry(root: &TestDir) -> NativeFoundry {
+    NativeFoundry::open(root.path(), source_commit()).expect("open native Foundry")
+}
+
 #[test]
 fn missing_required_cas_artifact_fails_replay_without_repair() {
     let root = TestDir::new("missing-artifact");
-    let foundry = NativeFoundry::open(root.path(), SOURCE_COMMIT).unwrap();
+    let foundry = open_foundry(&root);
     let receipt = foundry.run(NativeScenario::Pass).unwrap();
     let cas = LocalCas::open(foundry.cas_root()).unwrap();
     let before = count_objects(cas.root());
@@ -55,16 +61,31 @@ fn missing_required_cas_artifact_fails_replay_without_repair() {
 #[test]
 fn crossed_receipt_reference_fails_closed() {
     let root = TestDir::new("crossed-receipt");
-    let foundry = NativeFoundry::open(root.path(), SOURCE_COMMIT).unwrap();
+    let foundry = open_foundry(&root);
     let mut receipt = foundry.run(NativeScenario::Pass).unwrap();
     receipt.manifest_uri = receipt.verdict_uri.clone();
     assert!(foundry.replay(&receipt).is_err());
 }
 
 #[test]
+fn source_commit_mismatch_fails_closed_before_replay() {
+    let root = TestDir::new("source-commit-mismatch");
+    let foundry = open_foundry(&root);
+    let receipt = foundry.run(NativeScenario::Pass).unwrap();
+    let mismatched = NativeFoundry::open(
+        root.path(),
+        "ffffffffffffffffffffffffffffffffffffffff",
+    )
+    .unwrap();
+
+    let error = mismatched.replay(&receipt).unwrap_err();
+    assert!(matches!(error, FoundryError::InvalidReceipt(_)));
+}
+
+#[test]
 fn missing_journal_blocks_replay_and_is_not_recreated() {
     let root = TestDir::new("missing-journal");
-    let foundry = NativeFoundry::open(root.path(), SOURCE_COMMIT).unwrap();
+    let foundry = open_foundry(&root);
     let receipt = foundry.run(NativeScenario::Policy).unwrap();
     let journal = journal_path(root.path(), &receipt.run_id);
     fs::remove_file(&journal).unwrap();
@@ -80,7 +101,7 @@ fn missing_journal_blocks_replay_and_is_not_recreated() {
 #[test]
 fn rerunning_same_deterministic_scenario_is_idempotent() {
     let root = TestDir::new("idempotent");
-    let foundry = NativeFoundry::open(root.path(), SOURCE_COMMIT).unwrap();
+    let foundry = open_foundry(&root);
     let first = foundry.run(NativeScenario::Pass).unwrap();
     let second = foundry.run(NativeScenario::Pass).unwrap();
     assert_eq!(first, second);
@@ -89,7 +110,7 @@ fn rerunning_same_deterministic_scenario_is_idempotent() {
 #[test]
 fn controlled_infra_collision_is_removed_after_classification() {
     let root = TestDir::new("infra-cleanup");
-    let foundry = NativeFoundry::open(root.path(), SOURCE_COMMIT).unwrap();
+    let foundry = open_foundry(&root);
     let receipt = foundry.run(NativeScenario::Infra).unwrap();
     assert_eq!(
         receipt.classification,
