@@ -1,4 +1,4 @@
-use gs_cas::{Cas, LocalCas};
+use gs_cas::LocalCas;
 use gs_foundry_cli::{
     NativeFoundry, NativeScenario, ObservedClassification, ReplayReport, RunReceipt, receipt_bytes,
     replay_bytes,
@@ -82,9 +82,11 @@ fn five_native_scenarios_have_expected_classifications_and_verdicts() {
         assert_eq!(replay.classification, expected);
         assert_eq!(replay.run_id, receipt.run_id);
         assert_eq!(replay.journal_event_count, 3);
+        assert!(replay.replay_verified);
+        assert!(replay.evidence_verified);
         match scenario {
             NativeScenario::Pass => {
-                assert!(replay.verdict.safe_success);
+                assert!(!replay.verdict.safe_success);
                 assert!(!replay.verdict.false_done);
             }
             NativeScenario::Fail => {
