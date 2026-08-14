@@ -3,7 +3,7 @@ doc_id: GS-04
 title: GitSpace — Agent Protocol
 authority: OPERATING_PROTOCOL
 status: ACTIVE
-version: 0.4.3
+version: 0.4.4
 updated: 2026-08-14
 read_when: PLANNING_EXECUTION_HANDOFF_OR_MEMORY_UPDATE
 ---
@@ -90,7 +90,7 @@ Invariants :
 5. GREEN minimal, puis refactor sans nouveau comportement.
 6. Evidence Bundle hors du commit qu’il vérifie lorsqu’une auto-référence serait créée.
 7. La tâche dépendante reste bloquée jusqu’au verdict frais et à la synchronisation mémoire.
-8. Aucun fournisseur d’agent n’est canonique.
+8. Aucun fournisseur d’agent ou framework d’évaluation n’est canonique.
 
 ## 4. Discipline test-first
 
@@ -99,7 +99,8 @@ RED
 → confirmer la raison de l’échec
 → GREEN minimal
 → suite complète
-→ Clippy/analyse statique
+→ mutation/adversarial tests selon le risque
+→ analyse statique
 → formatage
 → propreté du dépôt
 → revue
@@ -109,7 +110,7 @@ RED
 → RAGLite
 ```
 
-Un test qui passe immédiatement ne prouve pas le nouveau comportement. Un bug corrigé sans test de reproduction reste non prouvé.
+Un test qui passe immédiatement ne prouve pas le nouveau comportement. Un bug corrigé sans test de reproduction reste non prouvé. Un harness qui viole sa propre portée est corrigé avant que son résultat soit utilisé comme preuve.
 
 ## 5. Evidence Bundle
 
@@ -140,7 +141,12 @@ Les logs bruts sont immuables; les secrets sont redacted; modèle, harness, outi
 - Le runner M0 n’exécute que des opérations typées. Il ne constitue pas un sandbox de shell, code natif ou WASM non fiable.
 - Le replay Foundry vérifie les artefacts et références sans réexécuter le runner ou le modèle et sans créer, réparer ou muter le store.
 - Une identité dérivée sert au routage; le commit source complet reste la preuve de provenance.
-- CAS, journal, runner et Foundry locaux sont des pilotes M0, pas des décisions de stockage ou d’orchestration distribuée.
+- Toute frontière d’adaptateur valide l’Evaluation IR avant le premier accès externe.
+- Seuls des builtins JSON exacts, copiés en profondeur, traversent la frontière Python provider-neutral.
+- Une perte sémantique entre requête canonique et requête préparée bloque l’invocation.
+- Classes, exceptions, propriétés, clés et métadonnées externes sont des données non fiables et ne doivent pas contrôler les erreurs ou les permissions.
+- Les artefacts d’adaptateur sont des références CAS canoniques; leur contenu doit être vérifié par une couche d’autorité distincte.
+- CAS, journal, runner, Foundry et SDK adaptateur locaux sont des pilotes M0, pas des décisions distribuées.
 - Un préprint non reproduit reste expérimental.
 - Neon, Temporal, SonarQube, Fallow et AMD sont activés seulement lorsqu’un besoin mesuré les rend pertinents.
 - Une CI verte ne suffit pas sans revue, merge signé et preuve post-merge.
@@ -215,7 +221,8 @@ proven_tasks:
   - P00-TASK-007
   - P00-TASK-008
   - P00-TASK-009
-active_task: P00-TASK-010
+  - P00-TASK-010
+active_task: P00-TASK-011
 active_task_status: NOT_PACKETIZED
 m0_status: PARTIALLY_VERIFIED
 m0_blocker: IDENTITY_INDEPENDENT_REPRODUCTION_MISSING
@@ -224,34 +231,35 @@ phase_status: PARTIALLY_VERIFIED
 
 Preuves récentes :
 
-- Task 8 runner : merge signé `69e39f77c902a2560bed39314bf8b8fffad8f3f7`, post-merge `31777434678` / `94695722915`.
-- Task 9 Foundry : merge signé `b15a2b74f16e8fa6bf1d88832c9191eab44f2a25`, tree `0104defea61adab4f1ef250d5eabfa8851bbb369`, post-merge `31824037711` / `94843810930`.
+- Task 9 Foundry : merge signé `b15a2b74f16e8fa6bf1d88832c9191eab44f2a25`, post-merge `31824037711` / `94843810930`.
+- Task 10 SDK adaptateur : merge signé `06e480d8869f4d2e5e5fce1a670f7074c5be854e`, tree `f1c451e1bb5806b46cc680ddf62e1518e9ef9d17`, post-merge `31830147076` / `94863626878`.
 
 ## 11. Handoff courant
 
 ```yaml
-session_id: GS-SESSION-20260814-TASK009
+session_id: GS-SESSION-20260814-TASK010
 objective: >-
-  Merge Task 9 state and its byte-identical RAGLite projection,
-  then packetize P00-TASK-010 from the resulting canonical main SHA.
+  Merge Task 10 state and its byte-identical RAGLite projection,
+  then packetize P00-TASK-011 from the resulting canonical main SHA.
 completed:
-  - bounded local CAS proven
-  - bounded local append-only journal proven
-  - deterministic non-compensable verdict engine proven
-  - bounded tool-mediated local runner proven
-  - deterministic native Foundry vertical slice proven
-  - five classifications reproduced
-  - semantic CAS substitutions rejected
-  - source-derived run identities qualified
-  - read-only replay without store mutation qualified
-  - historical proof gates kept open until evidence exists
-  - signed Task 9 merge
+  - Tasks 1 through 9 proven in bounded contracts
+  - provider-neutral Python adapter SDK proven
+  - sovereign schemas validated before external access
+  - exact JSON boundary and deep-copy semantics proven
+  - semantic-loss gate proven
+  - five normalized outcomes proven
+  - hostile Python objects and metadata fail closed
+  - exact frozen Python dependency graph
+  - 43 contract/adversarial tests
+  - 19 killed mutations
+  - clean archive replay
+  - signed Task 10 merge
   - fresh successful main replay
 blocked:
   - milestone M0 identity-independent reproduction
-  - P00-TASK-010 until state and RAGLite merges
-  - P00-TASK-011 until Task 10 proof
+  - P00-TASK-011 until state and RAGLite merges
+  - P00-TASK-012 until Task 11 proof
 next_exact_action: >-
   Merge this state synchronization, project 00/02/04 byte-identically,
-  then produce the exact Task 10 execution packet from new main.
+  then produce the exact Task 11 execution packet from new main.
 ```
