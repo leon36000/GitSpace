@@ -3,7 +3,7 @@ mod common;
 use common::source_commit;
 use gs_canonical_json::{Digest, canonical_bytes, canonical_digest, sha256_digest};
 use gs_cas::{Cas, LocalCas};
-use gs_eval_ir::{EvalRunManifest, EvidenceBundle};
+use gs_eval_ir::{EvalRunManifest, EvalVerdict, EvidenceBundle};
 use gs_event_journal::{
     EventOffset, EventSink, EventSource, LocalEventJournal, projection_bytes,
     rebuild_run_projection,
@@ -135,6 +135,52 @@ fn scoring_artifact_with_unknown_field_fails_closed() {
 }
 
 #[test]
+fn schema_valid_verdict_identity_substitution_fails_closed() {
+    let root = TestDir::new("verdict-identity");
+    let foundry = open_foundry(&root);
+    let mut receipt = foundry.run(NativeScenario::Pass).unwrap();
+    let cas = LocalCas::open(foundry.cas_root()).unwrap();
+
+    let mut verdict: EvalVerdict = get_json(&cas, &receipt.verdict_uri);
+    verdict.id = "GS-VERDICT-01ARZ3NDEKTSV4RRFFQ69G5FAW".to_owned();
+    let verdict_uri = put_json(&cas, &verdict);
+
+    let journal_root = root.path().join("journal");
+    let mut events = read_events(&journal_root, &foundry, &receipt);
+    let _ = events[2]
+        .payload
+        .insert("verdict_uri".to_owned(), json!(verdict_uri));
+    events[2].payload_digest = canonical_digest(&serde_json::to_value(&events[2].payload).unwrap())
+        .unwrap()
+        .to_string();
+    let trace_uri = rewrite_events(&journal_root, &foundry, &receipt, &events, &cas);
+
+    let mut evidence: EvidenceBundle = get_json(&cas, &receipt.evidence_uri);
+    let _ = evidence
+        .artifacts
+        .insert("verdict".to_owned(), verdict_uri.clone());
+    let _ = evidence
+        .artifacts
+        .insert("trace".to_owned(), trace_uri.clone());
+    let evidence_uri = put_json(&cas, &evidence);
+
+    let mut manifest: EvalRunManifest = get_json(&cas, &receipt.manifest_uri);
+    manifest.artifacts.trace = trace_uri.clone();
+    manifest.artifacts.evidence_bundle = evidence_uri.clone();
+
+    receipt.verdict_uri = verdict_uri;
+    receipt.trace_uri = trace_uri;
+    receipt.evidence_uri = evidence_uri;
+    receipt.manifest_uri = put_json(&cas, &manifest);
+
+    assert_replay_rejects(
+        &foundry,
+        &receipt,
+        "schema-valid verdict identity substitution",
+    );
+}
+
+#[test]
 fn evidence_environment_substitution_fails_closed() {
     let root = TestDir::new("evidence-environment");
     let foundry = open_foundry(&root);
@@ -172,40 +218,14 @@ fn journal_payload_substitution_with_matching_trace_fails_closed() {
     let cas = LocalCas::open(foundry.cas_root()).unwrap();
     let journal_root = root.path().join("journal");
 
-    let mut events = {
-        let journal = LocalEventJournal::open(
-            &journal_root,
-            LocalCas::open(foundry.cas_root()).unwrap(),
-            receipt.run_id.clone(),
-        )
-        .unwrap();
-        journal
-            .read_from(EventOffset::new(0))
-            .unwrap()
-            .into_iter()
-            .map(|record| record.event)
-            .collect::<Vec<_>>()
-    };
+    let mut events = read_events(&journal_root, &foundry, &receipt);
     let _ = events[0]
         .payload
         .insert("scenario".to_owned(), json!("fail"));
     events[0].payload_digest = canonical_digest(&serde_json::to_value(&events[0].payload).unwrap())
         .unwrap()
         .to_string();
-
-    fs::remove_file(journal_path(root.path(), &receipt.run_id)).unwrap();
-    let rewritten = LocalEventJournal::open(
-        &journal_root,
-        LocalCas::open(foundry.cas_root()).unwrap(),
-        receipt.run_id.clone(),
-    )
-    .unwrap();
-    for event in &events {
-        rewritten.append(event).unwrap();
-    }
-    let trace = projection_bytes(&rebuild_run_projection(&rewritten).unwrap()).unwrap();
-    drop(rewritten);
-    let trace_uri = cas_uri(cas.put(&trace).unwrap());
+    let trace_uri = rewrite_events(&journal_root, &foundry, &receipt, &events, &cas);
     replace_artifact(&cas, &mut receipt, "trace", trace_uri);
 
     assert_replay_rejects(&foundry, &receipt, "journal payload substitution");
@@ -217,6 +237,51 @@ fn open_foundry(root: &TestDir) -> NativeFoundry {
 
 fn assert_replay_rejects(foundry: &NativeFoundry, receipt: &RunReceipt, label: &str) {
     assert!(foundry.replay(receipt).is_err(), "replay accepted {label}");
+}
+
+fn read_events(
+    journal_root: &Path,
+    foundry: &NativeFoundry,
+    receipt: &RunReceipt,
+) -> Vec<gs_eval_ir::RunEvent> {
+    let journal = LocalEventJournal::open(
+        journal_root,
+        LocalCas::open(foundry.cas_root()).unwrap(),
+        receipt.run_id.clone(),
+    )
+    .unwrap();
+    journal
+        .read_from(EventOffset::new(0))
+        .unwrap()
+        .into_iter()
+        .map(|record| record.event)
+        .collect()
+}
+
+fn rewrite_events(
+    journal_root: &Path,
+    foundry: &NativeFoundry,
+    receipt: &RunReceipt,
+    events: &[gs_eval_ir::RunEvent],
+    cas: &LocalCas,
+) -> String {
+    fs::remove_file(journal_path(
+        journal_root.parent().unwrap(),
+        &receipt.run_id,
+    ))
+    .unwrap();
+    let rewritten = LocalEventJournal::open(
+        journal_root,
+        LocalCas::open(foundry.cas_root()).unwrap(),
+        receipt.run_id.clone(),
+    )
+    .unwrap();
+    for event in events {
+        rewritten.append(event).unwrap();
+    }
+    let trace = projection_bytes(&rebuild_run_projection(&rewritten).unwrap()).unwrap();
+    drop(rewritten);
+    cas_uri(cas.put(&trace).unwrap())
 }
 
 fn replace_artifact(cas: &LocalCas, receipt: &mut RunReceipt, name: &str, uri: String) {
