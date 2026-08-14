@@ -95,9 +95,7 @@ impl NativeFoundry {
                 "stored verdict run_id disagrees with receipt".to_owned(),
             ));
         }
-        let identity = receipt
-            .scenario
-            .identity_suffix(&receipt.source_commit);
+        let identity = receipt.scenario.identity_suffix(&receipt.source_commit);
         let derived = issue_verdict(to_verdict_input(
             &scoring,
             format!("GS-VERDICT-{identity}"),
@@ -189,9 +187,7 @@ impl NativeFoundry {
 }
 
 fn validate_receipt_shape(receipt: &RunReceipt) -> Result<(), FoundryError> {
-    let identity = receipt
-        .scenario
-        .identity_suffix(&receipt.source_commit);
+    let identity = receipt.scenario.identity_suffix(&receipt.source_commit);
     if receipt.version != 1 || receipt.run_id != format!("GS-RUN-{identity}") {
         return Err(FoundryError::InvalidReceipt(
             "receipt version or deterministic run ID is invalid".to_owned(),
@@ -502,9 +498,7 @@ fn expected_evidence(receipt: &RunReceipt) -> EvidenceBundle {
     ] {
         artifacts.insert(name.to_owned(), uri.clone());
     }
-    let identity = receipt
-        .scenario
-        .identity_suffix(&receipt.source_commit);
+    let identity = receipt.scenario.identity_suffix(&receipt.source_commit);
     EvidenceBundle {
         id: format!("GS-EVIDENCE-{identity}"),
         version: 1,
