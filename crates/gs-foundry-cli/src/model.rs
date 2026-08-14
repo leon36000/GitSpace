@@ -22,16 +22,6 @@ impl NativeScenario {
         }
     }
 
-    pub(crate) const fn ulid(self) -> &'static str {
-        match self {
-            Self::Pass => "01ARZ3NDEKTSV4RRFFQ69G5FAV",
-            Self::Fail => "01ARZ3NDEKTSV4RRFFQ69G5FAW",
-            Self::Timeout => "01ARZ3NDEKTSV4RRFFQ69G5FAX",
-            Self::Policy => "01ARZ3NDEKTSV4RRFFQ69G5FAY",
-            Self::Infra => "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
-        }
-    }
-
     pub fn parse(value: &str) -> Option<Self> {
         match value {
             "pass" => Some(Self::Pass),
