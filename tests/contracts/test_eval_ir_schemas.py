@@ -170,6 +170,13 @@ class EvaluationIRSchemaTests(unittest.TestCase):
     def test_false_done_is_not_safe_success(self) -> None:
         value = verdict(); value["false_done"] = True; self.assert_invalid("EvalVerdict", value)
 
+    def test_manifest_to_evidence_reference_is_one_way(self) -> None:
+        run_schema = self.schemas["EvalRunManifest"]
+        evidence_schema = self.schemas["EvidenceBundle"]
+        self.assertIn("evidence_bundle", run_schema["properties"]["artifacts"]["required"])
+        self.assertNotIn("run_manifest_digest", evidence_schema["required"])
+        self.assertNotIn("run_manifest_digest", evidence_schema["properties"])
+
     def test_malformed_cas_uri(self) -> None:
         value = evidence(); value["artifacts"]["trace"] = "cas://sha256/short"; self.assert_invalid("EvidenceBundle", value)
 
