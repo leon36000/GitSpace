@@ -144,14 +144,8 @@ fn world_fixture_digests_bind_the_actual_state_before() {
         .map(|hex| format!("sha256:{hex}"))
         .unwrap();
 
-    assert_eq!(
-        task["world_fixture"]["base_artifact_digest"],
-        state_digest
-    );
-    assert_eq!(
-        task["world_fixture"]["initial_state_digest"],
-        state_digest
-    );
+    assert_eq!(task["world_fixture"]["base_artifact_digest"], state_digest);
+    assert_eq!(task["world_fixture"]["initial_state_digest"], state_digest);
 }
 
 #[test]
