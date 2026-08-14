@@ -54,8 +54,11 @@ fn replay_command(args: &[String]) -> Result<Vec<u8>, String> {
         .map_err(|error| format!("failed to read receipt {receipt_path}: {error}"))?;
     let receipt: RunReceipt =
         serde_json::from_slice(&bytes).map_err(|error| format!("invalid receipt JSON: {error}"))?;
-    let foundry = NativeFoundry::open(PathBuf::from(root), receipt.source_commit.clone())
-        .map_err(|error| error.to_string())?;
+    let foundry = NativeFoundry::open_read_only(
+        PathBuf::from(root),
+        receipt.source_commit.clone(),
+    )
+    .map_err(|error| error.to_string())?;
     let report = foundry
         .replay(&receipt)
         .map_err(|error| error.to_string())?;
