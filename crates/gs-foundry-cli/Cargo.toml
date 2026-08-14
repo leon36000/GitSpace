@@ -1,0 +1,16 @@
+[package]
+name = "gs-foundry-cli"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+publish = false
+
+[dependencies]
+gs-canonical-json = { path = "../gs-canonical-json" }
+gs-eval-ir = { path = "../gs-eval-ir" }
+gs-cas = { path = "../gs-cas" }
+gs-event-journal = { path = "../gs-event-journal" }
+gs-verdict = { path = "../gs-verdict" }
+gs-local-runner = { path = "../gs-local-runner" }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.149"
