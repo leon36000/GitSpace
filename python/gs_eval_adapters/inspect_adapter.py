@@ -3,9 +3,11 @@ from __future__ import annotations
 import hashlib
 import json
 import tempfile
+from contextlib import contextmanager
 from importlib import import_module, metadata
 from pathlib import Path
-from typing import Callable
+from threading import Lock
+from typing import Callable, Iterator
 
 from inspect_ai import Task, eval as inspect_eval
 from inspect_ai.dataset import Sample
@@ -31,6 +33,7 @@ _MODEL_OUTPUT = "Default output from mockllm/model"
 _TASK_NAME = "gitspace_inspect_controlled"
 _SAMPLE_ID = "GS-SAMPLE-000011"
 _OPTIONS: JsonObject = {"location": "exact", "ignore_case": True, "numeric": False}
+_INSPECT_EVAL_LOCK = Lock()
 
 
 class InspectAdapter:
@@ -117,24 +120,28 @@ class InspectAdapter:
             metadata=task_metadata,
             epochs=1,
         )
-        with tempfile.TemporaryDirectory(prefix="gitspace-inspect-") as log_dir:
-            logs = inspect_eval(
-                task,
-                model="mockllm/model",
-                display="none",
-                log_dir=log_dir,
-                log_format="json",
-                limit=1,
-                epochs=1,
-                fail_on_error=True,
-                max_samples=1,
-                log_model_api=True,
-                log_realtime=False,
-                acp_server=False,
-                ctl_server=False,
-                notification=False,
-                trace=False,
-            )
+        with _INSPECT_EVAL_LOCK:
+            with _inspect_0_3_258_event_stream_cleanup():
+                with tempfile.TemporaryDirectory(
+                    prefix="gitspace-inspect-"
+                ) as log_dir:
+                    logs = inspect_eval(
+                        task,
+                        model="mockllm/model",
+                        display="none",
+                        log_dir=log_dir,
+                        log_format="json",
+                        limit=1,
+                        epochs=1,
+                        fail_on_error=True,
+                        max_samples=1,
+                        log_model_api=True,
+                        log_realtime=False,
+                        acp_server=False,
+                        ctl_server=False,
+                        notification=False,
+                        trace=False,
+                    )
         log = _single_eval_log(logs)
         log_value = log.model_dump(mode="json", exclude_none=True)
         log_bytes = _json_bytes(log_value)
@@ -257,6 +264,48 @@ class InspectAdapter:
             raise AdapterContractError("Inspect framework input is invalid")
         if set(value) != set(expected) | {"input"}:
             raise AdapterContractError("Inspect framework request fields differ")
+
+
+@contextmanager
+def _inspect_0_3_258_event_stream_cleanup() -> Iterator[None]:
+    """Patch the pinned Inspect release to close its drained receive stream.
+
+    Inspect 0.3.258 closes the sample event sender, drains the receive stream,
+    then drops the active reference without closing that receiver. The adapter
+    is pinned to this exact release, serializes eval calls, installs the narrow
+    compatibility function only for the duration of eval, and restores the
+    original private function afterwards.
+    """
+
+    try:
+        hooks = import_module("inspect_ai.hooks._hooks")
+        original = getattr(hooks, "drain_sample_events")
+        active_sample = getattr(hooks, "active_sample")
+        send_sample_events = getattr(hooks, "send_sample_events")
+    except (ImportError, AttributeError) as error:
+        raise AdapterContractError(
+            "Inspect 0.3.258 hook cleanup API is unavailable"
+        ) from error
+
+    async def drain_sample_events_with_receiver_close() -> None:
+        active = active_sample()
+        if active.event_send is not None:
+            await active.event_send.aclose()
+            active.event_send = None
+        if active.event_receive is not None:
+            receive = active.event_receive
+            try:
+                events = [event async for event in receive]
+            finally:
+                await receive.aclose()
+                active.event_receive = None
+            await send_sample_events(events)
+
+    setattr(hooks, "drain_sample_events", drain_sample_events_with_receiver_close)
+    try:
+        yield
+    finally:
+        setattr(hooks, "drain_sample_events", original)
 
 
 def _single_eval_log(logs: object) -> EvalLog:
