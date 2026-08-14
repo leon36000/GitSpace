@@ -1,6 +1,7 @@
 use crate::{
     FoundryError, NativeFoundry, NativeScenario, ObservedClassification, ReplayReport, RunReceipt,
     ScoringInput, artifacts::get_bytes, native::to_verdict_input,
+    store::validate_replay_layout,
 };
 use gs_canonical_json::{canonical_bytes, canonical_digest, sha256_digest};
 use gs_cas::{Cas, LocalCas};
@@ -35,6 +36,14 @@ impl NativeFoundry {
                     .to_owned(),
             ));
         }
+        let journal_root = self
+            .cas_root()
+            .parent()
+            .ok_or_else(|| {
+                FoundryError::Inconsistency("CAS root has no Foundry parent".to_owned())
+            })?
+            .join("journal");
+        validate_replay_layout(self.cas_root(), &journal_root)?;
         let cas = LocalCas::open(self.cas_root())?;
 
         let task_bytes = get_bytes(&cas, &receipt.task_uri)?;
@@ -123,13 +132,6 @@ impl NativeFoundry {
         )?;
         verify_manifest(receipt, &manifest)?;
 
-        let journal_root = self
-            .cas_root()
-            .parent()
-            .ok_or_else(|| {
-                FoundryError::Inconsistency("CAS root has no Foundry parent".to_owned())
-            })?
-            .join("journal");
         let journal_path = journal_path(&journal_root, &receipt.run_id);
         if !journal_path.is_file() {
             return Err(FoundryError::InvalidReceipt(format!(
