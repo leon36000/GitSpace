@@ -10,7 +10,7 @@ Evaluation IR
 → protected oracle result
 → immutable CAS artifacts
 → append-only event journal
-→ non-compensable verdict
+→ non-compensable pre-verification verdict
 → EvidenceBundle
 → EvalRunManifest
 → read-only replay/rescore
@@ -18,27 +18,41 @@ Evaluation IR
 
 ## Native scenarios
 
-- `pass` — protected oracle passes and produces safe success;
-- `fail` — protected oracle fails while success was declared, producing false-DONE;
+- `pass` — functional behavior and protected oracle pass;
+- `fail` — protected oracle fails while success was declared, exercising false-DONE detection;
 - `timeout` — monotonic deadline blocks the result;
 - `policy` — forbidden workspace action is blocked before an effect;
 - `infra` — a controlled pre-existing runner directory produces an infrastructure classification.
 
-No external model, provider, network, container, database or benchmark framework is involved.
+No external model, provider, network, container or database is involved.
+
+## Proof chronology
+
+A functional PASS is **not** allowed to self-promote to `safe_success` when the initial verdict is issued. At that moment the EvidenceBundle, replay and identity-independent verification have not yet been closed. The persisted PASS verdict is therefore deliberately `declared_outcome=blocked`, `safe_success=false`, `false_done=false`, with evidence/replay/independent-verification gates open.
+
+The FAIL scenario deliberately declares success despite a failed protected oracle and must therefore produce `false_done=true`.
+
+Replay happens later, from immutable persisted artifacts, and reports `replay_verified=true` and `evidence_verified=true` without rewriting the historical verdict. An eventual independently verified final-success decision belongs to a later/superseding verification step, not to self-assertion inside the original run.
 
 ## Replay boundary
 
 The receipt is a JSON locator, not a new canonical object. It points to immutable CAS objects and the run journal. Replay:
 
 - validates task, EvidenceBundle, RunManifest and verdict through the sovereign Evaluation IR;
+- binds the receipt and EvidenceBundle to the source commit actually executed;
+- verifies the qualified Task 9 environment in both evidence and manifest;
 - requires all receipt artifacts to remain readable through verified CAS;
 - verifies receipt ↔ bundle ↔ manifest agreement;
 - replays exactly three typed journal events;
 - rebuilds and compares the persisted trace;
-- reissues the verdict from persisted scoring input;
+- reissues the historical verdict from persisted scoring input;
 - performs no runner/model invocation and no CAS or journal write.
 
 Repeated replay over the same receipt must yield byte-identical canonical `ReplayReport` JSON.
+
+## Provenance in tests
+
+When Git metadata is available, the test harness binds `source_commit` to the exact checked-out commit using `git rev-parse HEAD`. Clean archive replays have no Git metadata and use an explicit all-zero synthetic digest solely to exercise the contract; that synthetic value is never claimed as repository provenance.
 
 ## CLI
 
