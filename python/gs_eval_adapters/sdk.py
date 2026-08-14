@@ -28,8 +28,8 @@ _PREPARED_KEYS = {"canonical_request", "framework_request", "extensions"}
 
 
 def execute_adapter(adapter: object, request: AdapterRequest) -> AdapterResult:
-    descriptor = validate_adapter_object(adapter, error_type=AdapterContractError)
     canonical_request = _canonical_request(request)
+    descriptor = validate_adapter_object(adapter, error_type=AdapterContractError)
 
     try:
         prepared_raw = adapter.prepare(clone_object(canonical_request))
@@ -172,6 +172,10 @@ def _result_from_payload(adapter_identity: str, value: object) -> AdapterResult:
         if type(metric) is float and not math.isfinite(metric):
             raise AdapterContractError(
                 f"$/result/metrics/{name}: non-finite metric"
+            )
+        if type(metric) is float and metric == 0.0 and math.copysign(1.0, metric) < 0.0:
+            raise AdapterContractError(
+                f"$/result/metrics/{name}: negative zero is forbidden"
             )
         metrics[validated_name] = metric
 

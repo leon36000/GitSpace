@@ -33,7 +33,11 @@ def _clone_json(
         raise JsonBoundaryError(f"{path}: JSON nesting exceeds {max_depth} levels")
 
     value_type = type(value)
-    if value is None or value_type in (str, bool):
+    if value is None or value_type is bool:
+        return value
+
+    if value_type is str:
+        _validate_unicode_scalar_text(value, path=path)
         return value
 
     if value_type is int:
@@ -46,6 +50,8 @@ def _clone_json(
     if value_type is float:
         if not math.isfinite(value):
             raise JsonBoundaryError(f"{path}: non-finite float is forbidden")
+        if value == 0.0 and math.copysign(1.0, value) < 0.0:
+            raise JsonBoundaryError(f"{path}: negative zero is forbidden")
         return value
 
     if value_type is list:
@@ -76,9 +82,13 @@ def _clone_json(
             output: JsonObject = {}
             for key, item in value.items():
                 if type(key) is not str:
+                    key_type = type(key)
                     raise JsonBoundaryError(
-                        f"{path}: JSON object key {key!r} is not an exact string"
+                        f"{path}: JSON object key type "
+                        f"{key_type.__module__}.{key_type.__qualname__} "
+                        "is not an exact string"
                     )
+                _validate_unicode_scalar_text(key, path=f"{path}/<key>")
                 output[key] = _clone_json(
                     item,
                     path=f"{path}/{_escape_pointer(key)}",
@@ -122,6 +132,12 @@ def validate_cas_uri(value: object, *, path: str) -> str:
     if type(value) is not str or not CAS_URI.fullmatch(value):
         raise JsonBoundaryError(f"{path}: expected canonical cas://sha256 URI")
     return value
+
+
+def _validate_unicode_scalar_text(value: str, *, path: str) -> None:
+    for character in value:
+        if 0xD800 <= ord(character) <= 0xDFFF:
+            raise JsonBoundaryError(f"{path}: lone Unicode surrogate is forbidden")
 
 
 def _escape_pointer(value: str) -> str:
