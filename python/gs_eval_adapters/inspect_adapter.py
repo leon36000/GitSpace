@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import tempfile
-from importlib import metadata
+from importlib import import_module, metadata
 from pathlib import Path
 from typing import Callable
 
@@ -13,7 +13,7 @@ from inspect_ai.log import EvalLog
 from inspect_ai.scorer import match
 from inspect_ai.solver import generate
 
-from .errors import AdapterContractError
+from .errors import AdapterContractError, JsonBoundaryError
 from .inspect_replay import (
     INSPECT_COMMIT,
     INSPECT_VERSION,
@@ -139,7 +139,7 @@ class InspectAdapter:
         log_value = log.model_dump(mode="json", exclude_none=True)
         log_bytes = _json_bytes(log_value)
         log_uri = self._publish_verified(log_bytes)
-        projection = self._projection_from_log(log_value)
+        projection = project_inspect_log(log_value)
         record = build_replay_record(projection, log_bytes=log_bytes, log_uri=log_uri)
         record_bytes = canonical_record_bytes(record)
         record_uri = self._publish_verified(record_bytes)
@@ -154,12 +154,21 @@ class InspectAdapter:
         if set(value) != {"record", "log_uri", "record_uri"}:
             raise AdapterContractError("Inspect raw result fields differ")
         record = InspectReplayRecord.from_json(value["record"])
-        log_uri = validate_cas_uri(value["log_uri"], path="$/inspect_raw/log_uri")
-        record_uri = validate_cas_uri(
-            value["record_uri"], path="$/inspect_raw/record_uri"
-        )
+        try:
+            log_uri = validate_cas_uri(value["log_uri"], path="$/inspect_raw/log_uri")
+            record_uri = validate_cas_uri(
+                value["record_uri"], path="$/inspect_raw/record_uri"
+            )
+        except JsonBoundaryError as error:
+            raise AdapterContractError(str(error)) from error
         if log_uri != record.log_uri:
             raise AdapterContractError("Inspect record and raw log URI disagree")
+        expected_record_uri = (
+            "cas://sha256/"
+            + hashlib.sha256(canonical_record_bytes(record)).hexdigest()
+        )
+        if record_uri != expected_record_uri:
+            raise AdapterContractError("Inspect record URI does not match record bytes")
         replay = rescore_inspect_record(record)
         if record.inspect_status != "success":
             status = AdapterStatus.INFRA
@@ -215,7 +224,12 @@ class InspectAdapter:
         )
 
     def _publish_verified(self, value: bytes) -> str:
-        uri = validate_cas_uri(self._publish_artifact(value), path="$/artifact_uri")
+        try:
+            uri = validate_cas_uri(
+                self._publish_artifact(value), path="$/artifact_uri"
+            )
+        except JsonBoundaryError as error:
+            raise AdapterContractError(str(error)) from error
         expected = "cas://sha256/" + hashlib.sha256(value).hexdigest()
         if uri != expected:
             raise AdapterContractError("artifact URI digest does not match published bytes")
@@ -244,86 +258,27 @@ class InspectAdapter:
         if set(value) != set(expected) | {"input"}:
             raise AdapterContractError("Inspect framework request fields differ")
 
-    @staticmethod
-    def _projection_from_log(log_value: object) -> JsonObject:
-        log = clone_object(log_value, path="$/eval_log")
-        samples = log.get("samples")
-        if type(samples) is not list or len(samples) != 1:
-            raise AdapterContractError("Inspect EvalLog must contain exactly one sample")
-        sample = clone_object(samples[0], path="$/eval_log/samples/0")
-        eval_spec = clone_object(log.get("eval"), path="$/eval_log/eval")
-        metadata_value = clone_object(
-            eval_spec.get("metadata"), path="$/eval_log/eval/metadata"
-        )
-        required_metadata = {
-            "gitspace_task_id": "GS-TASK-000011",
-            "gitspace_task_name": _TASK_NAME,
-            "gitspace_sample_id": _SAMPLE_ID,
-            "gitspace_framework_version": INSPECT_VERSION,
-            "gitspace_framework_commit": INSPECT_COMMIT,
-            "gitspace_solver": "generate",
-            "gitspace_scorer": "match",
-            "gitspace_scorer_options": _OPTIONS,
-        }
-        for key, expected in required_metadata.items():
-            if metadata_value.get(key) != expected:
-                raise AdapterContractError(f"Inspect EvalLog metadata mismatch: {key}")
-        plan = clone_object(log.get("plan"), path="$/eval_log/plan")
-        steps = plan.get("steps")
-        if type(steps) is not list or len(steps) != 1:
-            raise AdapterContractError("Inspect EvalLog plan must have one step")
-        solver_name = clone_object(steps[0]).get("solver")
-        if type(solver_name) is not str or not solver_name.endswith("generate"):
-            raise AdapterContractError("Inspect EvalLog solver mismatch")
-        output = clone_object(sample.get("output"), path="$/eval_log/sample/output")
-        scores = clone_object(sample.get("scores"), path="$/eval_log/sample/scores")
-        if len(scores) != 1:
-            raise AdapterContractError("Inspect EvalLog must contain one score")
-        score_name, score_raw = next(iter(scores.items()))
-        if not score_name.endswith("match"):
-            raise AdapterContractError("Inspect EvalLog scorer mismatch")
-        score = clone_object(score_raw, path="$/eval_log/sample/score")
-        events_value = sample.get("events")
-        if type(events_value) is not list or not events_value:
-            raise AdapterContractError("Inspect EvalLog events are missing")
-        events = [clone_object(event).get("event") for event in events_value]
-        if any(type(event) is not str or not event for event in events):
-            raise AdapterContractError("Inspect EvalLog event type is invalid")
-        projection = {
-            "projection_version": 1,
-            "framework": "inspect-ai",
-            "framework_version": INSPECT_VERSION,
-            "framework_commit": INSPECT_COMMIT,
-            "eval_status": log.get("status"),
-            "task": {"id": "GS-TASK-000011", "name": _TASK_NAME, "version": 1},
-            "model": eval_spec.get("model"),
-            "solver": {"name": "generate"},
-            "scorer": {"name": "match", "options": dict(_OPTIONS)},
-            "sample": {
-                "id": sample.get("id"),
-                "epoch": sample.get("epoch"),
-                "input": sample.get("input"),
-                "target": sample.get("target"),
-                "output": output.get("completion"),
-                "inspect_score": score.get("value"),
-                "event_types": events,
-            },
-        }
-        return project_inspect_log(projection)
-
 
 def _single_eval_log(logs: object) -> EvalLog:
     logs_type = type(logs)
-    official_wrapper = (
-        type.__getattribute__(logs_type, "__module__") == "inspect_ai._eval.eval"
-        and type.__getattribute__(logs_type, "__name__") == "EvalLogs"
-    )
-    if logs_type is not list and not official_wrapper:
-        raise AdapterContractError("Inspect eval returned an unsupported log collection")
+    if logs_type is not list:
+        try:
+            module = import_module("inspect_ai._eval.eval")
+            official_type = getattr(module, "EvalLogs")
+        except (ImportError, AttributeError) as error:
+            raise AdapterContractError(
+                "Inspect official EvalLogs type is unavailable"
+            ) from error
+        if not isinstance(official_type, type) or logs_type is not official_type:
+            raise AdapterContractError(
+                "Inspect eval returned an unsupported log collection"
+            )
     try:
         count = len(logs)  # type: ignore[arg-type]
     except Exception as error:
-        raise AdapterContractError("Inspect log collection has no stable cardinality") from error
+        raise AdapterContractError(
+            "Inspect log collection has no stable cardinality"
+        ) from error
     if count != 1:
         raise AdapterContractError("Inspect must return exactly one EvalLog")
     try:
