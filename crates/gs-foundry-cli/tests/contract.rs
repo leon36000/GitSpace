@@ -1,4 +1,5 @@
-use gs_cas::LocalCas;
+use gs_canonical_json::Digest;
+use gs_cas::{Cas, LocalCas};
 use gs_foundry_cli::{
     NativeFoundry, NativeScenario, ObservedClassification, ReplayReport, RunReceipt, receipt_bytes,
     replay_bytes,
@@ -130,6 +131,30 @@ fn replay_is_read_only_and_byte_stable() {
 }
 
 #[test]
+fn world_fixture_digests_bind_the_actual_state_before() {
+    let root = TestDir::new("world-fixture-binding");
+    let foundry = open_foundry(&root);
+    let receipt = foundry.run(NativeScenario::Pass).unwrap();
+    let cas = LocalCas::open(foundry.cas_root()).unwrap();
+    let task_bytes = cas.get(&digest_from_uri(&receipt.task_uri)).unwrap();
+    let task: serde_json::Value = serde_json::from_slice(&task_bytes).unwrap();
+    let state_digest = receipt
+        .state_before_uri
+        .strip_prefix("cas://sha256/")
+        .map(|hex| format!("sha256:{hex}"))
+        .unwrap();
+
+    assert_eq!(
+        task["world_fixture"]["base_artifact_digest"],
+        state_digest
+    );
+    assert_eq!(
+        task["world_fixture"]["initial_state_digest"],
+        state_digest
+    );
+}
+
+#[test]
 fn receipt_json_is_deterministic_and_round_trips() {
     let root = TestDir::new("receipt");
     let foundry = open_foundry(&root);
@@ -139,6 +164,24 @@ fn receipt_json_is_deterministic_and_round_trips() {
     let second = receipt_bytes(&decoded).unwrap();
     assert_eq!(first, second);
     assert_eq!(decoded, receipt);
+}
+
+fn digest_from_uri(uri: &str) -> Digest {
+    let hex = uri.strip_prefix("cas://sha256/").unwrap();
+    let mut bytes = [0_u8; 32];
+    for (index, byte) in bytes.iter_mut().enumerate() {
+        *byte = (hex_nibble(hex.as_bytes()[index * 2]) << 4)
+            | hex_nibble(hex.as_bytes()[index * 2 + 1]);
+    }
+    Digest::from_bytes(bytes)
+}
+
+fn hex_nibble(byte: u8) -> u8 {
+    match byte {
+        b'0'..=b'9' => byte - b'0',
+        b'a'..=b'f' => byte - b'a' + 10,
+        _ => panic!("invalid hex"),
+    }
 }
 
 fn object_count(cas_root: &Path) -> usize {
