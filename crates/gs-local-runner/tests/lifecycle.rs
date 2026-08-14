@@ -5,11 +5,7 @@ use gs_local_runner::{
 use std::{fs, path::Path, time::Duration};
 
 fn runner(root: &Path) -> LocalRunner<LocalCas> {
-    LocalRunner::open(
-        root.join("runs"),
-        LocalCas::open(root.join("cas")).unwrap(),
-    )
-    .unwrap()
+    LocalRunner::open(root.join("runs"), LocalCas::open(root.join("cas")).unwrap()).unwrap()
 }
 
 fn plan(run_id: &str) -> RunPlan {
@@ -79,14 +75,29 @@ fn policy_block_preserves_prior_effect_but_stops_all_later_operations() {
 #[test]
 fn mutable_run_directory_is_removed_for_every_returned_status() {
     let scenarios = [
-        ("completed", RunStatus::Completed, Vec::new(), vec![OracleCheck::WorkspaceFileAbsent {
-            path: "output/x.txt".to_owned(),
-        }]),
-        ("timeout", RunStatus::TimedOut, vec![AgentOperation::Delay { millis: 20 }], Vec::new()),
-        ("oracle", RunStatus::OracleFailed, Vec::new(), vec![OracleCheck::WorkspaceFileEquals {
-            path: "input/a.txt".to_owned(),
-            expected: b"wrong".to_vec(),
-        }]),
+        (
+            "completed",
+            RunStatus::Completed,
+            Vec::new(),
+            vec![OracleCheck::WorkspaceFileAbsent {
+                path: "output/x.txt".to_owned(),
+            }],
+        ),
+        (
+            "timeout",
+            RunStatus::TimedOut,
+            vec![AgentOperation::Delay { millis: 20 }],
+            Vec::new(),
+        ),
+        (
+            "oracle",
+            RunStatus::OracleFailed,
+            Vec::new(),
+            vec![OracleCheck::WorkspaceFileEquals {
+                path: "input/a.txt".to_owned(),
+                expected: b"wrong".to_vec(),
+            }],
+        ),
     ];
 
     for (label, expected_status, operations, checks) in scenarios {
