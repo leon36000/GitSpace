@@ -6,8 +6,10 @@ on:
       - Cargo.toml
       - Cargo.lock
       - crates/gs-eval-ir/**
+      - schemas/v1/**
       - tests/contracts/eval_ir_parity.json
       - tests/contracts/test_eval_ir_parity.py
+      - tests/contracts/test_eval_ir_schemas.py
       - .github/workflows/p00-task-004.yml
       - docs/phase-00/tasks/P00-TASK-004.md
       - docs/phase-00/evidence/P00-TASK-004-*.md
@@ -44,6 +46,8 @@ jobs:
         run: cargo metadata --locked --no-deps --format-version 1 > /tmp/gitspace-cargo-metadata.json
       - name: Test shared corpus with Rust
         run: cargo test --locked -p gs-eval-ir --all-targets
+      - name: Test complete workspace against the revised IR
+        run: cargo test --locked --workspace --all-targets
       - name: Clippy
         run: cargo clippy --locked -p gs-eval-ir --all-targets -- -D warnings
       - name: Formatting
