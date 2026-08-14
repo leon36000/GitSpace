@@ -8,7 +8,6 @@ pub struct EvidenceBundle {
     pub version: u64,
     pub run_id: String,
     pub task_id: String,
-    pub run_manifest_digest: String,
     pub environment_digest: String,
     pub commit_sha: String,
     pub artifacts: BTreeMap<String, String>,
