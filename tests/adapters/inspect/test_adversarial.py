@@ -73,11 +73,11 @@ class InspectAdapterAdversarialTests(unittest.TestCase):
             with self.subTest(status=status):
                 mutated = deepcopy(projection)
                 mutated["eval_status"] = status
-                cas = MemoryCas()
-                adapter = InspectAdapter(cas.publish)
+                adapter = InspectAdapter(MemoryCas().publish)
+                record = adapter.record_from_projection_for_test(mutated)
                 raw = {
-                    "record": adapter.record_from_projection_for_test(mutated),
-                    "log_uri": "cas://sha256/" + "a" * 64,
+                    "record": record.to_json(),
+                    "log_uri": record.log_uri,
                     "record_uri": "cas://sha256/" + "b" * 64,
                 }
                 collected = adapter.collect(raw)
@@ -101,7 +101,10 @@ class InspectAdapterAdversarialTests(unittest.TestCase):
         record = InspectAdapter.record_from_static_fixture_for_test().to_json()
         record["inspect_score"] = "I"
         parsed = InspectReplayRecord.from_json(record)
-        self.assertEqual(rescore_inspect_record(parsed).score, "C")
+        replay = rescore_inspect_record(parsed)
+        self.assertEqual(replay.score, "C")
+        self.assertEqual(replay.status, AdapterStatus.INFRA)
+        self.assertFalse(replay.obligations["inspect_score_agrees"])
 
         adapter = InspectAdapter(MemoryCas().publish)
         with self.assertRaises(AdapterContractError):
