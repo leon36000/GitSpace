@@ -97,7 +97,7 @@ impl NativeFoundry {
         }
         let derived = issue_verdict(to_verdict_input(
             &scoring,
-            stored_verdict.id.clone(),
+            format!("GS-VERDICT-{}", receipt.scenario.ulid()),
             receipt.run_id.clone(),
         ))?;
         if canonical_bytes(&serde_json::to_value(&derived)?)? != verdict_bytes {
