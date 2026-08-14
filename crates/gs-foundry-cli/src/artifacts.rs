@@ -32,8 +32,14 @@ pub(crate) fn parse_cas_uri(uri: &str) -> Result<Digest, FoundryError> {
     let hex = uri
         .strip_prefix("cas://sha256/")
         .ok_or_else(|| FoundryError::InvalidReceipt(format!("not a CAS URI: {uri}")))?;
-    if hex.len() != 64 || !hex.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)) {
-        return Err(FoundryError::InvalidReceipt(format!("malformed CAS digest: {uri}")));
+    if hex.len() != 64
+        || !hex
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(FoundryError::InvalidReceipt(format!(
+            "malformed CAS digest: {uri}"
+        )));
     }
     let mut bytes = [0_u8; 32];
     for (index, slot) in bytes.iter_mut().enumerate() {

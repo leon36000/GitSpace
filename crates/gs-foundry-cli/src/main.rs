@@ -1,7 +1,10 @@
-use gs_foundry_cli::{
-    NativeFoundry, NativeScenario, RunReceipt, receipt_bytes, replay_bytes,
+use gs_foundry_cli::{NativeFoundry, NativeScenario, RunReceipt, receipt_bytes, replay_bytes};
+use std::{
+    env, fs,
+    io::{self, Write},
+    path::PathBuf,
+    process::ExitCode,
 };
-use std::{env, fs, io::{self, Write}, path::PathBuf, process::ExitCode};
 
 fn main() -> ExitCode {
     match execute(env::args().skip(1).collect()) {
@@ -49,11 +52,13 @@ fn replay_command(args: &[String]) -> Result<Vec<u8>, String> {
     ensure_exact_flags(args, &["--root", "--receipt"])?;
     let bytes = fs::read(&receipt_path)
         .map_err(|error| format!("failed to read receipt {receipt_path}: {error}"))?;
-    let receipt: RunReceipt = serde_json::from_slice(&bytes)
-        .map_err(|error| format!("invalid receipt JSON: {error}"))?;
+    let receipt: RunReceipt =
+        serde_json::from_slice(&bytes).map_err(|error| format!("invalid receipt JSON: {error}"))?;
     let foundry = NativeFoundry::open(PathBuf::from(root), receipt.source_commit.clone())
         .map_err(|error| error.to_string())?;
-    let report = foundry.replay(&receipt).map_err(|error| error.to_string())?;
+    let report = foundry
+        .replay(&receipt)
+        .map_err(|error| error.to_string())?;
     replay_bytes(&report).map_err(|error| error.to_string())
 }
 

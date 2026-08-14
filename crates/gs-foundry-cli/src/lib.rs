@@ -7,9 +7,9 @@ mod native;
 mod replay;
 
 pub use error::FoundryError;
+pub(crate) use model::ScoringInput;
 pub use model::{NativeScenario, ObservedClassification, ReplayReport, RunReceipt};
 pub use native::NativeFoundry;
-pub(crate) use model::ScoringInput;
 
 pub fn receipt_bytes(receipt: &RunReceipt) -> Result<Vec<u8>, FoundryError> {
     let value = serde_json::to_value(receipt)?;

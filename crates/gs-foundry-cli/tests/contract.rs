@@ -1,9 +1,13 @@
 use gs_cas::{Cas, LocalCas};
 use gs_foundry_cli::{
-    NativeFoundry, NativeScenario, ObservedClassification, ReplayReport, RunReceipt,
-    receipt_bytes, replay_bytes,
+    NativeFoundry, NativeScenario, ObservedClassification, ReplayReport, RunReceipt, receipt_bytes,
+    replay_bytes,
 };
-use std::{fs, path::{Path, PathBuf}, sync::atomic::{AtomicU64, Ordering}};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
 const SOURCE_COMMIT: &str = "7cc65f670dfd7a682c77d3cc8cda656fe9c30ccd";
@@ -21,10 +25,14 @@ impl TestDir {
         fs::create_dir_all(&path).unwrap();
         Self(path)
     }
-    fn path(&self) -> &Path { &self.0 }
+    fn path(&self) -> &Path {
+        &self.0
+    }
 }
 impl Drop for TestDir {
-    fn drop(&mut self) { let _ = fs::remove_dir_all(&self.0); }
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
 }
 
 fn open_foundry(root: &TestDir) -> NativeFoundry {
@@ -67,7 +75,9 @@ fn five_native_scenarios_have_expected_classifications_and_verdicts() {
             assert_cas_uri(uri);
         }
 
-        let replay = foundry.replay(&receipt).expect("replay deterministic scenario");
+        let replay = foundry
+            .replay(&receipt)
+            .expect("replay deterministic scenario");
         assert_eq!(replay.scenario, scenario);
         assert_eq!(replay.classification, expected);
         assert_eq!(replay.run_id, receipt.run_id);
@@ -101,9 +111,20 @@ fn replay_is_read_only_and_byte_stable() {
     let first = foundry.replay(&receipt).unwrap();
     let second = foundry.replay(&receipt).unwrap();
 
-    assert_eq!(replay_bytes(&first).unwrap(), replay_bytes(&second).unwrap());
-    assert_eq!(object_count(cas.root()), before_count, "replay wrote CAS objects");
-    assert_eq!(journal_bytes(root.path(), &receipt.run_id), journal_before, "replay wrote journal bytes");
+    assert_eq!(
+        replay_bytes(&first).unwrap(),
+        replay_bytes(&second).unwrap()
+    );
+    assert_eq!(
+        object_count(cas.root()),
+        before_count,
+        "replay wrote CAS objects"
+    );
+    assert_eq!(
+        journal_bytes(root.path(), &receipt.run_id),
+        journal_before,
+        "replay wrote journal bytes"
+    );
 }
 
 #[test]

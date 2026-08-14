@@ -1,7 +1,11 @@
 use gs_canonical_json::Digest;
 use gs_cas::{Cas, LocalCas};
 use gs_foundry_cli::{FoundryError, NativeFoundry, NativeScenario};
-use std::{fs, path::{Path, PathBuf}, sync::atomic::{AtomicU64, Ordering}};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
 const SOURCE_COMMIT: &str = "7cc65f670dfd7a682c77d3cc8cda656fe9c30ccd";
@@ -10,14 +14,23 @@ struct TestDir(PathBuf);
 impl TestDir {
     fn new(label: &str) -> Self {
         let serial = NEXT_TEMP.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!("gitspace-task9-adv-{label}-{}-{serial}", std::process::id()));
+        let path = std::env::temp_dir().join(format!(
+            "gitspace-task9-adv-{label}-{}-{serial}",
+            std::process::id()
+        ));
         let _ = fs::remove_dir_all(&path);
         fs::create_dir_all(&path).unwrap();
         Self(path)
     }
-    fn path(&self) -> &Path { &self.0 }
+    fn path(&self) -> &Path {
+        &self.0
+    }
 }
-impl Drop for TestDir { fn drop(&mut self) { let _ = fs::remove_dir_all(&self.0); } }
+impl Drop for TestDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
 
 #[test]
 fn missing_required_cas_artifact_fails_replay_without_repair() {
@@ -31,7 +44,11 @@ fn missing_required_cas_artifact_fails_replay_without_repair() {
     let after_delete = count_objects(cas.root());
 
     assert!(foundry.replay(&receipt).is_err());
-    assert_eq!(count_objects(cas.root()), after_delete, "replay repaired a missing CAS object");
+    assert_eq!(
+        count_objects(cas.root()),
+        after_delete,
+        "replay repaired a missing CAS object"
+    );
     assert_eq!(before, after_delete + 1);
 }
 
@@ -54,7 +71,10 @@ fn missing_journal_blocks_replay_and_is_not_recreated() {
 
     let error = foundry.replay(&receipt).unwrap_err();
     assert!(matches!(error, FoundryError::InvalidReceipt(_)));
-    assert!(!journal.exists(), "read-only replay recreated a missing journal");
+    assert!(
+        !journal.exists(),
+        "read-only replay recreated a missing journal"
+    );
 }
 
 #[test]
@@ -71,9 +91,15 @@ fn controlled_infra_collision_is_removed_after_classification() {
     let root = TestDir::new("infra-cleanup");
     let foundry = NativeFoundry::open(root.path(), SOURCE_COMMIT).unwrap();
     let receipt = foundry.run(NativeScenario::Infra).unwrap();
-    assert_eq!(receipt.classification, gs_foundry_cli::ObservedClassification::Infra);
+    assert_eq!(
+        receipt.classification,
+        gs_foundry_cli::ObservedClassification::Infra
+    );
     let runner_entries = fs::read_dir(root.path().join("runner")).unwrap().count();
-    assert_eq!(runner_entries, 0, "controlled infrastructure collision survived cleanup");
+    assert_eq!(
+        runner_entries, 0,
+        "controlled infrastructure collision survived cleanup"
+    );
 }
 
 fn digest_from_uri(uri: &str) -> Digest {
@@ -97,10 +123,15 @@ fn hex_nibble(byte: u8) -> u8 {
 fn count_objects(root: &Path) -> usize {
     fn walk(path: &Path) -> usize {
         fs::read_dir(path)
-            .map(|entries| entries.filter_map(Result::ok).map(|entry| {
-                let path = entry.path();
-                if path.is_dir() { walk(&path) } else { 1 }
-            }).sum())
+            .map(|entries| {
+                entries
+                    .filter_map(Result::ok)
+                    .map(|entry| {
+                        let path = entry.path();
+                        if path.is_dir() { walk(&path) } else { 1 }
+                    })
+                    .sum()
+            })
             .unwrap_or(0)
     }
     walk(&root.join("objects").join("sha256"))
@@ -108,5 +139,7 @@ fn count_objects(root: &Path) -> usize {
 
 fn journal_path(root: &Path, run_id: &str) -> PathBuf {
     let digest = gs_canonical_json::sha256_digest(run_id.as_bytes()).to_string();
-    root.join("journal").join("runs").join(format!("{}.gsej", digest.strip_prefix("sha256:").unwrap()))
+    root.join("journal")
+        .join("runs")
+        .join(format!("{}.gsej", digest.strip_prefix("sha256:").unwrap()))
 }

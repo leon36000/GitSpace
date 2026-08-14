@@ -4,19 +4,24 @@ use crate::{
 };
 use gs_canonical_json::{canonical_digest, sha256_digest};
 use gs_cas::{Cas, LocalCas};
-use gs_event_journal::{EventSink, LocalEventJournal, projection_bytes, rebuild_run_projection};
 use gs_eval_ir::{
     AgentConfiguration, DeclaredOutcome, EvalRunManifest, EvidenceBundle, ExecutionWindow,
     Extensions, FunctionalOutcome, RunArtifacts, RunEnvironment, RunEvent, SchemaName,
     TaskValidity, validate_named_json, validate_task_json,
 };
+use gs_event_journal::{EventSink, LocalEventJournal, projection_bytes, rebuild_run_projection};
 use gs_local_runner::{
     AgentOperation, Capability, Effect, EffectKind, FixtureFile, LocalRunner, OracleCheck,
     OracleFile, RunPlan, RunResult, RunStatus, RunnerError,
 };
 use gs_verdict::{CoverageCount, VerdictInput, issue_verdict};
 use serde_json::{Value, json};
-use std::{collections::BTreeMap, fs, path::{Path, PathBuf}, time::Duration};
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 const TASK_ID: &str = "GS-TASK-000009";
 const FIXTURE_TIME_0: &str = "2026-08-14T00:00:00Z";
@@ -67,7 +72,13 @@ impl NativeFoundry {
         fs::create_dir_all(&journal_root)
             .map_err(|source| FoundryError::io("create journal root", &journal_root, source))?;
         LocalRunner::open(&runner_root, LocalCas::open(&cas_root)?)?;
-        Ok(Self { root, cas_root, journal_root, runner_root, source_commit })
+        Ok(Self {
+            root,
+            cas_root,
+            journal_root,
+            runner_root,
+            source_commit,
+        })
     }
 
     pub fn cas_root(&self) -> &Path {
@@ -154,7 +165,8 @@ impl NativeFoundry {
             environment: RunEnvironment {
                 image_digest: sha256_digest(b"gitspace-m0-native-fixture-v1").to_string(),
                 architecture: "x86_64".to_owned(),
-                dependency_lock_digest: sha256_digest(include_bytes!("../../../Cargo.lock")).to_string(),
+                dependency_lock_digest: sha256_digest(include_bytes!("../../../Cargo.lock"))
+                    .to_string(),
                 network_policy_digest: sha256_digest(b"network:none").to_string(),
             },
             execution: ExecutionWindow {
@@ -216,11 +228,18 @@ impl NativeFoundry {
                         "controlled INFRA collision already existed before scenario".to_owned(),
                     ));
                 }
-                Err(source) => return Err(FoundryError::io("create controlled INFRA collision", &collision, source)),
+                Err(source) => {
+                    return Err(FoundryError::io(
+                        "create controlled INFRA collision",
+                        &collision,
+                        source,
+                    ));
+                }
             }
             let result = runner.execute(plan);
-            fs::remove_dir_all(&collision)
-                .map_err(|source| FoundryError::io("clean controlled INFRA collision", &collision, source))?;
+            fs::remove_dir_all(&collision).map_err(|source| {
+                FoundryError::io("clean controlled INFRA collision", &collision, source)
+            })?;
             match result {
                 Err(RunnerError::RunAlreadyExists { .. }) => {
                     let marker = json!({"available": false, "reason": "run_root_collision"});
@@ -347,13 +366,21 @@ fn classify_runner(
         NativeScenario::Pass => (RunStatus::Completed, true, ObservedClassification::Pass),
         NativeScenario::Fail => (RunStatus::OracleFailed, false, ObservedClassification::Fail),
         NativeScenario::Timeout => (RunStatus::TimedOut, false, ObservedClassification::Timeout),
-        NativeScenario::Policy => (RunStatus::PolicyBlocked, false, ObservedClassification::Policy),
+        NativeScenario::Policy => (
+            RunStatus::PolicyBlocked,
+            false,
+            ObservedClassification::Policy,
+        ),
         NativeScenario::Infra => unreachable!("INFRA is handled before runner classification"),
     };
     if result.status != expected.0 || result.oracle_passed != expected.1 {
         return Err(FoundryError::Inconsistency(format!(
             "scenario {} observed runner status {:?}, oracle_passed={} instead of {:?}, {}",
-            scenario.slug(), result.status, result.oracle_passed, expected.0, expected.1
+            scenario.slug(),
+            result.status,
+            result.oracle_passed,
+            expected.0,
+            expected.1
         )));
     }
     Ok(expected.2)
@@ -481,7 +508,9 @@ fn plan_value(scenario: NativeScenario, plan: &RunPlan) -> Value {
         .iter()
         .map(|operation| match operation {
             AgentOperation::Read { path } => json!({"op":"read","path":path}),
-            AgentOperation::Write { path, bytes } => json!({"op":"write","path":path,"bytes":bytes}),
+            AgentOperation::Write { path, bytes } => {
+                json!({"op":"write","path":path,"bytes":bytes})
+            }
             AgentOperation::Delay { millis } => json!({"op":"delay","millis":millis}),
         })
         .collect::<Vec<_>>();

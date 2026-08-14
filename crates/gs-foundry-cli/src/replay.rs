@@ -5,8 +5,13 @@ use crate::{
 };
 use gs_canonical_json::{canonical_bytes, sha256_digest};
 use gs_cas::LocalCas;
-use gs_event_journal::{EventOffset, EventSource, LocalEventJournal, projection_bytes, rebuild_run_projection};
-use gs_eval_ir::{EvalRunManifest, EvalVerdict, EvidenceBundle, SchemaName, validate_named_json, validate_task_json};
+use gs_eval_ir::{
+    EvalRunManifest, EvalVerdict, EvidenceBundle, SchemaName, validate_named_json,
+    validate_task_json,
+};
+use gs_event_journal::{
+    EventOffset, EventSource, LocalEventJournal, projection_bytes, rebuild_run_projection,
+};
 use gs_verdict::issue_verdict;
 
 impl NativeFoundry {
@@ -19,7 +24,8 @@ impl NativeFoundry {
         validate_task_json(&task_value)?;
 
         let scoring: ScoringInput = get_json(&cas, &receipt.scoring_uri)?;
-        if scoring.scenario != receipt.scenario || scoring.classification != receipt.classification {
+        if scoring.scenario != receipt.scenario || scoring.classification != receipt.classification
+        {
             return Err(FoundryError::Inconsistency(
                 "receipt classification disagrees with persisted scoring input".to_owned(),
             ));
@@ -27,7 +33,10 @@ impl NativeFoundry {
 
         let verdict_bytes = get_bytes(&cas, &receipt.verdict_uri)?;
         let stored_verdict: EvalVerdict = serde_json::from_slice(&verdict_bytes)?;
-        validate_named_json(SchemaName::EvalVerdict, &serde_json::to_value(&stored_verdict)?)?;
+        validate_named_json(
+            SchemaName::EvalVerdict,
+            &serde_json::to_value(&stored_verdict)?,
+        )?;
         if stored_verdict.run_id != receipt.run_id {
             return Err(FoundryError::Inconsistency(
                 "stored verdict run_id disagrees with receipt".to_owned(),
@@ -46,12 +55,18 @@ impl NativeFoundry {
 
         let evidence_bytes = get_bytes(&cas, &receipt.evidence_uri)?;
         let evidence: EvidenceBundle = serde_json::from_slice(&evidence_bytes)?;
-        validate_named_json(SchemaName::EvidenceBundle, &serde_json::to_value(&evidence)?)?;
+        validate_named_json(
+            SchemaName::EvidenceBundle,
+            &serde_json::to_value(&evidence)?,
+        )?;
         verify_evidence(receipt, &evidence)?;
 
         let manifest_bytes = get_bytes(&cas, &receipt.manifest_uri)?;
         let manifest: EvalRunManifest = serde_json::from_slice(&manifest_bytes)?;
-        validate_named_json(SchemaName::EvalRunManifest, &serde_json::to_value(&manifest)?)?;
+        validate_named_json(
+            SchemaName::EvalRunManifest,
+            &serde_json::to_value(&manifest)?,
+        )?;
         verify_manifest(receipt, &manifest)?;
 
         for uri in [
@@ -67,7 +82,9 @@ impl NativeFoundry {
         let journal_root = self
             .cas_root()
             .parent()
-            .ok_or_else(|| FoundryError::Inconsistency("CAS root has no Foundry parent".to_owned()))?
+            .ok_or_else(|| {
+                FoundryError::Inconsistency("CAS root has no Foundry parent".to_owned())
+            })?
             .join("journal");
         let journal_path = journal_path(&journal_root, &receipt.run_id);
         if !journal_path.is_file() {
@@ -178,10 +195,22 @@ fn verify_manifest(receipt: &RunReceipt, manifest: &EvalRunManifest) -> Result<(
     let artifacts = &manifest.artifacts;
     for (name, actual, expected) in [
         ("trace", &artifacts.trace, &receipt.trace_uri),
-        ("state_before", &artifacts.state_before, &receipt.state_before_uri),
-        ("state_after", &artifacts.state_after, &receipt.state_after_uri),
+        (
+            "state_before",
+            &artifacts.state_before,
+            &receipt.state_before_uri,
+        ),
+        (
+            "state_after",
+            &artifacts.state_after,
+            &receipt.state_after_uri,
+        ),
         ("patch", &artifacts.patch, &receipt.patch_uri),
-        ("evidence_bundle", &artifacts.evidence_bundle, &receipt.evidence_uri),
+        (
+            "evidence_bundle",
+            &artifacts.evidence_bundle,
+            &receipt.evidence_uri,
+        ),
     ] {
         if actual != expected {
             return Err(FoundryError::Inconsistency(format!(
