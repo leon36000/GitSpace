@@ -238,12 +238,12 @@ def rescore_inspect_record(record: InspectReplayRecord | object) -> InspectRepla
         "inspect_score_agrees": agrees,
     }
     if parsed.inspect_status != "success" or not agrees:
-        status, replay_score = AdapterStatus.INFRA, "INFRA"
+        status = AdapterStatus.INFRA
     else:
-        status, replay_score = (AdapterStatus.PASS if matched else AdapterStatus.FAIL), score
+        status = AdapterStatus.PASS if matched else AdapterStatus.FAIL
     return InspectReplayResult(
         status=status,
-        score=replay_score,
+        score=score,
         obligations=obligations,
         record_sha256="sha256:" + hashlib.sha256(canonical_record_bytes(parsed)).hexdigest(),
     )
