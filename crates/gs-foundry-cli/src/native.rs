@@ -1,6 +1,7 @@
 use crate::{
     FoundryError, NativeScenario, ObservedClassification, RunReceipt, ScoringInput,
     artifacts::{cas_uri, put_json, put_value},
+    store::{canonical_existing_directory, validate_replay_layout},
 };
 use gs_canonical_json::{canonical_digest, sha256_digest};
 use gs_cas::{Cas, LocalCas};
@@ -33,6 +34,7 @@ pub struct NativeFoundry {
     journal_root: PathBuf,
     runner_root: PathBuf,
     source_commit: String,
+    execution_enabled: bool,
 }
 
 struct Observation {
@@ -86,6 +88,29 @@ impl NativeFoundry {
             journal_root,
             runner_root,
             source_commit,
+            execution_enabled: true,
+        })
+    }
+
+    pub fn open_read_only(
+        root: impl AsRef<Path>,
+        source_commit: impl Into<String>,
+    ) -> Result<Self, FoundryError> {
+        let source_commit = source_commit.into();
+        if !valid_source_commit(&source_commit) {
+            return Err(FoundryError::InvalidSourceCommit);
+        }
+        let root = canonical_existing_directory(root.as_ref(), "Foundry root")?;
+        let cas_root = root.join("cas");
+        let journal_root = root.join("journal");
+        let runner_root = root.join("runner");
+        validate_replay_layout(&cas_root, &journal_root)?;
+        Ok(Self {
+            cas_root,
+            journal_root,
+            runner_root,
+            source_commit,
+            execution_enabled: false,
         })
     }
 
@@ -98,6 +123,11 @@ impl NativeFoundry {
     }
 
     pub fn run(&self, scenario: NativeScenario) -> Result<RunReceipt, FoundryError> {
+        if !self.execution_enabled {
+            return Err(FoundryError::Inconsistency(
+                "read-only Foundry handles cannot execute scenarios".to_owned(),
+            ));
+        }
         let cas = LocalCas::open(&self.cas_root)?;
         let identity = scenario.identity_suffix(&self.source_commit);
         let run_id = format!("GS-RUN-{identity}");
