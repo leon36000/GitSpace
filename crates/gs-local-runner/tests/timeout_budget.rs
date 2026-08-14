@@ -1,6 +1,9 @@
 use gs_cas::LocalCas;
 use gs_local_runner::{AgentOperation, Capability, LocalRunner, RunPlan, RunStatus};
-use std::{fs, time::{Duration, Instant}};
+use std::{
+    fs,
+    time::{Duration, Instant},
+};
 
 #[test]
 fn delay_is_bounded_by_the_remaining_timeout_budget() {
@@ -11,11 +14,8 @@ fn delay_is_bounded_by_the_remaining_timeout_budget() {
     let _ = fs::remove_dir_all(&root);
     fs::create_dir_all(&root).unwrap();
 
-    let runner = LocalRunner::open(
-        root.join("runs"),
-        LocalCas::open(root.join("cas")).unwrap(),
-    )
-    .unwrap();
+    let runner =
+        LocalRunner::open(root.join("runs"), LocalCas::open(root.join("cas")).unwrap()).unwrap();
     let plan = RunPlan {
         run_id: "GS-RUN-TASK8-DELAY-BUDGET".to_owned(),
         fixture: Vec::new(),
