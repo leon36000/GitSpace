@@ -1,5 +1,5 @@
 use gs_canonical_json::Digest;
-use gs_cas::{Cas, LocalCas};
+use gs_cas::LocalCas;
 use gs_foundry_cli::{FoundryError, NativeFoundry, NativeScenario};
 use std::{
     fs,
@@ -105,8 +105,8 @@ fn controlled_infra_collision_is_removed_after_classification() {
 fn digest_from_uri(uri: &str) -> Digest {
     let hex = uri.strip_prefix("cas://sha256/").unwrap();
     let mut bytes = [0_u8; 32];
-    for index in 0..32 {
-        bytes[index] = (hex_nibble(hex.as_bytes()[index * 2]) << 4)
+    for (index, byte) in bytes.iter_mut().enumerate() {
+        *byte = (hex_nibble(hex.as_bytes()[index * 2]) << 4)
             | hex_nibble(hex.as_bytes()[index * 2 + 1]);
     }
     Digest::from_bytes(bytes)
