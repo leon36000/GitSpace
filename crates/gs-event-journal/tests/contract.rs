@@ -3,7 +3,7 @@ use gs_cas::{Cas, LocalCas};
 use gs_eval_ir::{Extensions, RunEvent};
 use gs_event_journal::{
     EventError, EventOffset, EventSink, EventSource, LocalEventJournal,
-    rebuild_run_projection, projection_bytes,
+    projection_bytes, rebuild_run_projection,
 };
 use serde_json::{Value, json};
 use std::{
@@ -14,6 +14,12 @@ use std::{
 };
 
 static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
+const RUN_1: &str = "GS-RUN-01ARZ3NDEKTSV4RRFFQ69G5FAV";
+const RUN_2: &str = "GS-RUN-01ARZ3NDEKTSV4RRFFQ69G5FAW";
+const RUN_3: &str = "GS-RUN-01ARZ3NDEKTSV4RRFFQ69G5FAX";
+const RUN_4: &str = "GS-RUN-01ARZ3NDEKTSV4RRFFQ69G5FAY";
+const RUN_5: &str = "GS-RUN-01ARZ3NDEKTSV4RRFFQ69G5FAZ";
+const RUN_6: &str = "GS-RUN-01ARZ3NDEKTSV4RRFFQ69G5FB0";
 
 struct TestDir(PathBuf);
 
@@ -68,9 +74,9 @@ fn journal(root: &TestDir, run_id: &str) -> LocalEventJournal<LocalCas> {
 #[test]
 fn append_replay_and_projection_rebuild_are_deterministic() {
     let root = TestDir::new("round-trip");
-    let journal = journal(&root, "GS-RUN-000001");
-    let started = event("GS-RUN-000001", 0, "run.started", "start");
-    let finished = event("GS-RUN-000001", 1, "run.finished", "finish");
+    let journal = journal(&root, RUN_1);
+    let started = event(RUN_1, 0, "RUN_STARTED", "start");
+    let finished = event(RUN_1, 1, "RUN_FINISHED", "finish");
 
     assert_eq!(journal.append(&started).unwrap(), EventOffset::new(0));
     assert_eq!(journal.append(&finished).unwrap(), EventOffset::new(1));
@@ -85,12 +91,12 @@ fn append_replay_and_projection_rebuild_are_deterministic() {
 
     let projection = rebuild_run_projection(&journal).unwrap();
     assert_eq!(projection.version, 1);
-    assert_eq!(projection.run_id, "GS-RUN-000001");
+    assert_eq!(projection.run_id, RUN_1);
     assert_eq!(projection.event_count, 2);
     assert_eq!(projection.last_offset, Some(1));
-    assert_eq!(projection.last_event_type.as_deref(), Some("run.finished"));
-    assert_eq!(projection.event_type_counts["run.started"], 1);
-    assert_eq!(projection.event_type_counts["run.finished"], 1);
+    assert_eq!(projection.last_event_type.as_deref(), Some("RUN_FINISHED"));
+    assert_eq!(projection.event_type_counts["RUN_STARTED"], 1);
+    assert_eq!(projection.event_type_counts["RUN_FINISHED"], 1);
 
     let first = projection_bytes(&projection).unwrap();
     let projection_path = root.path().join("derived-projection.json");
@@ -107,8 +113,8 @@ fn append_replay_and_projection_rebuild_are_deterministic() {
 #[test]
 fn identical_retry_is_idempotent() {
     let root = TestDir::new("idempotent");
-    let journal = journal(&root, "GS-RUN-000002");
-    let event = event("GS-RUN-000002", 0, "run.started", "same");
+    let journal = journal(&root, RUN_2);
+    let event = event(RUN_2, 0, "RUN_STARTED", "same");
 
     assert_eq!(journal.append(&event).unwrap(), EventOffset::new(0));
     assert_eq!(journal.append(&event).unwrap(), EventOffset::new(0));
@@ -118,8 +124,8 @@ fn identical_retry_is_idempotent() {
 #[test]
 fn sequence_gap_is_rejected() {
     let root = TestDir::new("gap");
-    let journal = journal(&root, "GS-RUN-000003");
-    let event = event("GS-RUN-000003", 1, "run.started", "gap");
+    let journal = journal(&root, RUN_3);
+    let event = event(RUN_3, 1, "RUN_STARTED", "gap");
 
     let error = journal.append(&event).unwrap_err();
     assert!(matches!(
@@ -134,8 +140,8 @@ fn sequence_gap_is_rejected() {
 #[test]
 fn payload_digest_mismatch_is_rejected_before_visibility() {
     let root = TestDir::new("payload-digest");
-    let journal = journal(&root, "GS-RUN-000004");
-    let mut event = event("GS-RUN-000004", 0, "run.started", "tampered");
+    let journal = journal(&root, RUN_4);
+    let mut event = event(RUN_4, 0, "RUN_STARTED", "tampered");
     event.payload_digest = format!("sha256:{}", "0".repeat(64));
 
     let error = journal.append(&event).unwrap_err();
@@ -147,7 +153,7 @@ fn payload_digest_mismatch_is_rejected_before_visibility() {
 fn orphan_cas_event_is_not_visible_until_pointer_commit() {
     let root = TestDir::new("orphan");
     let cas_root = root.path().join("cas");
-    let event = event("GS-RUN-000005", 0, "run.started", "orphan");
+    let event = event(RUN_5, 0, "RUN_STARTED", "orphan");
     let event_value = serde_json::to_value(&event).unwrap();
     let event_bytes = canonical_bytes(&event_value).unwrap();
     LocalCas::open(&cas_root).unwrap().put(&event_bytes).unwrap();
@@ -155,7 +161,7 @@ fn orphan_cas_event_is_not_visible_until_pointer_commit() {
     let journal = LocalEventJournal::open(
         root.path().join("journal"),
         LocalCas::open(&cas_root).unwrap(),
-        "GS-RUN-000005",
+        RUN_5,
     )
     .unwrap();
 
@@ -167,9 +173,9 @@ fn orphan_cas_event_is_not_visible_until_pointer_commit() {
 #[test]
 fn projection_is_canonical_json() {
     let root = TestDir::new("projection-json");
-    let journal = journal(&root, "GS-RUN-000006");
+    let journal = journal(&root, RUN_6);
     journal
-        .append(&event("GS-RUN-000006", 0, "run.started", "x"))
+        .append(&event(RUN_6, 0, "RUN_STARTED", "x"))
         .unwrap();
 
     let bytes = projection_bytes(&rebuild_run_projection(&journal).unwrap()).unwrap();

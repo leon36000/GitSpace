@@ -8,11 +8,22 @@ use std::{
     fs::{self, OpenOptions},
     io::{Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
-    sync::{Arc, Barrier, atomic::{AtomicU64, Ordering}},
+    sync::{
+        Arc, Barrier,
+        atomic::{AtomicU64, Ordering},
+    },
     thread,
 };
 
 static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
+const RUN_1: &str = "GS-RUN-01ARZ3NDEKTSV4RRFFQ69G5FB1";
+const RUN_2: &str = "GS-RUN-01ARZ3NDEKTSV4RRFFQ69G5FB2";
+const RUN_3: &str = "GS-RUN-01ARZ3NDEKTSV4RRFFQ69G5FB3";
+const RUN_4: &str = "GS-RUN-01ARZ3NDEKTSV4RRFFQ69G5FB4";
+const RUN_5: &str = "GS-RUN-01ARZ3NDEKTSV4RRFFQ69G5FB5";
+const RUN_6: &str = "GS-RUN-01ARZ3NDEKTSV4RRFFQ69G5FB6";
+const RUN_7: &str = "GS-RUN-01ARZ3NDEKTSV4RRFFQ69G5FB7";
+const RUN_WRONG: &str = "GS-RUN-01ARZ3NDEKTSV4RRFFQ69G5FC0";
 
 struct TestDir(PathBuf);
 
@@ -69,9 +80,9 @@ fn journal(root: &TestDir, run_id: &str) -> LocalEventJournal<LocalCas> {
 #[test]
 fn truncated_record_tail_blocks_replay_and_future_append() {
     let root = TestDir::new("truncated-tail");
-    let journal = journal(&root, "GS-RUN-100001");
+    let journal = journal(&root, RUN_1);
     journal
-        .append(&event("GS-RUN-100001", 0, "run.started", "ok"))
+        .append(&event(RUN_1, 0, "RUN_STARTED", "ok"))
         .unwrap();
 
     let mut file = OpenOptions::new()
@@ -88,7 +99,7 @@ fn truncated_record_tail_blocks_replay_and_future_append() {
     ));
     assert!(matches!(
         journal
-            .append(&event("GS-RUN-100001", 1, "run.finished", "blocked"))
+            .append(&event(RUN_1, 1, "RUN_FINISHED", "blocked"))
             .unwrap_err(),
         EventError::TruncatedTail { trailing_bytes: 3 }
     ));
@@ -97,9 +108,9 @@ fn truncated_record_tail_blocks_replay_and_future_append() {
 #[test]
 fn changed_chain_digest_is_detected() {
     let root = TestDir::new("chain");
-    let journal = journal(&root, "GS-RUN-100002");
+    let journal = journal(&root, RUN_2);
     journal
-        .append(&event("GS-RUN-100002", 0, "run.started", "chain"))
+        .append(&event(RUN_2, 0, "RUN_STARTED", "chain"))
         .unwrap();
 
     let mut file = OpenOptions::new()
@@ -126,13 +137,13 @@ fn changed_chain_digest_is_detected() {
 #[test]
 fn same_sequence_with_different_event_is_conflict() {
     let root = TestDir::new("conflict");
-    let journal = journal(&root, "GS-RUN-100003");
+    let journal = journal(&root, RUN_3);
     journal
-        .append(&event("GS-RUN-100003", 0, "run.started", "first"))
+        .append(&event(RUN_3, 0, "RUN_STARTED", "first"))
         .unwrap();
 
     let error = journal
-        .append(&event("GS-RUN-100003", 0, "run.started", "different"))
+        .append(&event(RUN_3, 0, "RUN_STARTED", "different"))
         .unwrap_err();
     assert!(matches!(
         error,
@@ -143,10 +154,10 @@ fn same_sequence_with_different_event_is_conflict() {
 #[test]
 fn run_id_mismatch_is_rejected() {
     let root = TestDir::new("run-id");
-    let journal = journal(&root, "GS-RUN-100004");
+    let journal = journal(&root, RUN_4);
 
     let error = journal
-        .append(&event("GS-RUN-WRONG", 0, "run.started", "wrong"))
+        .append(&event(RUN_WRONG, 0, "RUN_STARTED", "wrong"))
         .unwrap_err();
     assert!(matches!(error, EventError::RunIdMismatch { .. }));
 }
@@ -154,8 +165,8 @@ fn run_id_mismatch_is_rejected() {
 #[test]
 fn concurrent_identical_writers_commit_one_record() {
     let root = TestDir::new("concurrent");
-    let journal = Arc::new(journal(&root, "GS-RUN-100005"));
-    let event = event("GS-RUN-100005", 0, "run.started", "same");
+    let journal = Arc::new(journal(&root, RUN_5));
+    let event = event(RUN_5, 0, "RUN_STARTED", "same");
     let barrier = Arc::new(Barrier::new(3));
 
     let handles = (0..2)
@@ -184,11 +195,11 @@ fn missing_cas_object_is_detected_during_replay() {
     let journal = LocalEventJournal::open(
         root.path().join("journal"),
         LocalCas::open(&cas_root).unwrap(),
-        "GS-RUN-100006",
+        RUN_6,
     )
     .unwrap();
     journal
-        .append(&event("GS-RUN-100006", 0, "run.started", "stored"))
+        .append(&event(RUN_6, 0, "RUN_STARTED", "stored"))
         .unwrap();
     let digest = journal.read_from(EventOffset::new(0)).unwrap()[0].event_digest;
     let object_path = LocalCas::open(&cas_root).unwrap().object_path(&digest);
@@ -206,9 +217,9 @@ fn symlink_replacement_is_rejected() {
     use std::os::unix::fs::symlink;
 
     let root = TestDir::new("symlink");
-    let journal = journal(&root, "GS-RUN-100007");
+    let journal = journal(&root, RUN_7);
     journal
-        .append(&event("GS-RUN-100007", 0, "run.started", "safe"))
+        .append(&event(RUN_7, 0, "RUN_STARTED", "safe"))
         .unwrap();
 
     let target = root.path().join("attacker-controlled");
