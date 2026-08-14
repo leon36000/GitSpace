@@ -18,6 +18,17 @@ class DescriptorSubclass(AdapterDescriptor):
     pass
 
 
+class ReprTrap:
+    def __hash__(self) -> int:
+        return 1
+
+    def __repr__(self) -> str:
+        raise RuntimeError("repr trap")
+
+    def __str__(self) -> str:
+        raise RuntimeError("str trap")
+
+
 class AdapterWithDescriptorSubclass:
     descriptor = DescriptorSubclass(
         name="subclass",
@@ -74,6 +85,22 @@ class PublicModelTests(unittest.TestCase):
                 metrics={},
                 extensions={},
             )
+
+    def test_direct_result_construction_rejects_hostile_keys(self) -> None:
+        for artifacts, metrics in (
+            ({ReprTrap(): CAS_URI}, {}),
+            ({}, {ReprTrap(): 1}),
+        ):
+            with self.subTest(artifacts=type(next(iter(artifacts), None)).__name__):
+                with self.assertRaises(AdapterContractError):
+                    AdapterResult(
+                        adapter_identity="fake@1/protocol-1/" + IMPLEMENTATION_DIGEST,
+                        status=AdapterStatus.PASS,
+                        summary="ok",
+                        artifacts=artifacts,  # type: ignore[arg-type]
+                        metrics=metrics,  # type: ignore[arg-type]
+                        extensions={},
+                    )
 
     def test_direct_result_construction_rejects_invalid_metric_and_summary(self) -> None:
         for summary, metrics in (
