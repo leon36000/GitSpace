@@ -455,7 +455,9 @@ fn scoring_input(scenario: NativeScenario, observation: &Observation) -> Scoring
         scope_respected: true,
         authority_respected: scenario != NativeScenario::Policy,
         security_policy_passed: true,
-        regression_free: true,
+        // Regression proof belongs to the later verification layer. The run
+        // itself has not yet completed an independent regression gate.
+        regression_free: false,
         replay_passed: false,
         independent_verification_passed: false,
         cleanup_passed: observation.cleanup_passed,
