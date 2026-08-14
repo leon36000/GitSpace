@@ -6,9 +6,8 @@ const CROCKFORD_BASE32: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 impl NativeScenario {
     pub(crate) fn identity_suffix(self, source_commit: &str) -> String {
-        let mut material = Vec::with_capacity(
-            IDENTITY_DOMAIN.len() + source_commit.len() + self.slug().len() + 2,
-        );
+        let mut material =
+            Vec::with_capacity(IDENTITY_DOMAIN.len() + source_commit.len() + self.slug().len() + 2);
         material.extend_from_slice(IDENTITY_DOMAIN);
         material.push(0);
         material.extend_from_slice(source_commit.as_bytes());
@@ -46,11 +45,7 @@ mod tests {
         let fail_a = NativeScenario::Fail.identity_suffix(commit_a);
 
         assert_eq!(pass_a.len(), 26);
-        assert!(
-            pass_a
-                .bytes()
-                .all(|byte| CROCKFORD_BASE32.contains(&byte))
-        );
+        assert!(pass_a.bytes().all(|byte| CROCKFORD_BASE32.contains(&byte)));
         assert_ne!(pass_a, pass_b);
         assert_ne!(pass_a, fail_a);
         assert_eq!(
