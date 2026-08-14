@@ -99,7 +99,8 @@ impl NativeFoundry {
 
     pub fn run(&self, scenario: NativeScenario) -> Result<RunReceipt, FoundryError> {
         let cas = LocalCas::open(&self.cas_root)?;
-        let run_id = format!("GS-RUN-{}", scenario.ulid());
+        let identity = scenario.identity_suffix(&self.source_commit);
+        let run_id = format!("GS-RUN-{identity}");
         let plan = runner_plan(scenario, &run_id);
         let state_before = state_before_value(&plan.fixture);
         let state_before_digest = canonical_digest(&state_before)?.to_string();
@@ -120,7 +121,7 @@ impl NativeFoundry {
         // before replay/independent verification exist. It must therefore not
         // self-award those gates. The later ReplayReport records the replay
         // verification separately while preserving byte-identical rescoring.
-        let verdict_id = format!("GS-VERDICT-{}", scenario.ulid());
+        let verdict_id = format!("GS-VERDICT-{identity}");
         let verdict = issue_verdict(to_verdict_input(&scoring, verdict_id, run_id.clone()))?;
         let verdict_value = serde_json::to_value(&verdict)?;
         validate_named_json(SchemaName::EvalVerdict, &verdict_value)?;
@@ -162,7 +163,7 @@ impl NativeFoundry {
         }
         let environment_digest = environment_digest();
         let evidence = EvidenceBundle {
-            id: format!("GS-EVIDENCE-{}", scenario.ulid()),
+            id: format!("GS-EVIDENCE-{identity}"),
             version: 1,
             run_id: run_id.clone(),
             task_id: TASK_ID.to_owned(),
