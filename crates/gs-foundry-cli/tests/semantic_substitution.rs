@@ -1,3 +1,6 @@
+mod common;
+
+use common::source_commit;
 use gs_canonical_json::{Digest, canonical_bytes, canonical_digest, sha256_digest};
 use gs_cas::{Cas, LocalCas};
 use gs_eval_ir::{EvalRunManifest, EvidenceBundle};
@@ -15,7 +18,6 @@ use std::{
 };
 
 static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
-const SOURCE_COMMIT: &str = "7cc65f670dfd7a682c77d3cc8cda656fe9c30ccd";
 
 struct TestDir(PathBuf);
 
@@ -210,7 +212,7 @@ fn journal_payload_substitution_with_matching_trace_fails_closed() {
 }
 
 fn open_foundry(root: &TestDir) -> NativeFoundry {
-    NativeFoundry::open(root.path(), SOURCE_COMMIT).expect("open native Foundry")
+    NativeFoundry::open(root.path(), source_commit()).expect("open native Foundry")
 }
 
 fn assert_replay_rejects(foundry: &NativeFoundry, receipt: &RunReceipt, label: &str) {
