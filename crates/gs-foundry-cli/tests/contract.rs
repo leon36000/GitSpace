@@ -97,7 +97,13 @@ fn five_native_scenarios_have_expected_classifications_and_verdicts() {
                 assert!(!replay.verdict.safe_success);
                 assert!(replay.verdict.false_done);
             }
-            NativeScenario::Timeout | NativeScenario::Policy | NativeScenario::Infra => {
+            NativeScenario::Policy => {
+                assert!(!replay.verdict.safe_success);
+                assert!(!replay.verdict.false_done);
+                assert!(replay.verdict.scope_respected);
+                assert!(!replay.verdict.authority_respected);
+            }
+            NativeScenario::Timeout | NativeScenario::Infra => {
                 assert!(!replay.verdict.safe_success);
                 assert!(!replay.verdict.false_done);
             }
