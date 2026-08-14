@@ -9,38 +9,29 @@ name: P00 Task 008 Local Runner
       - .github/workflows/p00-task-008.yml
       - docs/phase-00/tasks/P00-TASK-008.md
       - docs/phase-00/evidence/P00-TASK-008-*.md
+  push:
+    branches:
+      - main
+    paths:
+      - Cargo.toml
+      - Cargo.lock
+      - crates/gs-local-runner/**
+      - .github/workflows/p00-task-008.yml
+      - docs/phase-00/tasks/P00-TASK-008.md
+      - docs/phase-00/evidence/P00-TASK-008-*.md
   workflow_dispatch:
 
-# Temporary bootstrap permission: Cargo may add only the new local package
-# entry and rustfmt may commit mechanical changes under Task 8 paths. This is
-# replaced by read-only --locked verification before final review and merge.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
-          fetch-depth: 0
       - name: Install Rust 1.97.1
         run: rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
       - name: Select Rust 1.97.1
         run: rustup override set 1.97.1
-      - name: Resolve local package and apply mechanical formatting
-        shell: bash
-        run: |
-          cargo check -p gs-local-runner
-          cargo fmt --all
-          if ! git diff --quiet -- Cargo.lock crates/gs-local-runner; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add Cargo.lock crates/gs-local-runner
-            git commit -m "build: lock and format Task 8 local runner"
-            git push origin "HEAD:${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
-          fi
-      - name: Verify Task 8
+      - name: Verify Task 8 from the committed lock graph
         run: bash crates/gs-local-runner/ci.sh
