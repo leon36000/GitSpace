@@ -29,7 +29,6 @@ const FIXTURE_TIME_1: &str = "2026-08-14T00:00:01Z";
 const FIXTURE_TIME_2: &str = "2026-08-14T00:00:02Z";
 
 pub struct NativeFoundry {
-    root: PathBuf,
     cas_root: PathBuf,
     journal_root: PathBuf,
     runner_root: PathBuf,
@@ -40,8 +39,18 @@ struct Observation {
     classification: ObservedClassification,
     effects: Vec<Effect>,
     state_after_uri: String,
-    oracle_passed: bool,
     cleanup_passed: bool,
+}
+
+struct EventContext<'a> {
+    scenario: NativeScenario,
+    run_id: &'a str,
+    task_uri: &'a str,
+    classification: ObservedClassification,
+    state_after_uri: &'a str,
+    verdict_uri: &'a str,
+    safe_success: bool,
+    false_done: bool,
 }
 
 impl NativeFoundry {
@@ -73,7 +82,6 @@ impl NativeFoundry {
             .map_err(|source| FoundryError::io("create journal root", &journal_root, source))?;
         LocalRunner::open(&runner_root, LocalCas::open(&cas_root)?)?;
         Ok(Self {
-            root,
             cas_root,
             journal_root,
             runner_root,
@@ -112,16 +120,16 @@ impl NativeFoundry {
             LocalCas::open(&self.cas_root)?,
             run_id.clone(),
         )?;
-        let events = run_events(
+        let events = run_events(EventContext {
             scenario,
-            &run_id,
-            &task_uri,
-            observation.classification,
-            &observation.state_after_uri,
-            &verdict_uri,
-            verdict.safe_success,
-            verdict.false_done,
-        )?;
+            run_id: &run_id,
+            task_uri: &task_uri,
+            classification: observation.classification,
+            state_after_uri: &observation.state_after_uri,
+            verdict_uri: &verdict_uri,
+            safe_success: verdict.safe_success,
+            false_done: verdict.false_done,
+        })?;
         for event in &events {
             journal.append(event)?;
         }
@@ -247,7 +255,6 @@ impl NativeFoundry {
                         classification: ObservedClassification::Infra,
                         effects: Vec::new(),
                         state_after_uri: put_value(cas, &marker)?,
-                        oracle_passed: false,
                         cleanup_passed: true,
                     });
                 }
@@ -271,7 +278,6 @@ impl NativeFoundry {
             classification,
             effects: result.effects,
             state_after_uri: cas_uri(result.workspace_snapshot),
-            oracle_passed: result.oracle_passed,
             cleanup_passed: result.cleaned_up,
         })
     }
@@ -525,37 +531,28 @@ fn plan_value(scenario: NativeScenario, plan: &RunPlan) -> Value {
     })
 }
 
-fn run_events(
-    scenario: NativeScenario,
-    run_id: &str,
-    task_uri: &str,
-    classification: ObservedClassification,
-    state_after_uri: &str,
-    verdict_uri: &str,
-    safe_success: bool,
-    false_done: bool,
-) -> Result<[RunEvent; 3], FoundryError> {
+fn run_events(context: EventContext<'_>) -> Result<[RunEvent; 3], FoundryError> {
     Ok([
         make_event(
-            run_id,
+            context.run_id,
             0,
             "RUN_PREPARED",
             FIXTURE_TIME_0,
-            json!({"scenario":scenario.slug(),"task_uri":task_uri}),
+            json!({"scenario":context.scenario.slug(),"task_uri":context.task_uri}),
         )?,
         make_event(
-            run_id,
+            context.run_id,
             1,
             "RUN_EXECUTED",
             FIXTURE_TIME_1,
-            json!({"classification":classification_slug(classification),"state_after_uri":state_after_uri}),
+            json!({"classification":classification_slug(context.classification),"state_after_uri":context.state_after_uri}),
         )?,
         make_event(
-            run_id,
+            context.run_id,
             2,
             "VERDICT_ISSUED",
             FIXTURE_TIME_2,
-            json!({"verdict_uri":verdict_uri,"safe_success":safe_success,"false_done":false_done}),
+            json!({"verdict_uri":context.verdict_uri,"safe_success":context.safe_success,"false_done":context.false_done}),
         )?,
     ])
 }
