@@ -9,12 +9,11 @@ from typing import Callable
 
 from inspect_ai import Task, eval as inspect_eval
 from inspect_ai.dataset import Sample
+from inspect_ai.log import EvalLog
 from inspect_ai.scorer import match
 from inspect_ai.solver import generate
 
 from .errors import AdapterContractError
-from .json_boundary import JsonObject, JsonValue, clone_object, validate_cas_uri
-from .model import AdapterDescriptor, AdapterStatus
 from .inspect_replay import (
     INSPECT_COMMIT,
     INSPECT_VERSION,
@@ -25,6 +24,8 @@ from .inspect_replay import (
     project_inspect_log,
     rescore_inspect_record,
 )
+from .json_boundary import JsonObject, JsonValue, clone_object, validate_cas_uri
+from .model import AdapterDescriptor, AdapterStatus
 
 _MODEL_OUTPUT = "Default output from mockllm/model"
 _TASK_NAME = "gitspace_inspect_controlled"
@@ -134,11 +135,7 @@ class InspectAdapter:
                 notification=False,
                 trace=False,
             )
-        if type(logs) is not list or len(logs) != 1:
-            raise AdapterContractError("Inspect must return exactly one EvalLog")
-        log = logs[0]
-        if not hasattr(log, "model_dump"):
-            raise AdapterContractError("Inspect eval returned a non-EvalLog object")
+        log = _single_eval_log(logs)
         log_value = log.model_dump(mode="json", exclude_none=True)
         log_bytes = _json_bytes(log_value)
         log_uri = self._publish_verified(log_bytes)
@@ -313,6 +310,29 @@ class InspectAdapter:
             },
         }
         return project_inspect_log(projection)
+
+
+def _single_eval_log(logs: object) -> EvalLog:
+    logs_type = type(logs)
+    official_wrapper = (
+        type.__getattribute__(logs_type, "__module__") == "inspect_ai._eval.eval"
+        and type.__getattribute__(logs_type, "__name__") == "EvalLogs"
+    )
+    if logs_type is not list and not official_wrapper:
+        raise AdapterContractError("Inspect eval returned an unsupported log collection")
+    try:
+        count = len(logs)  # type: ignore[arg-type]
+    except Exception as error:
+        raise AdapterContractError("Inspect log collection has no stable cardinality") from error
+    if count != 1:
+        raise AdapterContractError("Inspect must return exactly one EvalLog")
+    try:
+        log = logs[0]  # type: ignore[index]
+    except Exception as error:
+        raise AdapterContractError("Inspect log collection is not indexable") from error
+    if type(log) is not EvalLog:
+        raise AdapterContractError("Inspect eval returned a non-EvalLog object")
+    return log
 
 
 def _json_bytes(value: object) -> bytes:
