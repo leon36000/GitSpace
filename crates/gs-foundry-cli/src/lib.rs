@@ -6,6 +6,7 @@ mod identity;
 mod model;
 mod native;
 mod replay;
+mod store;
 
 pub use error::FoundryError;
 pub(crate) use model::ScoringInput;
