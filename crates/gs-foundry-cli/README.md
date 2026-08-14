@@ -50,6 +50,27 @@ The FAIL scenario deliberately declares success despite a failed protected oracl
 
 Replay happens later, from immutable persisted artifacts, and reports `replay_verified=true` and `evidence_verified=true` without rewriting the historical verdict. An eventual independently verified final-success decision belongs to a later/superseding verification step, not to self-assertion inside the original run.
 
+## Opening modes
+
+The two constructors have different authority:
+
+```text
+NativeFoundry::open
+  → initializes a writable/executable store
+  → opens CAS and runner roots
+  → permits run
+
+NativeFoundry::open_read_only
+  → requires an existing real Foundry root
+  → validates the complete CAS and journal layout
+  → does not require or open the runner root
+  → refuses run before effects
+```
+
+The CLI `run` command uses the writable constructor. The CLI `replay` command uses the read-only constructor.
+
+A missing Foundry root or a missing required CAS/journal directory therefore causes replay to fail without creating or repairing filesystem state. Removing `runner/` does not prevent replay and replay does not recreate it.
+
 ## Replay boundary
 
 The receipt is a JSON locator, not a new canonical object. It points to immutable CAS objects and the run journal. Replay:
@@ -57,13 +78,14 @@ The receipt is a JSON locator, not a new canonical object. It points to immutabl
 - validates task, EvidenceBundle, RunManifest and verdict through the sovereign Evaluation IR;
 - binds the receipt, run identity and EvidenceBundle to the source commit actually executed;
 - verifies the qualified Task 9 environment in both evidence and manifest;
+- requires the Foundry, CAS and journal layout to pre-exist without symlink substitution;
 - requires all receipt artifacts to remain readable through verified CAS;
 - verifies the exact qualified bytes of task, plan, state-before, state-after, patch and scoring artifacts;
 - verifies receipt ↔ bundle ↔ manifest agreement;
 - replays exactly three complete typed journal events;
 - rebuilds and compares the persisted trace;
 - reissues the historical verdict from persisted scoring input and the qualified identity;
-- performs no runner/model invocation and no CAS or journal write.
+- performs no runner/model invocation and no CAS, journal or layout write.
 
 Repeated replay over the same receipt must yield byte-identical canonical `ReplayReport` JSON.
 
@@ -82,4 +104,4 @@ Both commands emit one JSON object on stdout.
 
 ## Non-goals
 
-This is a deterministic M0 fixture, not an arbitrary-code benchmark harness. It does not provide external model execution, network, container/VM sandboxing, adapter integration, signatures or remote storage.
+This is a deterministic M0 fixture, not an arbitrary-code benchmark harness. It does not provide external model execution, network, container/VM sandboxing, adapter integration, signatures, remote storage or protection against a concurrently hostile local filesystem process.
