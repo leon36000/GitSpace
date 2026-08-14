@@ -15,9 +15,7 @@ pub struct RunProjection {
     pub chain_head: Option<String>,
 }
 
-pub fn rebuild_run_projection(
-    source: &impl EventSource,
-) -> Result<RunProjection, EventError> {
+pub fn rebuild_run_projection(source: &impl EventSource) -> Result<RunProjection, EventError> {
     let records = source.read_from(EventOffset::new(0))?;
     let mut event_type_counts = BTreeMap::new();
     for record in &records {

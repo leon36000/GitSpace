@@ -6,8 +6,5 @@ fn digest_can_be_reconstructed_from_exact_bytes() {
     let digest = Digest::from_bytes(bytes);
 
     assert_eq!(digest.as_bytes(), &bytes);
-    assert_eq!(
-        digest.to_string(),
-        format!("sha256:{}", "5a".repeat(32))
-    );
+    assert_eq!(digest.to_string(), format!("sha256:{}", "5a".repeat(32)));
 }

@@ -2,8 +2,8 @@ use gs_canonical_json::{canonical_bytes, canonical_digest};
 use gs_cas::{Cas, LocalCas};
 use gs_eval_ir::{Extensions, RunEvent};
 use gs_event_journal::{
-    EventError, EventOffset, EventSink, EventSource, LocalEventJournal,
-    projection_bytes, rebuild_run_projection,
+    EventError, EventOffset, EventSink, EventSource, LocalEventJournal, projection_bytes,
+    rebuild_run_projection,
 };
 use serde_json::{Value, json};
 use std::{
@@ -67,8 +67,7 @@ fn event(run_id: &str, sequence: u64, event_type: &str, message: &str) -> RunEve
 
 fn journal(root: &TestDir, run_id: &str) -> LocalEventJournal<LocalCas> {
     let cas = LocalCas::open(root.path().join("cas")).expect("open CAS");
-    LocalEventJournal::open(root.path().join("journal"), cas, run_id)
-        .expect("open event journal")
+    LocalEventJournal::open(root.path().join("journal"), cas, run_id).expect("open event journal")
 }
 
 #[test]
@@ -156,7 +155,10 @@ fn orphan_cas_event_is_not_visible_until_pointer_commit() {
     let event = event(RUN_5, 0, "RUN_STARTED", "orphan");
     let event_value = serde_json::to_value(&event).unwrap();
     let event_bytes = canonical_bytes(&event_value).unwrap();
-    LocalCas::open(&cas_root).unwrap().put(&event_bytes).unwrap();
+    LocalCas::open(&cas_root)
+        .unwrap()
+        .put(&event_bytes)
+        .unwrap();
 
     let journal = LocalEventJournal::open(
         root.path().join("journal"),

@@ -62,10 +62,7 @@ pub(crate) fn parse_index(
 ) -> Result<Vec<IndexRecord>, EventError> {
     if bytes.len() < HEADER_LEN {
         return Err(EventError::InvalidHeader {
-            reason: format!(
-                "expected {HEADER_LEN} bytes, found {}",
-                bytes.len()
-            ),
+            reason: format!("expected {HEADER_LEN} bytes, found {}", bytes.len()),
         });
     }
     if &bytes[..MAGIC.len()] != MAGIC {
@@ -115,12 +112,8 @@ pub(crate) fn parse_index(
         chain_digest_bytes.copy_from_slice(&record_bytes[40..72]);
         let actual_chain = Digest::from_bytes(chain_digest_bytes);
         let offset = EventOffset::new(actual_offset);
-        let expected_chain = next_chain_digest(
-            expected_run_id_digest,
-            previous_chain,
-            offset,
-            event_digest,
-        );
+        let expected_chain =
+            next_chain_digest(expected_run_id_digest, previous_chain, offset, event_digest);
         if actual_chain != expected_chain {
             return Err(EventError::CorruptChain {
                 offset: actual_offset,

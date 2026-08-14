@@ -57,11 +57,7 @@ pub enum EventError {
 }
 
 impl EventError {
-    pub(crate) fn io(
-        operation: &'static str,
-        path: impl Into<PathBuf>,
-        source: io::Error,
-    ) -> Self {
+    pub(crate) fn io(operation: &'static str, path: impl Into<PathBuf>, source: io::Error) -> Self {
         Self::Io {
             operation,
             path: path.into(),
@@ -84,14 +80,24 @@ impl fmt::Display for EventError {
             ),
             Self::Cas(source) => write!(formatter, "event journal CAS failure: {source}"),
             Self::Canonical(source) => {
-                write!(formatter, "event journal canonicalization failure: {source}")
+                write!(
+                    formatter,
+                    "event journal canonicalization failure: {source}"
+                )
             }
             Self::Validation(source) => {
-                write!(formatter, "event journal schema validation failure: {source}")
+                write!(
+                    formatter,
+                    "event journal schema validation failure: {source}"
+                )
             }
             Self::Json(source) => write!(formatter, "event journal JSON failure: {source}"),
             Self::UnsafePath { path, reason } => {
-                write!(formatter, "unsafe event journal path {}: {reason}", path.display())
+                write!(
+                    formatter,
+                    "unsafe event journal path {}: {reason}",
+                    path.display()
+                )
             }
             Self::InvalidHeader { reason } => {
                 write!(formatter, "invalid event journal header: {reason}")

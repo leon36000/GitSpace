@@ -82,10 +82,7 @@ impl<C: Cas> LocalEventJournal<C> {
         Ok(canonical_bytes(&value)?)
     }
 
-    fn read_event(
-        &self,
-        record: IndexRecord,
-    ) -> Result<JournalRecord, EventError> {
+    fn read_event(&self, record: IndexRecord) -> Result<JournalRecord, EventError> {
         let bytes = self.cas.get(&record.event_digest)?;
         let value: serde_json::Value = serde_json::from_slice(&bytes)?;
         if canonical_bytes(&value)? != bytes {
@@ -133,9 +130,12 @@ impl<C: Cas> LocalEventJournal<C> {
         let mut file = OpenOptions::new()
             .read(true)
             .open(&self.journal_path)
-            .map_err(|source| EventError::io("open journal for replay", &self.journal_path, source))?;
-        file.lock_shared()
-            .map_err(|source| EventError::io("lock journal for replay", &self.journal_path, source))?;
+            .map_err(|source| {
+                EventError::io("open journal for replay", &self.journal_path, source)
+            })?;
+        file.lock_shared().map_err(|source| {
+            EventError::io("lock journal for replay", &self.journal_path, source)
+        })?;
         let bytes = read_all(&mut file, &self.journal_path)?;
         parse_index(&bytes, self.run_id_digest)
     }
@@ -151,9 +151,12 @@ impl<C: Cas> EventSink for LocalEventJournal<C> {
             .read(true)
             .append(true)
             .open(&self.journal_path)
-            .map_err(|source| EventError::io("open journal for append", &self.journal_path, source))?;
-        file.lock()
-            .map_err(|source| EventError::io("lock journal for append", &self.journal_path, source))?;
+            .map_err(|source| {
+                EventError::io("open journal for append", &self.journal_path, source)
+            })?;
+        file.lock().map_err(|source| {
+            EventError::io("lock journal for append", &self.journal_path, source)
+        })?;
         let bytes = read_all(&mut file, &self.journal_path)?;
         let records = parse_index(&bytes, self.run_id_digest)?;
         let expected = records.len() as u64;
@@ -178,19 +181,16 @@ impl<C: Cas> EventSink for LocalEventJournal<C> {
 
         let offset = EventOffset::new(event.sequence);
         let previous_chain = records.last().map(|record| record.chain_digest);
-        let chain_digest = next_chain_digest(
-            self.run_id_digest,
-            previous_chain,
-            offset,
-            event_digest,
-        );
+        let chain_digest =
+            next_chain_digest(self.run_id_digest, previous_chain, offset, event_digest);
         let record = IndexRecord {
             offset,
             event_digest,
             chain_digest,
         };
-        file.write_all(&record_bytes(record))
-            .map_err(|source| EventError::io("append journal record", &self.journal_path, source))?;
+        file.write_all(&record_bytes(record)).map_err(|source| {
+            EventError::io("append journal record", &self.journal_path, source)
+        })?;
         file.sync_all()
             .map_err(|source| EventError::io("sync journal record", &self.journal_path, source))?;
         Ok(offset)
