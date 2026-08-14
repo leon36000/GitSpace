@@ -6,7 +6,7 @@ import unicodedata
 from dataclasses import dataclass, field
 from enum import Enum
 
-from .errors import AdapterContractError, JsonBoundaryError
+from .errors import AdapterContractError, JsonBoundaryError, safe_type_name
 from .json_boundary import (
     SAFE_INTEGER,
     JsonObject,
@@ -19,6 +19,8 @@ from .json_boundary import (
 
 _DESCRIPTOR_NAME = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
 _DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
+_PROTOCOL_SEGMENT = "/protocol-1/"
+_MAX_IDENTITY_LENGTH = 512
 
 
 class AdapterStatus(str, Enum):
@@ -52,6 +54,8 @@ class AdapterDescriptor:
             or not _DIGEST.fullmatch(self.implementation_digest)
         ):
             raise AdapterContractError("adapter implementation_digest is invalid")
+        if len(self.identity) > _MAX_IDENTITY_LENGTH:
+            raise AdapterContractError("adapter descriptor identity exceeds 512 characters")
 
     @property
     def identity(self) -> str:
@@ -79,18 +83,8 @@ class AdapterResult:
     extensions: dict[str, JsonValue]
 
     def __post_init__(self) -> None:
-        if (
-            type(self.adapter_identity) is not str
-            or not self.adapter_identity
-            or len(self.adapter_identity) > 512
-            or any(
-                ord(character) < 32
-                or ord(character) > 126
-                or unicodedata.category(character).startswith("C")
-                for character in self.adapter_identity
-            )
-        ):
-            raise AdapterContractError("adapter result identity is invalid")
+        if not _is_canonical_adapter_identity(self.adapter_identity):
+            raise AdapterContractError("adapter result identity is not canonical")
         if type(self.status) is not AdapterStatus:
             raise AdapterContractError("adapter result status must be an AdapterStatus")
         if (
@@ -113,11 +107,8 @@ class AdapterResult:
         artifacts: dict[str, str] = {}
         for name, uri in self.artifacts.items():
             if type(name) is not str:
-                name_type = type(name)
                 raise AdapterContractError(
-                    "$/artifacts: key type "
-                    f"{name_type.__module__}.{name_type.__qualname__} "
-                    "is not an exact string"
+                    f"$/artifacts: key type {safe_type_name(name)} is not an exact string"
                 )
             path = f"$/artifacts/{name}"
             try:
@@ -129,11 +120,8 @@ class AdapterResult:
         metrics: dict[str, int | float] = {}
         for name, metric in self.metrics.items():
             if type(name) is not str:
-                name_type = type(name)
                 raise AdapterContractError(
-                    "$/metrics: key type "
-                    f"{name_type.__module__}.{name_type.__qualname__} "
-                    "is not an exact string"
+                    f"$/metrics: key type {safe_type_name(name)} is not an exact string"
                 )
             path = f"$/metrics/{name}"
             try:
@@ -141,13 +129,9 @@ class AdapterResult:
             except JsonBoundaryError as error:
                 raise AdapterContractError(str(error)) from error
             if type(metric) not in (int, float):
-                raise AdapterContractError(
-                    f"{path}: expected exact non-bool number"
-                )
+                raise AdapterContractError(f"{path}: expected exact non-bool number")
             if type(metric) is int and not -SAFE_INTEGER <= metric <= SAFE_INTEGER:
-                raise AdapterContractError(
-                    f"{path}: unsafe interoperable integer"
-                )
+                raise AdapterContractError(f"{path}: unsafe interoperable integer")
             if type(metric) is float and not math.isfinite(metric):
                 raise AdapterContractError(f"{path}: non-finite metric")
             if (
@@ -179,3 +163,24 @@ class AdapterResult:
             },
             path="$",
         )
+
+
+def _is_canonical_adapter_identity(value: object) -> bool:
+    if type(value) is not str or not value or len(value) > _MAX_IDENTITY_LENGTH:
+        return False
+    prefix, separator, digest = value.rpartition(_PROTOCOL_SEGMENT)
+    if not separator:
+        return False
+    name, name_separator, version = prefix.partition("@")
+    if not name_separator:
+        return False
+    try:
+        descriptor = AdapterDescriptor(
+            name=name,
+            version=version,
+            protocol_version=1,
+            implementation_digest=digest,
+        )
+    except AdapterContractError:
+        return False
+    return descriptor.identity == value
