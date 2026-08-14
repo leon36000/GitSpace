@@ -73,6 +73,18 @@ MUTATIONS = (
         "            if False:\n",
     ),
     Mutation(
+        "drop-event-receiver-close",
+        "inspect_adapter.py",
+        "                await receive.aclose()\n",
+        "",
+    ),
+    Mutation(
+        "drop-cleanup-shim-restore",
+        "inspect_adapter.py",
+        '        setattr(hooks, "drain_sample_events", original)\n',
+        "",
+    ),
+    Mutation(
         "accept-multiple-full-log-samples",
         "inspect_replay.py",
         "    if type(samples) is not list or len(samples) != 1:\n",
