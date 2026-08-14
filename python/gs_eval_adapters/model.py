@@ -1,0 +1,84 @@
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+from enum import Enum
+
+from .errors import AdapterContractError
+from .json_boundary import JsonObject, JsonValue, clone_object
+
+_DESCRIPTOR_NAME = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
+_DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
+
+
+class AdapterStatus(str, Enum):
+    PASS = "pass"
+    FAIL = "fail"
+    TIMEOUT = "timeout"
+    POLICY = "policy"
+    INFRA = "infra"
+
+
+@dataclass(frozen=True, slots=True)
+class AdapterDescriptor:
+    name: str
+    version: str
+    protocol_version: int
+    implementation_digest: str
+
+    def __post_init__(self) -> None:
+        if not _DESCRIPTOR_NAME.fullmatch(self.name):
+            raise AdapterContractError("adapter descriptor name is invalid")
+        if not self.version or not all(32 <= ord(char) <= 126 for char in self.version):
+            raise AdapterContractError("adapter descriptor version is invalid")
+        if self.protocol_version != 1:
+            raise AdapterContractError("adapter protocol_version must equal 1")
+        if not _DIGEST.fullmatch(self.implementation_digest):
+            raise AdapterContractError("adapter implementation_digest is invalid")
+
+    @property
+    def identity(self) -> str:
+        return (
+            f"{self.name}@{self.version}/protocol-{self.protocol_version}/"
+            f"{self.implementation_digest}"
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class AdapterRequest:
+    task: dict[str, JsonValue]
+    agent: dict[str, JsonValue]
+    seed: int
+    extensions: dict[str, JsonValue] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class AdapterResult:
+    adapter_identity: str
+    status: AdapterStatus
+    summary: str
+    artifacts: dict[str, str]
+    metrics: dict[str, int | float]
+    extensions: dict[str, JsonValue]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "artifacts", dict(self.artifacts))
+        object.__setattr__(self, "metrics", dict(self.metrics))
+        object.__setattr__(
+            self,
+            "extensions",
+            clone_object(self.extensions, path="$/extensions"),
+        )
+
+    def to_json(self) -> JsonObject:
+        return clone_object(
+            {
+                "adapter_identity": self.adapter_identity,
+                "status": self.status.value,
+                "summary": self.summary,
+                "artifacts": dict(self.artifacts),
+                "metrics": dict(self.metrics),
+                "extensions": self.extensions,
+            },
+            path="$",
+        )
