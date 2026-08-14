@@ -44,6 +44,14 @@ class ReprTrap:
     def __repr__(self) -> str:
         raise RuntimeError("repr trap")
 
+    def __str__(self) -> str:
+        raise RuntimeError("str trap")
+
+
+class HashTrap:
+    def __hash__(self) -> int:
+        raise RuntimeError("hash trap")
+
 
 class BaseAdapter:
     descriptor = AdapterDescriptor(
@@ -78,9 +86,21 @@ class ExplodingStringError(Exception):
         raise RuntimeError("stringification trap")
 
 
+class HostileMetadataError(Exception):
+    pass
+
+
+HostileMetadataError.__module__ = ReprTrap()  # type: ignore[assignment]
+
+
 class HostileExceptionAdapter(BaseAdapter):
     def invoke(self, prepared: dict[str, object]) -> dict[str, object]:
         raise ExplodingStringError()
+
+
+class HostileMetadataAdapter(BaseAdapter):
+    def invoke(self, prepared: dict[str, object]) -> dict[str, object]:
+        raise HostileMetadataError("metadata")
 
 
 class DescriptorTrap:
@@ -139,6 +159,10 @@ class BoundaryHardeningTests(unittest.TestCase):
                 with self.assertRaises(JsonBoundaryError):
                     execute_adapter(BaseAdapter(), request_with(value))
 
+    def test_huge_integer_still_produces_a_boundary_error(self) -> None:
+        with self.assertRaises(JsonBoundaryError):
+            execute_adapter(BaseAdapter(), request_with(10**5000))
+
     def test_hostile_dictionary_key_repr_cannot_escape_boundary_error(self) -> None:
         with self.assertRaises(JsonBoundaryError):
             execute_adapter(BaseAdapter(), request_with({ReprTrap(): "value"}))
@@ -178,11 +202,26 @@ class BoundaryHardeningTests(unittest.TestCase):
         self.assertIn("invoke", result.summary)
         self.assertIn("ExplodingStringError", result.summary)
 
+    def test_exception_with_hostile_type_metadata_is_still_normalized(self) -> None:
+        result = execute_adapter(HostileMetadataAdapter(), request_with("ok"))
+        self.assertEqual(result.status, AdapterStatus.INFRA)
+        self.assertLessEqual(len(result.summary), 512)
+        self.assertIn("invoke", result.summary)
+        self.assertIn("HostileMetadataError", result.summary)
+
     def test_descriptor_property_exception_is_wrapped_by_sdk_boundaries(self) -> None:
         with self.assertRaises(AdapterContractError):
             execute_adapter(DescriptorTrap(), request_with("ok"))
         with self.assertRaises(RegistrationError):
             AdapterRegistry().register(DescriptorTrap())
+
+    def test_registry_lookup_rejects_non_string_without_hashing_it(self) -> None:
+        registry = AdapterRegistry()
+        registry.register(BaseAdapter())
+        with self.assertRaises(RegistrationError):
+            registry.resolve(HashTrap())  # type: ignore[arg-type]
+        with self.assertRaises(RegistrationError):
+            registry.resolve(StringSubclass("hardening"))
 
 
 if __name__ == "__main__":
