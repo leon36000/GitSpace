@@ -38,6 +38,9 @@ fn native_task_template_is_valid_in_the_rust_schema_boundary() {
     });
 
     if let Err(report) = validate_task_json(&task) {
-        panic!("Task 9 native task failed Rust schema validation: {:#?}", report.issues());
+        panic!(
+            "Task 9 native task failed Rust schema validation: {:#?}",
+            report.issues()
+        );
     }
 }
