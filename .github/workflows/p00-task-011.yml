@@ -12,24 +12,35 @@ on:
       - docs/phase-00/tasks/P00-TASK-011.md
       - docs/phase-00/evidence/P00-TASK-011-*.md
       - .github/workflows/p00-task-011.yml
+  push:
+    branches:
+      - main
+    paths:
+      - pyproject.toml
+      - uv.lock
+      - python/gs_eval_adapters/inspect_adapter.py
+      - python/gs_eval_adapters/inspect_replay.py
+      - tests/adapters/inspect/**
+      - docs/phase-00/qualifications/inspect-ai-0.3.258.json
+      - docs/phase-00/tasks/P00-TASK-011.md
+      - docs/phase-00/evidence/P00-TASK-011-*.md
+      - .github/workflows/p00-task-011.yml
   workflow_dispatch:
 
-# Temporary same-repository bootstrap permission. The workflow may commit only
-# the generated uv.lock. It is replaced by read-only frozen verification before
-# final review and merge.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
-          ref: ${{ github.head_ref || github.ref_name }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
+      - name: Record exact checked-out head
+        run: git rev-parse HEAD
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12.13'
@@ -39,17 +50,8 @@ jobs:
         run: |
           python --version | grep -Fx 'Python 3.12.13'
           python -c "import importlib.metadata as m; assert m.version('uv') == '0.12.0'"
-      - name: Generate and commit exact Inspect dependency graph
-        shell: bash
-        run: |
-          uv lock --python 3.12.13
-          if test -n "$(git status --porcelain=v1 -- uv.lock)"; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add uv.lock
-            git commit -m "build: lock Task 11 Inspect dependency graph"
-            git push origin "HEAD:${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
-          fi
+      - name: Verify committed Inspect dependency graph
+        run: uv lock --check --python 3.12.13
       - name: Sync frozen Python environment
         run: uv sync --frozen
       - name: Verify exact qualified distributions
@@ -58,6 +60,8 @@ jobs:
           uv run --frozen python -c "import importlib.metadata as m; assert m.version('jsonschema') == '4.26.0'"
       - name: Test Inspect adapter contract
         run: PYTHONPATH=python:tests/adapters/inspect uv run --frozen python -m unittest discover -s tests/adapters/inspect -p 'test_*.py' -v
+      - name: Kill critical Inspect adapter mutations
+        run: PYTHONPATH=python:tests/adapters/inspect uv run --frozen python tests/adapters/inspect/run_mutations.py
       - name: Replay provider-neutral SDK contract
         run: PYTHONPATH=python:tests/adapters uv run --frozen python -m unittest discover -s tests/adapters -p 'test_*.py' -v
       - name: Compile Python adapter boundary
@@ -66,6 +70,23 @@ jobs:
         run: uv run --frozen python -m unittest -v tests/contracts/test_toolchains.py
       - name: Replay sovereign schema contract
         run: uv run --frozen python -m unittest -v tests/contracts/test_eval_ir_schemas.py
+      - name: Replay Task 11 from a clean archive
+        shell: bash
+        run: |
+          archive_dir="$(mktemp -d)"
+          git archive HEAD | tar -x -C "$archive_dir"
+          (
+            cd "$archive_dir"
+            uv lock --check --python 3.12.13
+            uv sync --frozen
+            uv run --frozen python -c "import importlib.metadata as m; assert m.version('inspect-ai') == '0.3.258'"
+            PYTHONPATH=python:tests/adapters/inspect uv run --frozen python -m unittest discover -s tests/adapters/inspect -p 'test_*.py' -v
+            PYTHONPATH=python:tests/adapters uv run --frozen python -m unittest discover -s tests/adapters -p 'test_*.py' -v
+            PYTHONPATH=python uv run --frozen python -m compileall -q python/gs_eval_adapters tests/adapters/inspect
+            uv run --frozen python -m unittest -v tests/contracts/test_toolchains.py
+            uv run --frozen python -m unittest -v tests/contracts/test_eval_ir_schemas.py
+          )
+          rm -rf "$archive_dir"
       - name: Install Rust 1.97.1
         run: |
           rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
