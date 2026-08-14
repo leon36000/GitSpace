@@ -268,38 +268,76 @@ class InspectAdapter:
 
 @contextmanager
 def _inspect_0_3_258_event_stream_cleanup() -> Iterator[None]:
-    """Patch the pinned Inspect release to close its drained receive stream.
+    """Close the drained event receiver that Inspect 0.3.258 leaves open.
 
-    Inspect 0.3.258 closes the sample event sender, drains the receive stream,
-    then drops the active reference without closing that receiver. The adapter
-    is pinned to this exact release, serializes eval calls, installs the narrow
-    compatibility function only for the duration of eval, and restores the
-    original private function afterwards.
+    The pinned release closes the sender, waits for the background emitter,
+    drains remaining events, then clears the receiver reference without closing
+    the receiver. This temporary, serialized compatibility shim mirrors the
+    official function and adds only the missing receiver close. The original
+    private function is restored even when eval fails.
     """
 
     try:
         hooks = import_module("inspect_ai.hooks._hooks")
         original = getattr(hooks, "drain_sample_events")
-        active_sample = getattr(hooks, "active_sample")
-        send_sample_events = getattr(hooks, "send_sample_events")
+        sample_active = getattr(hooks, "sample_active")
+        anyio = getattr(hooks, "anyio")
+        emit_to_all = getattr(hooks, "_emit_to_all")
+        logger = getattr(hooks, "logger")
     except (ImportError, AttributeError) as error:
         raise AdapterContractError(
             "Inspect 0.3.258 hook cleanup API is unavailable"
         ) from error
 
     async def drain_sample_events_with_receiver_close() -> None:
-        active = active_sample()
-        if active.event_send is not None:
-            await active.event_send.aclose()
+        active = sample_active()
+        if active is None:
+            return
+
+        receive = active.event_receive
+        try:
+            if active.event_send is not None:
+                await active.event_send.aclose()
+
+            if active.event_done is not None:
+                with anyio.move_on_after(5):
+                    await active.event_done.wait()
+                if not active.event_done.is_set():
+                    logger.warning(
+                        "Timed out waiting for sample event emitter to drain"
+                    )
+
+            if receive is not None:
+                try:
+                    while True:
+                        data = receive.receive_nowait()
+
+                        async def emit_event(
+                            hook: object, event: object = data
+                        ) -> None:
+                            await hook.on_sample_event(event)
+
+                        await emit_to_all(emit_event)
+                except (
+                    anyio.WouldBlock,
+                    anyio.EndOfStream,
+                    anyio.ClosedResourceError,
+                ):
+                    pass
+        except Exception as error:
+            logger.warning(f"Exception draining sample events: {error}")
+        finally:
+            if receive is not None:
+                try:
+                    await receive.aclose()
+                except (
+                    anyio.ClosedResourceError,
+                    anyio.BrokenResourceError,
+                ):
+                    pass
             active.event_send = None
-        if active.event_receive is not None:
-            receive = active.event_receive
-            try:
-                events = [event async for event in receive]
-            finally:
-                await receive.aclose()
-                active.event_receive = None
-            await send_sample_events(events)
+            active.event_receive = None
+            active.event_done = None
 
     setattr(hooks, "drain_sample_events", drain_sample_events_with_receiver_close)
     try:
