@@ -2,6 +2,7 @@
 
 mod artifacts;
 mod error;
+mod identity;
 mod model;
 mod native;
 mod replay;
