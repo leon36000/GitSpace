@@ -26,6 +26,22 @@ Evaluation IR
 
 No external model, provider, network, container or database is involved.
 
+## Deterministic identity
+
+`RunReceipt`, `EvalVerdict` and `EvidenceBundle` share one 26-character Crockford Base32 suffix. The suffix is the first 128 bits of SHA-256 over the domain-separated tuple:
+
+```text
+gitspace:p00-task-009:identity:v1
+NUL
+source_commit
+NUL
+scenario_slug
+```
+
+The same `(source_commit, scenario)` pair therefore reproduces the same identifiers and remains idempotent. A different source commit or scenario produces a different qualified identity, so two commits cannot alias one run while still allowing both runs to coexist in the same Foundry store.
+
+The suffix is ULID-shaped only to satisfy the Evaluation IR identifier schema; it is not a chronological timestamp. The complete source commit remains present in the receipt and EvidenceBundle and is rechecked during replay. The 128-bit suffix is a routing identity, not a replacement for full provenance evidence.
+
 ## Proof chronology
 
 A functional PASS is **not** allowed to self-promote to `safe_success` when the initial verdict is issued. At that moment the EvidenceBundle, replay and identity-independent verification have not yet been closed. The persisted PASS verdict is therefore deliberately `declared_outcome=blocked`, `safe_success=false`, `false_done=false`, with evidence/replay/independent-verification gates open.
@@ -39,13 +55,14 @@ Replay happens later, from immutable persisted artifacts, and reports `replay_ve
 The receipt is a JSON locator, not a new canonical object. It points to immutable CAS objects and the run journal. Replay:
 
 - validates task, EvidenceBundle, RunManifest and verdict through the sovereign Evaluation IR;
-- binds the receipt and EvidenceBundle to the source commit actually executed;
+- binds the receipt, run identity and EvidenceBundle to the source commit actually executed;
 - verifies the qualified Task 9 environment in both evidence and manifest;
 - requires all receipt artifacts to remain readable through verified CAS;
+- verifies the exact qualified bytes of task, plan, state-before, state-after, patch and scoring artifacts;
 - verifies receipt ↔ bundle ↔ manifest agreement;
-- replays exactly three typed journal events;
+- replays exactly three complete typed journal events;
 - rebuilds and compares the persisted trace;
-- reissues the historical verdict from persisted scoring input;
+- reissues the historical verdict from persisted scoring input and the qualified identity;
 - performs no runner/model invocation and no CAS or journal write.
 
 Repeated replay over the same receipt must yield byte-identical canonical `ReplayReport` JSON.
