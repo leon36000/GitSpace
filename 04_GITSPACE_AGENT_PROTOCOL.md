@@ -3,7 +3,7 @@ doc_id: GS-04
 title: GitSpace — Agent Protocol
 authority: OPERATING_PROTOCOL
 status: ACTIVE
-version: 0.4.0
+version: 0.4.1
 updated: 2026-08-14
 read_when: PLANNING_EXECUTION_HANDOFF_OR_MEMORY_UPDATE
 ---
@@ -134,9 +134,10 @@ Les logs bruts sont immuables; les secrets sont redacted; modèle, harness, outi
 
 - Evaluation IR GitSpace reste souverain; les frameworks externes sont des adaptateurs.
 - Sécurité, autorité, intégrité, portée et nettoyage sont non compensables.
+- Le verdict engine recalcule `safe_success` et `false_done`; ces champs ne sont jamais acceptés depuis un score, une confiance ou un consensus.
 - Les oracles protégés restent hors du workspace agent.
 - Un préprint non reproduit reste expérimental.
-- Le CAS et le journal locaux sont des pilotes M0, pas des décisions de stockage distribué.
+- CAS, journal et runner locaux sont des pilotes M0, pas des décisions de stockage ou d’orchestration distribuée.
 - Neon, Temporal, SonarQube, Fallow et AMD sont activés seulement lorsqu’un besoin mesuré les rend pertinents.
 - Une CI verte ne suffit pas sans revue, merge signé et preuve post-merge.
 - Faux `DONE = 0`.
@@ -206,36 +207,36 @@ proven_tasks:
   - P00-TASK-004
   - P00-TASK-005
   - P00-TASK-006
-active_task: P00-TASK-007
+  - P00-TASK-007
+active_task: P00-TASK-008
 active_task_status: NOT_PACKETIZED
 phase_status: PARTIALLY_VERIFIED
 ```
 
 Preuves récentes :
 
-- Task 5 CAS : merge signé `c8b1a1a50040ce757e44eb2867257c14b270dc8a`.
-- Task 6 journal : merge signé `6c48ef758d0fbdeae3abb9d0e912ad23167c0e3a`.
-- Task 6 post-merge : workflow `31765845548`, job `94661445335`, succès.
+- Task 6 journal : merge signé `6c48ef758d0fbdeae3abb9d0e912ad23167c0e3a`, post-merge `31765845548` / `94661445335`.
+- Task 7 verdict : merge signé `453b7a1e33daac5d485ad176608225403b2ba5dc`, post-merge `31767376709` / `94665911378`.
 
 ## 11. Handoff courant
 
 ```yaml
-session_id: GS-SESSION-20260814-TASK006
+session_id: GS-SESSION-20260814-TASK007
 objective: >-
-  Merge Task 6 state and its byte-identical RAGLite projection,
-  then packetize P00-TASK-007 from the resulting canonical main SHA.
+  Merge Task 7 state and its byte-identical RAGLite projection,
+  then packetize P00-TASK-008 from the resulting canonical main SHA.
 completed:
   - bounded local CAS proven
   - bounded local append-only journal proven
-  - canonical RunEvent storage in CAS
-  - monotonic fixed-width journal index
-  - verified replay and deterministic projection rebuild
-  - signed Task 6 merge
+  - deterministic non-compensable verdict engine proven
+  - seventeen independent gate mutations
+  - 256 boolean-gate combinations
+  - signed Task 7 merge
   - fresh successful main workflow
 blocked:
-  - P00-TASK-007 until state and RAGLite merges
-  - P00-TASK-008 until Task 7 proof
+  - P00-TASK-008 until state and RAGLite merges
+  - P00-TASK-009 until Task 8 proof
 next_exact_action: >-
   Merge this state synchronization, project 00/02/04 byte-identically,
-  then produce the exact Task 7 execution packet from new main.
+  then produce the exact Task 8 execution packet from new main.
 ```
