@@ -1,0 +1,46 @@
+name: P00 Task 007 Verdict Engine
+
+"on":
+  pull_request:
+    paths:
+      - Cargo.toml
+      - Cargo.lock
+      - crates/gs-verdict/**
+      - .github/workflows/p00-task-007.yml
+      - docs/phase-00/tasks/P00-TASK-007.md
+      - docs/phase-00/evidence/P00-TASK-007-*.md
+  workflow_dispatch:
+
+# Temporary bootstrap permission: Cargo resolves only the new local package and
+# rustfmt may commit mechanical changes under Task 7 paths. This workflow is
+# replaced by read-only --locked verification before final review and merge.
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          fetch-depth: 0
+      - name: Install Rust 1.97.1
+        run: rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+      - name: Select Rust 1.97.1
+        run: rustup override set 1.97.1
+      - name: Resolve local package and apply mechanical formatting
+        shell: bash
+        run: |
+          cargo check -p gs-verdict
+          cargo fmt --all
+          if ! git diff --quiet -- Cargo.lock crates/gs-verdict; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add Cargo.lock crates/gs-verdict
+            git commit -m "build: lock and format Task 7 verdict engine"
+            git push origin "HEAD:${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          fi
+      - name: Verify Task 7
+        run: bash crates/gs-verdict/ci.sh
