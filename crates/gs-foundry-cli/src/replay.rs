@@ -1,8 +1,6 @@
 use crate::{
     FoundryError, NativeFoundry, NativeScenario, ObservedClassification, ReplayReport, RunReceipt,
-    ScoringInput,
-    artifacts::get_bytes,
-    native::to_verdict_input,
+    ScoringInput, artifacts::get_bytes, native::to_verdict_input,
 };
 use gs_canonical_json::{canonical_bytes, canonical_digest, sha256_digest};
 use gs_cas::{Cas, LocalCas};
@@ -215,11 +213,7 @@ fn verify_exact_artifact(
     verify_exact_bytes(label, &actual, expected)
 }
 
-fn verify_exact_bytes(
-    label: &str,
-    actual: &[u8],
-    expected: &Value,
-) -> Result<(), FoundryError> {
+fn verify_exact_bytes(label: &str, actual: &[u8], expected: &Value) -> Result<(), FoundryError> {
     let expected = canonical_bytes(expected)?;
     if actual != expected {
         return Err(FoundryError::Inconsistency(format!(
