@@ -3,7 +3,7 @@ doc_id: GS-00
 title: GitSpace — Start Here
 authority: ROUTER
 status: ACTIVE
-version: 0.4.4
+version: 0.4.5
 updated: 2026-08-13
 ---
 # GitSpace — START HERE
@@ -24,7 +24,7 @@ GitSpace est un **Native Software World Engine pour contributeurs IA**. Architec
 - état courant : `02_GITSPACE_NOW_DECISIONS_ROADMAP.md`;
 - recherche : `03_GITSPACE_RESEARCH_ATLAS.md`;
 - planification/handoff : `04_GITSPACE_AGENT_PROTOCOL.md` + plan Phase 00;
-- preuves Tasks 1–4 : `docs/phase-00/evidence/`;
+- preuves Tasks 1–5 : `docs/phase-00/evidence/`;
 - projection mobile : `raglite/RAGLITE-MANIFEST.yaml`.
 
 ## Invariants
@@ -32,16 +32,17 @@ GitSpace est un **Native Software World Engine pour contributeurs IA**. Architec
 - Git reste périphérique au produit.
 - Evaluation IR GitSpace reste souverain.
 - Une mémoire n’est pas une vérité; une conversation n’est pas un état.
-- Un agent ne se déclare jamais lui-même `PROVEN`.
+- Un agent ne se déclare jamais lui-même `PROVEN` sans preuve indépendante fraîche.
 - Test avant code pour tout comportement.
 - Chaque tâche est packetisée depuis un commit frais.
 - Validation Evaluation IR : schéma Draft 2020-12 local avant décodage Serde.
+- CAS local : objets immuables adressés par SHA-256, lecture re-hashée et aucun overwrite silencieux.
 - Faux `DONE = 0`.
 
 ## État
 
-`P00-TASK-001` à `P00-TASK-004` sont fusionnées et prouvées. Task 4 a ajouté huit variantes Rust Evaluation IR, un registre URN offline, des erreurs structurées, un corpus de parité Python/Rust et un contrôle adversarial permanent sur le domaine entier de `execution.seed`.
+`P00-TASK-001` à `P00-TASK-005` sont fusionnées et prouvées.
 
-Son merge GitHub signé est `e1d057908f0c9f01c22f9ff5d45000b52bed2e21` et son tree est identique à la tête qualifiée.
+Task 5 a ajouté le premier Content-Addressed Store GitSpace : backend filesystem local, identité SHA-256 souveraine, layout shardé déterministe, écritures temporaires synchronisées, commit atomique sans remplacement, déduplication idempotente, lecture revalidée et rejets permanents de corruption, symlink et objet non régulier. Son merge GitHub signé est `c8b1a1a50040ce757e44eb2867257c14b270dc8a`; la vérification post-merge fraîche est le run `31757546436`, job `94636551986`.
 
-La prochaine unité est `P00-TASK-005` : Content-Addressed Store local. La Phase 00 globale reste `PARTIALLY_VERIFIED`.
+La prochaine unité est `P00-TASK-006` : journal d’événements append-only et reconstruction de projections avec `EventSink` et `EventSource`. La Phase 00 globale reste `PARTIALLY_VERIFIED`.
