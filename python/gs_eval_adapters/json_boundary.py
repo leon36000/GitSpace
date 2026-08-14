@@ -4,7 +4,7 @@ import math
 import re
 from typing import TypeAlias
 
-from .errors import JsonBoundaryError
+from .errors import JsonBoundaryError, safe_type_name
 
 JsonScalar: TypeAlias = None | bool | int | float | str
 JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
@@ -43,7 +43,7 @@ def _clone_json(
     if value_type is int:
         if not -SAFE_INTEGER <= value <= SAFE_INTEGER:
             raise JsonBoundaryError(
-                f"{path}: integer {value} exceeds the interoperable JSON safe range"
+                f"{path}: integer exceeds the interoperable JSON safe range"
             )
         return value
 
@@ -82,10 +82,8 @@ def _clone_json(
             output: JsonObject = {}
             for key, item in value.items():
                 if type(key) is not str:
-                    key_type = type(key)
                     raise JsonBoundaryError(
-                        f"{path}: JSON object key type "
-                        f"{key_type.__module__}.{key_type.__qualname__} "
+                        f"{path}: JSON object key type {safe_type_name(key)} "
                         "is not an exact string"
                     )
                 _validate_unicode_scalar_text(key, path=f"{path}/<key>")
@@ -100,9 +98,7 @@ def _clone_json(
         finally:
             active.remove(identity)
 
-    raise JsonBoundaryError(
-        f"{path}: {value_type.__module__}.{value_type.__qualname__} is not exact JSON"
-    )
+    raise JsonBoundaryError(f"{path}: {safe_type_name(value)} is not exact JSON")
 
 
 def clone_object(value: object, *, path: str = "$") -> JsonObject:
