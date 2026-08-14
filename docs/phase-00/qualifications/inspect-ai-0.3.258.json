@@ -1,0 +1,68 @@
+{
+  "schema": "GS-FRAMEWORK-QUALIFICATION-001",
+  "framework": "inspect-ai",
+  "status": "PINNED_FOR_TASK_011",
+  "version": "0.3.258",
+  "tag": "0.3.258",
+  "source_repository": "https://github.com/UKGovernmentBEIS/inspect_ai",
+  "source_commit": "e72c73f8a514c53ddf55da180e4bedaf8f0362b4",
+  "package": {
+    "index": "https://pypi.org/project/inspect-ai/0.3.258/",
+    "requires_python": ">=3.10",
+    "wheel": {
+      "filename": "inspect_ai-0.3.258-py3-none-any.whl",
+      "sha256": "638da28a5f3a021152481c5aa22d440a2855e462804dce2d49a44e6e47be16a4"
+    },
+    "sdist": {
+      "filename": "inspect_ai-0.3.258.tar.gz",
+      "sha256": "785a14b5348c57a188e8790a1919106bff539645d93c4e9d1dfdd8f2b0896405"
+    }
+  },
+  "gitspace_runtime": {
+    "python": "3.12.13",
+    "uv": "0.12.0",
+    "model": "mockllm/model",
+    "task_count": 1,
+    "sample_count": 1,
+    "solver": "generate",
+    "scorer": "match",
+    "scorer_options": {
+      "location": "exact",
+      "ignore_case": true,
+      "numeric": false
+    },
+    "network": "forbidden"
+  },
+  "qualification_scope": [
+    "one in-process Inspect Task",
+    "one deterministic mockllm sample",
+    "generate solver",
+    "exact text match scorer",
+    "EvalLog projection",
+    "content-addressed log and normalized-record artifacts",
+    "replay and rescore without importing Inspect"
+  ],
+  "non_scope": [
+    "external model providers",
+    "networked models",
+    "tools",
+    "sandboxes",
+    "multi-sample or multi-epoch evaluation",
+    "model-graded scoring",
+    "Inspect agents",
+    "Inspect approval policies",
+    "all other Inspect releases"
+  ],
+  "sources": [
+    {
+      "kind": "official_package_metadata",
+      "url": "https://pypi.org/pypi/inspect-ai/0.3.258/json",
+      "verified_at": "2026-08-14"
+    },
+    {
+      "kind": "official_git_tag",
+      "url": "https://github.com/UKGovernmentBEIS/inspect_ai/tree/0.3.258",
+      "verified_at": "2026-08-14"
+    }
+  ]
+}

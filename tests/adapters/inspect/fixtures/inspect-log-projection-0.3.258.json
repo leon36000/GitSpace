@@ -1,0 +1,37 @@
+{
+  "projection_version": 1,
+  "framework": "inspect-ai",
+  "framework_version": "0.3.258",
+  "framework_commit": "e72c73f8a514c53ddf55da180e4bedaf8f0362b4",
+  "eval_status": "success",
+  "task": {
+    "id": "GS-TASK-000011",
+    "name": "gitspace_inspect_controlled",
+    "version": 1
+  },
+  "model": "mockllm/model",
+  "solver": {
+    "name": "generate"
+  },
+  "scorer": {
+    "name": "match",
+    "options": {
+      "location": "exact",
+      "ignore_case": true,
+      "numeric": false
+    }
+  },
+  "sample": {
+    "id": "GS-SAMPLE-000011",
+    "epoch": 1,
+    "input": "Return exactly the deterministic mock output.",
+    "target": "Default output from mockllm/model",
+    "output": "Default output from mockllm/model",
+    "inspect_score": "C",
+    "event_types": [
+      "sample_init",
+      "model",
+      "score"
+    ]
+  }
+}

@@ -1,0 +1,45 @@
+name: P00 Task 011 RED Inspect Adapter Contract
+
+on:
+  pull_request:
+    paths:
+      - tests/adapters/inspect/**
+      - docs/phase-00/tasks/P00-TASK-011.md
+      - docs/phase-00/qualifications/inspect-ai-0.3.258.json
+      - docs/phase-00/evidence/P00-TASK-011-RED.md
+      - .github/workflows/p00-task-011-red.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  observe-red:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12.13'
+      - name: Verify Python identity
+        run: python --version | grep -Fx 'Python 3.12.13'
+      - name: Observe absent Inspect adapter production API
+        shell: bash
+        run: |
+          test ! -e python/gs_eval_adapters/inspect_adapter.py
+          test ! -e python/gs_eval_adapters/inspect_replay.py
+          set +e
+          PYTHONPATH=python:tests/adapters/inspect python tests/adapters/inspect/test_contract.py > /tmp/task11-red.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/task11-red.log
+          test "$status" -ne 0
+          grep -F "ModuleNotFoundError: No module named 'gs_eval_adapters.inspect_adapter'" /tmp/task11-red.log
+      - name: Verify no Inspect dependency or production modules
+        shell: bash
+        run: |
+          ! grep -Fq 'inspect-ai==' pyproject.toml
+          test ! -e python/gs_eval_adapters/inspect_adapter.py
+          test ! -e python/gs_eval_adapters/inspect_replay.py
+      - name: Verify repository clean
+        run: test -z "$(git status --porcelain=v1)"
