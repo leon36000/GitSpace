@@ -59,7 +59,10 @@ fn cli_run_and_replay_emit_json_that_matches_the_library_contract() {
     let report: ReplayReport = serde_json::from_slice(&replay.stdout).unwrap();
     assert_eq!(report.run_id, receipt.run_id);
     assert_eq!(report.classification, ObservedClassification::Pass);
-    assert!(report.verdict.safe_success);
+    assert!(!report.verdict.safe_success);
+    assert!(!report.verdict.false_done);
+    assert!(report.replay_verified);
+    assert!(report.evidence_verified);
 
     let _ = fs::remove_dir_all(root);
 }
