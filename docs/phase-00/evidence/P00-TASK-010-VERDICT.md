@@ -5,30 +5,30 @@ recorded_at: 2026-08-14
 base_commit: a5dc165ff78df74db35779695dd116c0b085a6a5
 implementation_pr: 45
 red_pr: 44
-pre_evidence_head: 21a3f49a05ceb966523d326a0cba527c33498501
-pre_evidence_workflow_run: 31828214693
-pre_evidence_workflow_job: 94857381057
+pre_final_head: 398ea125653496fe312a2512d6d0b1404c41ec38
+pre_final_workflow_run: 31829611615
+pre_final_workflow_job: 94861886711
 identity_independent_review: false
 ---
 # P00-TASK-010 — Verdict de vérification pré-merge
 
 ## Résultat sous revue
 
-Task 10 ajoute le SDK Python provider-neutral qui sépare l’Evaluation IR souverain de GitSpace des frameworks externes :
+Task 10 ajoute une frontière Python provider-neutral entre l’Evaluation IR souverain de GitSpace et les frameworks externes :
 
 ```text
 EvalTaskSpec + AgentConfiguration
 → validation locale Draft 2020-12
 → copie JSON canonique stricte
-→ préparation + snapshot sémantique
-→ invocation externe
-→ collecte
+→ prepare + snapshot sémantique
+→ invoke
+→ collect
 → résultat normalisé PASS/FAIL/TIMEOUT/POLICY/INFRA
 ```
 
-Aucune classe, exception, collection, nombre non interopérable ou référence d’artefact externe n’est autorisé à traverser cette frontière comme donnée canonique.
+Aucune classe, exception, collection, valeur numérique non interopérable, identité forgée ou référence d’artefact externe ne peut traverser cette frontière comme donnée canonique.
 
-## TDD RED
+## TDD RED initial
 
 ### RED corrigé
 
@@ -57,7 +57,7 @@ uv_lock_blob: e279733d2a0897679cec5f8a7cd7cde2a212b406
 
 Le lock contient le package virtuel GitSpace et les dépendances résolues de `jsonschema` avec URLs, hashes et versions exactes. Aucun framework externe concret n’est ajouté.
 
-## GREEN initial et findings adversariaux
+## GREEN et findings adversariaux
 
 ### Premier GREEN complet
 
@@ -92,21 +92,33 @@ Le RED `31827661778` / `94855529349` a démontré qu’un appelant pouvait const
 
 Le RED `31827970831` / `94856568066` a ensuite démontré qu’une clé hostile pouvait encore déclencher `str(key)` dans cette voie directe.
 
-Corrections : le constructeur public valide désormais identité, statut typé, texte borné, noms, URI CAS, métriques finies, safe integers, zéro négatif, extensions et clés exactes avant tout formatage externe.
+Corrections : le constructeur public valide identité, statut typé, texte borné, noms, URI CAS, métriques finies, safe integers, zéro négatif, extensions et clés exactes avant tout formatage externe.
+
+### Finding — identité, lookup et métadonnées hostiles
+
+Le RED `31829183050` / `94860543008` a démontré :
+
+- un entier gigantesque pouvait faire échouer la construction du message d’erreur;
+- `AdapterRegistry.resolve` pouvait exécuter `__hash__` d’une clé externe;
+- des métadonnées de type d’exception hostiles pouvaient casser la normalisation;
+- un descriptor pouvait produire une identité non bornée;
+- un `AdapterResult` direct pouvait accepter une identité structurée non canonique.
+
+Corrections : les messages d’entier n’interpolent pas la valeur hostile; le registre valide une clé string exacte avant lookup; les labels de type sont bornés et extraits sans confiance dans `__module__`, `__name__`, `__qualname__` ou `__str__`; l’identité est bornée à 512 caractères et doit être exactement celle qu’un `AdapterDescriptor` canonique reproduirait.
 
 ## Preuve GREEN lecture seule
 
 Head candidat avant l’ajout de ce dossier :
 
 ```text
-21a3f49a05ceb966523d326a0cba527c33498501
+398ea125653496fe312a2512d6d0b1404c41ec38
 ```
 
 Workflow exact-head :
 
 ```yaml
-run: 31828214693
-job: 94857381057
+run: 31829611615
+job: 94861886711
 checkout: detached_exact_head
 os: Ubuntu 24.04
 python: 3.12.13
@@ -122,7 +134,7 @@ Gates reproduits :
 - `uv lock --check --python 3.12.13`;
 - `uv sync --frozen`;
 - identité exacte `jsonschema==4.26.0`;
-- 38 tests contractuels et adversariaux Task 10;
+- 43 tests contractuels et adversariaux Task 10;
 - validation offline sans socket, y compris références HTTP/URN inconnues;
 - `compileall`;
 - contrat toolchain Python historique;
@@ -135,7 +147,7 @@ Gates reproduits :
 
 ## Mutation testing
 
-Quatorze mutations critiques ont été injectées dans des copies jetables; toutes ont été tuées :
+Dix-neuf mutations critiques ont été injectées dans des copies jetables; toutes ont été tuées :
 
 ```text
 skip-task-schema
@@ -143,20 +155,25 @@ skip-agent-schema
 skip-semantic-snapshot
 allow-unnamespaced-extension
 allow-unsafe-integer
+reflect-huge-integer-value
 allow-nonfinite-float
 allow-negative-zero
 allow-nonstr-key
 allow-arbitrary-artifact-uri
 allow-prepared-core-fields
+trust-exception-type-metadata
 allow-incomplete-adapter
 allow-descriptor-subclass
+allow-nonstr-registry-lookup
 allow-scalar-subclass
+allow-unbounded-descriptor-identity
+allow-noncanonical-result-identity
 drop-result-core-check
 ```
 
 ```yaml
-mutations: 14
-killed: 14
+mutations: 19
+killed: 19
 survived: 0
 ```
 
@@ -170,13 +187,14 @@ survived: 0
 6. `prepare` doit conserver un snapshot canonique exact; toute perte sémantique bloque `invoke`.
 7. Request, prepared et result ferment leurs champs core et exigent des extensions namespacées.
 8. PASS, FAIL, TIMEOUT, POLICY et INFRA sont normalisés déterministement.
-9. Timeout/policy externes restent distincts; les autres exceptions deviennent INFRA avec texte borné, single-line et résistant à `__str__` hostile.
+9. Timeout/policy externes restent distincts; les autres exceptions deviennent INFRA avec texte borné, single-line et résistant à `__str__` et métadonnées de type hostiles.
 10. Artefacts = noms bornés + URI CAS canoniques seulement.
 11. Métriques = noms bornés + nombres exacts, finis, non-bool, safe-range et non négatif-zéro.
 12. Descriptor, identité et registre sont déterministes; adaptateurs incomplets, noms ou identités dupliqués échouent.
-13. Le constructeur public `AdapterResult` ne contourne pas la frontière.
-14. `to_json()` retourne une nouvelle copie JSON-only.
-15. Deux exécutions identiques produisent des payloads JSON byte-équivalents avec clés triées.
+13. Lookup du registre n’exécute pas `__hash__` d’un objet non-string.
+14. Le constructeur public `AdapterResult` ne contourne pas la frontière et exige une identité canonique bornée.
+15. `to_json()` retourne une nouvelle copie JSON-only.
+16. Deux exécutions identiques produisent des payloads JSON byte-équivalents avec clés triées.
 
 ## Portée vérifiée
 
@@ -205,7 +223,7 @@ Aucun schéma v1, crate Rust, CAS, journal, verdict, runner, Foundry, adaptateur
 
 Statut actuel : `PARTIALLY_VERIFIED_PENDING_FINAL_HEAD_AND_MERGE`.
 
-Le commit de ce dossier crée un nouveau head. Son workflow exact doit donc être vérifié et enregistré dans la revue PR, pas inscrit ici, afin d’éviter une auto-référence infinie.
+Le commit de ce dossier et les corrections documentaires créent un nouveau head. Son workflow exact doit donc être vérifié et enregistré dans la revue PR, pas inscrit ici, afin d’éviter une auto-référence infinie.
 
 Task 10 devient `PROVEN` uniquement après :
 
