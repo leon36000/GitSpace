@@ -1,0 +1,39 @@
+name: P00 Task 006 Event Journal
+
+"on":
+  pull_request:
+    paths:
+      - Cargo.toml
+      - Cargo.lock
+      - crates/gs-canonical-json/**
+      - crates/gs-event-journal/**
+      - .github/workflows/p00-task-006.yml
+      - docs/phase-00/tasks/P00-TASK-006.md
+      - docs/phase-00/evidence/P00-TASK-006-*.md
+  push:
+    branches:
+      - main
+    paths:
+      - Cargo.toml
+      - Cargo.lock
+      - crates/gs-canonical-json/**
+      - crates/gs-event-journal/**
+      - .github/workflows/p00-task-006.yml
+      - docs/phase-00/tasks/P00-TASK-006.md
+      - docs/phase-00/evidence/P00-TASK-006-*.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Install Rust 1.97.1
+        run: rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+      - name: Select Rust 1.97.1
+        run: rustup override set 1.97.1
+      - name: Verify Task 6 from the committed lock graph
+        run: bash crates/gs-event-journal/ci.sh
