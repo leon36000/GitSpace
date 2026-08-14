@@ -1,0 +1,38 @@
+name: P00 Task 009 RED Contract
+
+"on":
+  pull_request:
+    paths:
+      - Cargo.toml
+      - crates/gs-foundry-cli/**
+      - .github/workflows/p00-task-009-red.yml
+      - docs/phase-00/tasks/P00-TASK-009.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  observe-red:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Install Rust 1.97.1
+        run: rustup toolchain install 1.97.1 --profile minimal
+      - name: Select Rust 1.97.1
+        run: rustup override set 1.97.1
+      - name: Generate temporary RED lock graph
+        run: cargo generate-lockfile
+      - name: Observe missing Task 9 Foundry API
+        shell: bash
+        run: |
+          set +e
+          cargo test -p gs-foundry-cli --test contract > task9-red.log 2>&1
+          status=$?
+          set -e
+          cat task9-red.log
+          test "$status" -ne 0
+          grep -E "unresolved imports|no .*NativeFoundry.* in the root|could not find" task9-red.log
+      - name: Verify RED branch contains no production implementation
+        run: |
+          test "$(grep -cv '^\s*\($\|//\|#!\)' crates/gs-foundry-cli/src/lib.rs)" -eq 0
