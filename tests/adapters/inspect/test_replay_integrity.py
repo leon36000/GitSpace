@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import unittest
+from copy import deepcopy
 from dataclasses import replace
 
 from common import MemoryCas, load_static_projection, task11_request
@@ -30,15 +31,14 @@ class InspectReplayIntegrityTests(unittest.TestCase):
         cls.result = execute_adapter(cls.adapter, task11_request())
         if cls.result.status is not AdapterStatus.PASS:
             raise AssertionError(cls.result.summary)
+        cls.log_bytes = cls.cas.read(cls.result.artifacts["inspect_log"])
+        cls.log_value = json.loads(cls.log_bytes)
 
     def test_complete_eval_log_projects_in_the_inspect_free_module(self) -> None:
-        log_bytes = self.cas.read(self.result.artifacts["inspect_log"])
-        log_value = json.loads(log_bytes)
-
-        projection = project_inspect_log(log_value)
+        projection = project_inspect_log(self.log_value)
         record = build_replay_record(
             projection,
-            log_bytes=log_bytes,
+            log_bytes=self.log_bytes,
             log_uri=self.result.artifacts["inspect_log"],
         )
 
@@ -46,6 +46,14 @@ class InspectReplayIntegrityTests(unittest.TestCase):
         self.assertEqual(record.sample_id, "GS-SAMPLE-000011")
         self.assertEqual(record.model, "mockllm/model")
         self.assertEqual(rescore_inspect_record(record).status, AdapterStatus.PASS)
+
+    def test_complete_eval_log_requires_exactly_one_sample(self) -> None:
+        for samples in ([], self.log_value["samples"] * 2):
+            with self.subTest(count=len(samples)):
+                log_value = deepcopy(self.log_value)
+                log_value["samples"] = samples
+                with self.assertRaises(AdapterContractError):
+                    project_inspect_log(log_value)
 
     def test_collect_rejects_record_uri_that_does_not_match_record_bytes(self) -> None:
         record = InspectAdapter.record_from_static_fixture_for_test()
@@ -62,6 +70,8 @@ class InspectReplayIntegrityTests(unittest.TestCase):
         record = InspectAdapter.record_from_static_fixture_for_test()
         record.scorer_options["ignore_case"] = False
 
+        with self.assertRaises(AdapterContractError):
+            record.to_json()
         with self.assertRaises(AdapterContractError):
             canonical_record_bytes(record)
         with self.assertRaises(AdapterContractError):
