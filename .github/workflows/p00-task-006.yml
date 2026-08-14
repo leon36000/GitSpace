@@ -13,8 +13,8 @@ name: P00 Task 006 Event Journal
   workflow_dispatch:
 
 # Temporary bootstrap permission: Cargo resolves from the existing lockfile and
-# may commit only the new local package entry. This workflow is replaced by
-# read-only --locked verification before final review and merge.
+# rustfmt may commit only mechanical changes under the Task 6 allowed paths.
+# This workflow is replaced by read-only --locked verification before review.
 permissions:
   contents: write
 
@@ -31,15 +31,16 @@ jobs:
         run: rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
       - name: Select Rust 1.97.1
         run: rustup override set 1.97.1
-      - name: Resolve only the new local Task 6 package into Cargo.lock
+      - name: Resolve local package and apply mechanical formatting
         shell: bash
         run: |
           cargo check -p gs-event-journal
-          if ! git diff --quiet -- Cargo.lock; then
+          cargo fmt --all
+          if ! git diff --quiet -- Cargo.lock crates/gs-canonical-json crates/gs-event-journal; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add Cargo.lock
-            git commit -m "build: minimally lock Task 6 local package"
+            git add Cargo.lock crates/gs-canonical-json crates/gs-event-journal
+            git commit -m "style: format Task 6 implementation"
             git push origin "HEAD:${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
           fi
       - name: Verify Task 6
