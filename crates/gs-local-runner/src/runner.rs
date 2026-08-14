@@ -137,7 +137,13 @@ impl<C: Cas> LocalRunner<C> {
 
             match operation {
                 AgentOperation::Delay { millis } => {
-                    thread::sleep(Duration::from_millis(*millis));
+                    let elapsed = started.elapsed();
+                    let Some(remaining) = plan.timeout.checked_sub(elapsed) else {
+                        status = RunStatus::TimedOut;
+                        break;
+                    };
+                    let requested = Duration::from_millis(*millis);
+                    thread::sleep(requested.min(remaining));
                     if deadline_reached(started, plan.timeout) {
                         status = RunStatus::TimedOut;
                         break;
