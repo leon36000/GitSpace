@@ -1,3 +1,6 @@
+mod common;
+
+use common::source_commit;
 use gs_foundry_cli::{ObservedClassification, ReplayReport, RunReceipt};
 use std::{
     fs,
@@ -7,12 +10,10 @@ use std::{
 };
 
 static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
-const SOURCE_COMMIT: &str = "7cc65f670dfd7a682c77d3cc8cda656fe9c30ccd";
 
 #[test]
 fn cli_run_and_replay_emit_json_that_matches_the_library_contract() {
-    let expected_source_commit = std::env::var("GITSPACE_TEST_SOURCE_COMMIT")
-        .expect("ci.sh must bind tests to the executed commit");
+    let expected_source_commit = source_commit();
     let serial = NEXT_TEMP.fetch_add(1, Ordering::Relaxed);
     let root = std::env::temp_dir().join(format!(
         "gitspace-task9-cli-{}-{serial}",
@@ -29,7 +30,7 @@ fn cli_run_and_replay_emit_json_that_matches_the_library_contract() {
             "--scenario",
             "pass",
             "--source-commit",
-            SOURCE_COMMIT,
+            &expected_source_commit,
         ])
         .output()
         .unwrap();
