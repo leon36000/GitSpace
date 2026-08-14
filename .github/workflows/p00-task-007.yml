@@ -1,0 +1,37 @@
+name: P00 Task 007 Verdict Engine
+
+"on":
+  pull_request:
+    paths:
+      - Cargo.toml
+      - Cargo.lock
+      - crates/gs-verdict/**
+      - .github/workflows/p00-task-007.yml
+      - docs/phase-00/tasks/P00-TASK-007.md
+      - docs/phase-00/evidence/P00-TASK-007-*.md
+  push:
+    branches:
+      - main
+    paths:
+      - Cargo.toml
+      - Cargo.lock
+      - crates/gs-verdict/**
+      - .github/workflows/p00-task-007.yml
+      - docs/phase-00/tasks/P00-TASK-007.md
+      - docs/phase-00/evidence/P00-TASK-007-*.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Install Rust 1.97.1
+        run: rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+      - name: Select Rust 1.97.1
+        run: rustup override set 1.97.1
+      - name: Verify Task 7 from the committed lock graph
+        run: bash crates/gs-verdict/ci.sh
