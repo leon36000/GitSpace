@@ -100,13 +100,16 @@ impl NativeFoundry {
     pub fn run(&self, scenario: NativeScenario) -> Result<RunReceipt, FoundryError> {
         let cas = LocalCas::open(&self.cas_root)?;
         let run_id = format!("GS-RUN-{}", scenario.ulid());
-        let task = task_value();
+        let plan = runner_plan(scenario, &run_id);
+        let state_before = state_before_value(&plan.fixture);
+        let state_before_digest = canonical_digest(&state_before)?.to_string();
+
+        let task = task_value(&state_before_digest);
         validate_task_json(&task)?;
         let task_uri = put_value(&cas, &task)?;
 
-        let plan = runner_plan(scenario, &run_id);
         let plan_uri = put_value(&cas, &plan_value(scenario, &plan))?;
-        let state_before_uri = store_state_before(&cas, &plan.fixture)?;
+        let state_before_uri = store_state_before(&cas, &plan.fixture, &state_before)?;
 
         let observation = self.execute_scenario(scenario, &run_id, &plan, &cas)?;
         let patch_uri = put_value(&cas, &effects_value(&observation.effects))?;
@@ -458,8 +461,8 @@ pub(crate) fn to_verdict_input(
     }
 }
 
-fn task_value() -> Value {
-    let env = environment_digest();
+fn task_value(initial_state_digest: &str) -> Value {
+    let environment = environment_digest();
     json!({
         "id": TASK_ID,
         "version": 1,
@@ -471,8 +474,12 @@ fn task_value() -> Value {
             "latent_requirements":[],"non_goals":[],"allowed_ambiguities":[]
         },
         "world_fixture": {
-            "version":1,"base_artifact_digest":env,"environment_digest":env,
-            "services":[],"initial_state_digest":sha256_digest(b"task9-initial-state").to_string(),"extensions":{}
+            "version":1,
+            "base_artifact_digest":initial_state_digest,
+            "environment_digest":environment,
+            "services":[],
+            "initial_state_digest":initial_state_digest,
+            "extensions":{}
         },
         "authority": {
             "allowed_actions":["workspace.read","workspace.write"],
@@ -493,14 +500,34 @@ fn task_value() -> Value {
     })
 }
 
-fn store_state_before(cas: &LocalCas, fixture: &[FixtureFile]) -> Result<String, FoundryError> {
-    let mut entries = Vec::new();
+fn state_before_value(fixture: &[FixtureFile]) -> Value {
+    let mut entries = fixture
+        .iter()
+        .map(|file| {
+            json!({
+                "path": file.path,
+                "digest": sha256_digest(&file.bytes).to_string()
+            })
+        })
+        .collect::<Vec<_>>();
+    entries.sort_by(|left, right| left["path"].as_str().cmp(&right["path"].as_str()));
+    Value::Array(entries)
+}
+
+fn store_state_before(
+    cas: &LocalCas,
+    fixture: &[FixtureFile],
+    state_before: &Value,
+) -> Result<String, FoundryError> {
     for file in fixture {
         let digest = cas.put(&file.bytes)?;
-        entries.push(json!({"path": file.path, "digest": digest.to_string()}));
+        if digest != sha256_digest(&file.bytes) {
+            return Err(FoundryError::Inconsistency(
+                "CAS returned an unexpected fixture digest".to_owned(),
+            ));
+        }
     }
-    entries.sort_by(|left, right| left["path"].as_str().cmp(&right["path"].as_str()));
-    put_value(cas, &Value::Array(entries))
+    put_value(cas, state_before)
 }
 
 fn effects_value(effects: &[Effect]) -> Value {
