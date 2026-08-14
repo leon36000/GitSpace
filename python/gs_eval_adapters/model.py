@@ -27,13 +27,20 @@ class AdapterDescriptor:
     implementation_digest: str
 
     def __post_init__(self) -> None:
-        if not _DESCRIPTOR_NAME.fullmatch(self.name):
+        if type(self.name) is not str or not _DESCRIPTOR_NAME.fullmatch(self.name):
             raise AdapterContractError("adapter descriptor name is invalid")
-        if not self.version or not all(32 <= ord(char) <= 126 for char in self.version):
+        if (
+            type(self.version) is not str
+            or not self.version
+            or not all(32 <= ord(char) <= 126 for char in self.version)
+        ):
             raise AdapterContractError("adapter descriptor version is invalid")
-        if self.protocol_version != 1:
-            raise AdapterContractError("adapter protocol_version must equal 1")
-        if not _DIGEST.fullmatch(self.implementation_digest):
+        if type(self.protocol_version) is not int or self.protocol_version != 1:
+            raise AdapterContractError("adapter protocol_version must be the exact integer 1")
+        if (
+            type(self.implementation_digest) is not str
+            or not _DIGEST.fullmatch(self.implementation_digest)
+        ):
             raise AdapterContractError("adapter implementation_digest is invalid")
 
     @property

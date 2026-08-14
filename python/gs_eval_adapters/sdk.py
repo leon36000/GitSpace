@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import math
 import unicodedata
-from collections.abc import Callable
-from typing import TypeVar
 
 from .errors import (
     AdapterContractError,
@@ -25,7 +23,6 @@ from .model import AdapterRequest, AdapterResult, AdapterStatus
 from .registry import validate_adapter_object
 from .schemas import validate_agent, validate_task
 
-T = TypeVar("T")
 _RESULT_KEYS = {"status", "summary", "artifacts", "metrics", "extensions"}
 _PREPARED_KEYS = {"canonical_request", "framework_request", "extensions"}
 
@@ -69,13 +66,13 @@ def execute_adapter(adapter: object, request: AdapterRequest) -> AdapterResult:
 
 
 def _canonical_request(request: AdapterRequest) -> JsonObject:
-    if not isinstance(request, AdapterRequest):
-        raise AdapterContractError("request must be an AdapterRequest")
+    if type(request) is not AdapterRequest:
+        raise AdapterContractError("request must be an exact AdapterRequest")
 
     task = clone_object(request.task, path="$/task")
     agent = clone_object(request.agent, path="$/agent")
-    if isinstance(request.seed, bool) or not isinstance(request.seed, int):
-        raise JsonBoundaryError("$/seed: seed must be an integer")
+    if type(request.seed) is not int:
+        raise JsonBoundaryError("$/seed: seed must be an exact integer")
     seed = clone_json(request.seed, path="$/seed")
     extensions = validate_extensions(request.extensions, path="$/extensions")
 
@@ -127,8 +124,8 @@ def _result_from_payload(adapter_identity: str, value: object) -> AdapterResult:
     _require_exact_keys(payload, _RESULT_KEYS, path="$/result")
 
     status_value = payload["status"]
-    if not isinstance(status_value, str):
-        raise AdapterContractError("$/result/status: expected status string")
+    if type(status_value) is not str:
+        raise AdapterContractError("$/result/status: expected exact status string")
     try:
         status = AdapterStatus(status_value)
     except ValueError as error:
@@ -137,12 +134,12 @@ def _result_from_payload(adapter_identity: str, value: object) -> AdapterResult:
         ) from error
 
     summary_value = payload["summary"]
-    if not isinstance(summary_value, str):
-        raise AdapterContractError("$/result/summary: expected string")
+    if type(summary_value) is not str:
+        raise AdapterContractError("$/result/summary: expected exact string")
     summary = _sanitize_summary(summary_value)
 
     artifacts_value = payload["artifacts"]
-    if not isinstance(artifacts_value, dict):
+    if type(artifacts_value) is not dict:
         raise AdapterContractError("$/result/artifacts: expected object")
     artifacts: dict[str, str] = {}
     for name, uri in artifacts_value.items():
@@ -156,7 +153,7 @@ def _result_from_payload(adapter_identity: str, value: object) -> AdapterResult:
             raise AdapterContractError(str(error)) from error
 
     metrics_value = payload["metrics"]
-    if not isinstance(metrics_value, dict):
+    if type(metrics_value) is not dict:
         raise AdapterContractError("$/result/metrics: expected object")
     metrics: dict[str, int | float] = {}
     for name, metric in metrics_value.items():
@@ -164,15 +161,15 @@ def _result_from_payload(adapter_identity: str, value: object) -> AdapterResult:
             validated_name = validate_name(name, path=f"$/result/metrics/{name}")
         except JsonBoundaryError as error:
             raise AdapterContractError(str(error)) from error
-        if isinstance(metric, bool) or not isinstance(metric, (int, float)):
+        if type(metric) not in (int, float):
             raise AdapterContractError(
-                f"$/result/metrics/{name}: expected non-bool number"
+                f"$/result/metrics/{name}: expected exact non-bool number"
             )
-        if isinstance(metric, int) and not -SAFE_INTEGER <= metric <= SAFE_INTEGER:
+        if type(metric) is int and not -SAFE_INTEGER <= metric <= SAFE_INTEGER:
             raise AdapterContractError(
                 f"$/result/metrics/{name}: unsafe interoperable integer"
             )
-        if isinstance(metric, float) and not math.isfinite(metric):
+        if type(metric) is float and not math.isfinite(metric):
             raise AdapterContractError(
                 f"$/result/metrics/{name}: non-finite metric"
             )
@@ -198,10 +195,15 @@ def _failure(
     stage: str,
     error: BaseException,
 ) -> AdapterResult:
+    error_type = f"{type(error).__module__}.{type(error).__qualname__}"
+    try:
+        detail = str(error)
+    except Exception:
+        detail = "<unprintable exception message>"
     return AdapterResult(
         adapter_identity=adapter_identity,
         status=status,
-        summary=_sanitize_summary(f"adapter {stage} failed: {error}"),
+        summary=_sanitize_summary(f"adapter {stage} failed: {error_type}: {detail}"),
         artifacts={},
         metrics={},
         extensions={},

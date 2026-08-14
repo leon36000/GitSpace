@@ -7,10 +7,27 @@ _REQUIRED_METHODS = ("prepare", "invoke", "collect")
 
 
 def validate_adapter_object(adapter: object, *, error_type: type[Exception]) -> AdapterDescriptor:
-    descriptor = getattr(adapter, "descriptor", None)
-    if not isinstance(descriptor, AdapterDescriptor):
-        raise error_type("adapter descriptor must be an AdapterDescriptor")
-    missing = [name for name in _REQUIRED_METHODS if not callable(getattr(adapter, name, None))]
+    try:
+        descriptor = getattr(adapter, "descriptor", None)
+    except Exception as error:
+        raise error_type(
+            f"adapter descriptor access failed: {type(error).__module__}."
+            f"{type(error).__qualname__}"
+        ) from error
+    if type(descriptor) is not AdapterDescriptor:
+        raise error_type("adapter descriptor must be an exact AdapterDescriptor")
+
+    missing: list[str] = []
+    for name in _REQUIRED_METHODS:
+        try:
+            method = getattr(adapter, name, None)
+        except Exception as error:
+            raise error_type(
+                f"adapter method access failed for {name}: {type(error).__module__}."
+                f"{type(error).__qualname__}"
+            ) from error
+        if not callable(method):
+            missing.append(name)
     if missing:
         raise error_type(f"adapter is missing callable methods: {', '.join(missing)}")
     return descriptor

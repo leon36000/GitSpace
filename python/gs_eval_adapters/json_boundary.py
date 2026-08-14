@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import math
 import re
-import unicodedata
 from typing import TypeAlias
 
 from .errors import JsonBoundaryError
@@ -33,22 +32,23 @@ def _clone_json(
     if depth > max_depth:
         raise JsonBoundaryError(f"{path}: JSON nesting exceeds {max_depth} levels")
 
-    if value is None or isinstance(value, (str, bool)):
+    value_type = type(value)
+    if value is None or value_type in (str, bool):
         return value
 
-    if isinstance(value, int):
+    if value_type is int:
         if not -SAFE_INTEGER <= value <= SAFE_INTEGER:
             raise JsonBoundaryError(
                 f"{path}: integer {value} exceeds the interoperable JSON safe range"
             )
         return value
 
-    if isinstance(value, float):
+    if value_type is float:
         if not math.isfinite(value):
             raise JsonBoundaryError(f"{path}: non-finite float is forbidden")
         return value
 
-    if isinstance(value, list):
+    if value_type is list:
         identity = id(value)
         if identity in active:
             raise JsonBoundaryError(f"{path}: cyclic JSON array")
@@ -67,7 +67,7 @@ def _clone_json(
         finally:
             active.remove(identity)
 
-    if isinstance(value, dict):
+    if value_type is dict:
         identity = id(value)
         if identity in active:
             raise JsonBoundaryError(f"{path}: cyclic JSON object")
@@ -75,9 +75,9 @@ def _clone_json(
         try:
             output: JsonObject = {}
             for key, item in value.items():
-                if not isinstance(key, str):
+                if type(key) is not str:
                     raise JsonBoundaryError(
-                        f"{path}: JSON object key {key!r} is not a string"
+                        f"{path}: JSON object key {key!r} is not an exact string"
                     )
                 output[key] = _clone_json(
                     item,
@@ -91,13 +91,13 @@ def _clone_json(
             active.remove(identity)
 
     raise JsonBoundaryError(
-        f"{path}: {type(value).__module__}.{type(value).__qualname__} is not JSON"
+        f"{path}: {value_type.__module__}.{value_type.__qualname__} is not exact JSON"
     )
 
 
 def clone_object(value: object, *, path: str = "$") -> JsonObject:
     cloned = clone_json(value, path=path)
-    if not isinstance(cloned, dict):
+    if type(cloned) is not dict:
         raise JsonBoundaryError(f"{path}: expected a JSON object")
     return cloned
 
@@ -113,27 +113,15 @@ def validate_extensions(value: object, *, path: str) -> JsonObject:
 
 
 def validate_name(value: object, *, path: str) -> str:
-    if not isinstance(value, str) or not NAME.fullmatch(value):
+    if type(value) is not str or not NAME.fullmatch(value):
         raise JsonBoundaryError(f"{path}: invalid boundary name")
     return value
 
 
 def validate_cas_uri(value: object, *, path: str) -> str:
-    if not isinstance(value, str) or not CAS_URI.fullmatch(value):
+    if type(value) is not str or not CAS_URI.fullmatch(value):
         raise JsonBoundaryError(f"{path}: expected canonical cas://sha256 URI")
     return value
-
-
-def bounded_message(stage: str, error: BaseException) -> str:
-    raw = f"adapter {stage} failed: {error}"
-    normalized = []
-    for character in raw:
-        if character in "\r\n\t" or unicodedata.category(character).startswith("C"):
-            normalized.append(" ")
-        else:
-            normalized.append(character)
-    compact = " ".join("".join(normalized).split())
-    return compact[:512]
 
 
 def _escape_pointer(value: str) -> str:
