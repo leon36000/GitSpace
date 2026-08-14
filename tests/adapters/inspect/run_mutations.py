@@ -97,10 +97,16 @@ MUTATIONS = (
         '        or sample["epoch"] != 1\n',
     ),
     Mutation(
-        "allow-unsupported-scorer-options",
+        "allow-projection-scorer-options",
         "inspect_replay.py",
-        "    if options != _OPTIONS:\n",
-        "    if False:\n",
+        '    if options != _OPTIONS:\n        raise AdapterContractError("projection scorer options mismatch")\n',
+        '    if False:\n        raise AdapterContractError("projection scorer options mismatch")\n',
+    ),
+    Mutation(
+        "allow-record-scorer-options",
+        "inspect_replay.py",
+        '    if options != _OPTIONS:\n        raise AdapterContractError("record scorer options mismatch")\n',
+        '    if False:\n        raise AdapterContractError("record scorer options mismatch")\n',
     ),
     Mutation(
         "allow-record-string-subclasses",
@@ -162,9 +168,7 @@ MUTATIONS = (
 def prepare_mutant(root: Path) -> None:
     package_root = root / "python" / "gs_eval_adapters"
     tests_root = root / "tests" / "adapters" / "inspect"
-    qualification_root = (
-        root / "docs" / "phase-00" / "qualifications"
-    )
+    qualification_root = root / "docs" / "phase-00" / "qualifications"
     package_root.parent.mkdir(parents=True)
     tests_root.parent.mkdir(parents=True)
     qualification_root.mkdir(parents=True)
