@@ -57,6 +57,10 @@ class AdapterWithDescriptorSubclass:
         }
 
 
+def valid_identity() -> str:
+    return "fake@1/protocol-1/" + IMPLEMENTATION_DIGEST
+
+
 class PublicModelTests(unittest.TestCase):
     def test_descriptor_subclass_is_not_accepted_as_sdk_authority(self) -> None:
         from test_contract import valid_request
@@ -64,10 +68,44 @@ class PublicModelTests(unittest.TestCase):
         with self.assertRaises(AdapterContractError):
             execute_adapter(AdapterWithDescriptorSubclass(), valid_request())
 
+    def test_descriptor_identity_is_bounded(self) -> None:
+        for name, version in (
+            ("a" * 600, "1"),
+            ("fake", "v" * 600),
+        ):
+            with self.subTest(name_length=len(name), version_length=len(version)):
+                with self.assertRaises(AdapterContractError):
+                    AdapterDescriptor(
+                        name=name,
+                        version=version,
+                        protocol_version=1,
+                        implementation_digest=IMPLEMENTATION_DIGEST,
+                    )
+
+    def test_direct_result_construction_rejects_noncanonical_identity(self) -> None:
+        invalid = (
+            "fake",
+            "Fake@1/protocol-1/" + IMPLEMENTATION_DIGEST,
+            "fake@1/protocol-2/" + IMPLEMENTATION_DIGEST,
+            "fake@1/protocol-1/sha256:bad",
+            "fake@/protocol-1/" + IMPLEMENTATION_DIGEST,
+        )
+        for identity in invalid:
+            with self.subTest(identity=identity[:80]):
+                with self.assertRaises(AdapterContractError):
+                    AdapterResult(
+                        adapter_identity=identity,
+                        status=AdapterStatus.PASS,
+                        summary="ok",
+                        artifacts={},
+                        metrics={},
+                        extensions={},
+                    )
+
     def test_direct_result_construction_rejects_invalid_status(self) -> None:
         with self.assertRaises(AdapterContractError):
             AdapterResult(
-                adapter_identity="fake@1/protocol-1/" + IMPLEMENTATION_DIGEST,
+                adapter_identity=valid_identity(),
                 status="pass",  # type: ignore[arg-type]
                 summary="ok",
                 artifacts={},
@@ -78,7 +116,7 @@ class PublicModelTests(unittest.TestCase):
     def test_direct_result_construction_rejects_invalid_artifact(self) -> None:
         with self.assertRaises(AdapterContractError):
             AdapterResult(
-                adapter_identity="fake@1/protocol-1/" + IMPLEMENTATION_DIGEST,
+                adapter_identity=valid_identity(),
                 status=AdapterStatus.PASS,
                 summary="ok",
                 artifacts={"trace": "relative/path"},
@@ -94,7 +132,7 @@ class PublicModelTests(unittest.TestCase):
             with self.subTest(artifacts=type(next(iter(artifacts), None)).__name__):
                 with self.assertRaises(AdapterContractError):
                     AdapterResult(
-                        adapter_identity="fake@1/protocol-1/" + IMPLEMENTATION_DIGEST,
+                        adapter_identity=valid_identity(),
                         status=AdapterStatus.PASS,
                         summary="ok",
                         artifacts=artifacts,  # type: ignore[arg-type]
@@ -111,7 +149,7 @@ class PublicModelTests(unittest.TestCase):
             with self.subTest(summary=summary, metrics=metrics):
                 with self.assertRaises(AdapterContractError):
                     AdapterResult(
-                        adapter_identity="fake@1/protocol-1/" + IMPLEMENTATION_DIGEST,
+                        adapter_identity=valid_identity(),
                         status=AdapterStatus.PASS,
                         summary=summary,
                         artifacts={"trace": CAS_URI},
@@ -121,7 +159,7 @@ class PublicModelTests(unittest.TestCase):
 
     def test_direct_valid_result_still_returns_fresh_json(self) -> None:
         result = AdapterResult(
-            adapter_identity="fake@1/protocol-1/" + IMPLEMENTATION_DIGEST,
+            adapter_identity=valid_identity(),
             status=AdapterStatus.PASS,
             summary="ok",
             artifacts={"trace": CAS_URI},
