@@ -247,6 +247,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "gs-verdict"
+version = "0.1.0"
+dependencies = [
+ "gs-eval-ir",
+ "serde_json",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

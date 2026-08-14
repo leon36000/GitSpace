@@ -1,9 +1,7 @@
 use gs_eval_ir::{
     DeclaredOutcome, FunctionalOutcome, SchemaName, TaskValidity, validate_named_json,
 };
-use gs_verdict::{
-    CoverageCount, ResidualRisk, VerdictInput, issue_verdict,
-};
+use gs_verdict::{CoverageCount, ResidualRisk, VerdictInput, issue_verdict};
 
 const VERDICT_ID: &str = "GS-VERDICT-01ARZ3NDEKTSV4RRFFQ69G5FAV";
 const RUN_ID: &str = "GS-RUN-01ARZ3NDEKTSV4RRFFQ69G5FAV";
@@ -78,10 +76,7 @@ fn advisory_risk_remains_visible_without_blocking_complete_success() {
     let verdict = issue_verdict(input).expect("issue advisory verdict");
     assert!(verdict.safe_success);
     assert!(!verdict.false_done);
-    assert_eq!(
-        verdict.residual_risks,
-        vec!["advisory:future optimization"]
-    );
+    assert_eq!(verdict.residual_risks, vec!["advisory:future optimization"]);
     assert_eq!(
         verdict.extensions["gitspace.verdict"]["advisory_risk_count"],
         serde_json::json!(1)

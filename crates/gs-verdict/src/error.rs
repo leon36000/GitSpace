@@ -27,7 +27,10 @@ impl fmt::Display for VerdictError {
                 "invalid {field} coverage: closed {closed} exceeds total {total}"
             ),
             Self::EmptyRiskDescription { index } => {
-                write!(formatter, "residual risk at index {index} has an empty description")
+                write!(
+                    formatter,
+                    "residual risk at index {index} has an empty description"
+                )
             }
             Self::Serialization(source) => {
                 write!(formatter, "verdict serialization failed: {source}")

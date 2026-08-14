@@ -1,7 +1,5 @@
 use gs_eval_ir::{DeclaredOutcome, FunctionalOutcome, TaskValidity};
-use gs_verdict::{
-    CoverageCount, ResidualRisk, VerdictError, VerdictInput, issue_verdict,
-};
+use gs_verdict::{CoverageCount, ResidualRisk, VerdictError, VerdictInput, issue_verdict};
 
 const VERDICT_ID: &str = "GS-VERDICT-01ARZ3NDEKTSV4RRFFQ69G5FB0";
 const RUN_ID: &str = "GS-RUN-01ARZ3NDEKTSV4RRFFQ69G5FB0";
@@ -121,7 +119,10 @@ fn every_critical_gate_is_non_compensable_for_declared_success() {
             panic!("{case:?} should issue a rejecting verdict, not error: {error}")
         });
 
-        assert!(!verdict.safe_success, "{case:?} was incorrectly compensated");
+        assert!(
+            !verdict.safe_success,
+            "{case:?} was incorrectly compensated"
+        );
         assert!(verdict.false_done, "{case:?} did not flag false DONE");
         let failed = verdict.extensions["gitspace.verdict"]["failed_gates"]
             .as_array()

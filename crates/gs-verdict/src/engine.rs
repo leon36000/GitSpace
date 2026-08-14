@@ -1,6 +1,4 @@
-use crate::{
-    CoverageCount, ResidualRisk, RiskSeverity, VerdictError, VerdictInput,
-};
+use crate::{CoverageCount, ResidualRisk, RiskSeverity, VerdictError, VerdictInput};
 use gs_eval_ir::{
     DeclaredOutcome, EvalVerdict, Extensions, FunctionalOutcome, SchemaName, TaskValidity,
     validate_named_json,
@@ -9,17 +7,15 @@ use serde_json::json;
 use std::collections::BTreeSet;
 
 pub fn issue_verdict(input: VerdictInput) -> Result<EvalVerdict, VerdictError> {
-    let (obligation_coverage, obligations_complete) =
-        coverage("obligations", input.obligations)?;
+    let (obligation_coverage, obligations_complete) = coverage("obligations", input.obligations)?;
     let (evidence_coverage, evidence_complete) = coverage("evidence", input.evidence)?;
     let risks = normalize_risks(&input.residual_risks)?;
 
     let functional_pass = input.functional_outcome == FunctionalOutcome::Pass;
     let valid_task = input.task_validity == TaskValidity::Valid;
     let security_passed = input.security_policy_passed && !input.exploit_detected;
-    let integrity_passed = evidence_complete
-        && input.replay_passed
-        && input.independent_verification_passed;
+    let integrity_passed =
+        evidence_complete && input.replay_passed && input.independent_verification_passed;
     let no_critical_risk = risks.critical.is_empty();
 
     let mut failed_gates = Vec::new();
@@ -107,10 +103,7 @@ pub fn issue_verdict(input: VerdictInput) -> Result<EvalVerdict, VerdictError> {
     Ok(verdict)
 }
 
-fn coverage(
-    field: &'static str,
-    count: CoverageCount,
-) -> Result<(f64, bool), VerdictError> {
+fn coverage(field: &'static str, count: CoverageCount) -> Result<(f64, bool), VerdictError> {
     if count.closed > count.total {
         return Err(VerdictError::InvalidCoverage {
             field,
