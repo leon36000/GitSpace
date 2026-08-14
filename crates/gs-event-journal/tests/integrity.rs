@@ -131,7 +131,8 @@ fn corrupted_cas_event_is_rejected_during_replay() {
     journal.append(&event(RUN_3, 0, "RUN_STARTED")).unwrap();
     let digest = journal.read_from(EventOffset::new(0)).unwrap()[0].event_digest;
     let object_path = LocalCas::open(&cas_root).unwrap().object_path(&digest);
-    fs::write(object_path, b"corrupted event bytes").unwrap();
+    fs::remove_file(&object_path).unwrap();
+    fs::write(&object_path, b"corrupted event bytes").unwrap();
 
     assert!(matches!(
         journal.read_from(EventOffset::new(0)).unwrap_err(),
