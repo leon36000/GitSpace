@@ -99,6 +99,48 @@ fn replay_does_not_repair_a_missing_cas_layout_directory() {
     );
 }
 
+#[test]
+fn library_replay_does_not_repair_a_missing_cas_layout_directory() {
+    let root = TestDir::new("library-cas-layout");
+    let store = root.path().join("store");
+    let foundry = NativeFoundry::open(&store, source_commit()).unwrap();
+    let receipt = foundry.run(NativeScenario::Pass).unwrap();
+
+    let temporary_root = store.join("cas").join("tmp");
+    fs::remove_dir_all(&temporary_root).unwrap();
+    assert!(!temporary_root.exists());
+
+    assert!(
+        foundry.replay(&receipt).is_err(),
+        "library replay silently repaired a missing CAS layout directory"
+    );
+    assert!(
+        !temporary_root.exists(),
+        "library replay recreated a missing CAS layout directory"
+    );
+}
+
+#[test]
+fn read_only_handle_cannot_execute_or_recreate_the_runner_root() {
+    let root = TestDir::new("read-only-handle");
+    let store = root.path().join("store");
+    let receipt_path = root.path().join("receipt.json");
+    write_pass_receipt(&store, &receipt_path);
+
+    let runner_root = store.join("runner");
+    fs::remove_dir_all(&runner_root).unwrap();
+    let read_only = NativeFoundry::open_read_only(&store, source_commit()).unwrap();
+
+    assert!(
+        read_only.run(NativeScenario::Pass).is_err(),
+        "read-only Foundry handle executed a scenario"
+    );
+    assert!(
+        !runner_root.exists(),
+        "read-only Foundry handle recreated the runner root"
+    );
+}
+
 fn write_pass_receipt(store: &Path, receipt_path: &Path) {
     let foundry = NativeFoundry::open(store, source_commit()).unwrap();
     let receipt = foundry.run(NativeScenario::Pass).unwrap();
