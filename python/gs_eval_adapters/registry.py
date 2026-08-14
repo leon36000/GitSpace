@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .errors import RegistrationError
+from .errors import RegistrationError, safe_type_name
 from .model import AdapterDescriptor
 
 _REQUIRED_METHODS = ("prepare", "invoke", "collect")
@@ -11,8 +11,7 @@ def validate_adapter_object(adapter: object, *, error_type: type[Exception]) -> 
         descriptor = getattr(adapter, "descriptor", None)
     except Exception as error:
         raise error_type(
-            f"adapter descriptor access failed: {type(error).__module__}."
-            f"{type(error).__qualname__}"
+            f"adapter descriptor access failed: {safe_type_name(error)}"
         ) from error
     if type(descriptor) is not AdapterDescriptor:
         raise error_type("adapter descriptor must be an exact AdapterDescriptor")
@@ -23,8 +22,7 @@ def validate_adapter_object(adapter: object, *, error_type: type[Exception]) -> 
             method = getattr(adapter, name, None)
         except Exception as error:
             raise error_type(
-                f"adapter method access failed for {name}: {type(error).__module__}."
-                f"{type(error).__qualname__}"
+                f"adapter method access failed for {name}: {safe_type_name(error)}"
             ) from error
         if not callable(method):
             missing.append(name)
@@ -50,6 +48,8 @@ class AdapterRegistry:
         self._identities.add(descriptor.identity)
 
     def resolve(self, name: str) -> object:
+        if type(name) is not str:
+            raise RegistrationError("adapter lookup name must be an exact string")
         try:
             return self._by_name[name]
         except KeyError as error:
