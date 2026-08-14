@@ -243,3 +243,33 @@ pub(crate) fn relative_path_string(path: &Path) -> Result<String, RunnerError> {
     }
     Ok(parts.join("/"))
 }
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::{RelativePath, safe_file_path};
+    use crate::RunnerError;
+    use std::{fs, os::unix::fs::symlink};
+
+    #[test]
+    fn existing_symlink_component_is_rejected() {
+        let root = std::env::temp_dir().join(format!(
+            "gitspace-task8-path-symlink-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        let workspace = root.join("workspace");
+        let outside = root.join("outside");
+        fs::create_dir_all(&workspace).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        fs::write(outside.join("secret.txt"), b"outside").unwrap();
+        symlink(&outside, workspace.join("link")).unwrap();
+
+        let relative = RelativePath::parse("link/secret.txt").unwrap();
+        assert!(matches!(
+            safe_file_path(&workspace, &relative, true).unwrap_err(),
+            RunnerError::UnsafePath { .. }
+        ));
+
+        let _ = fs::remove_dir_all(root);
+    }
+}
