@@ -9,6 +9,7 @@ from .errors import (
     AdapterTimeout,
     JsonBoundaryError,
     SemanticLossError,
+    safe_type_name,
 )
 from .json_boundary import (
     SAFE_INTEGER,
@@ -199,7 +200,6 @@ def _failure(
     stage: str,
     error: BaseException,
 ) -> AdapterResult:
-    error_type = f"{type(error).__module__}.{type(error).__qualname__}"
     try:
         detail = str(error)
     except Exception:
@@ -207,7 +207,9 @@ def _failure(
     return AdapterResult(
         adapter_identity=adapter_identity,
         status=status,
-        summary=_sanitize_summary(f"adapter {stage} failed: {error_type}: {detail}"),
+        summary=_sanitize_summary(
+            f"adapter {stage} failed: {safe_type_name(error)}: {detail}"
+        ),
         artifacts={},
         metrics={},
         extensions={},
