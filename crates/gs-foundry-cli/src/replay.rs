@@ -40,7 +40,8 @@ impl NativeFoundry {
         let task_bytes = get_bytes(&cas, &receipt.task_uri)?;
         let task_value: Value = serde_json::from_slice(&task_bytes)?;
         validate_task_json(&task_value)?;
-        verify_exact_bytes("task", &task_bytes, &expected_task_value())?;
+        let expected_task = expected_task_value()?;
+        verify_exact_bytes("task", &task_bytes, &expected_task)?;
 
         verify_exact_artifact(
             &cas,
@@ -275,9 +276,10 @@ fn expected_classification(scenario: NativeScenario) -> ObservedClassification {
     }
 }
 
-fn expected_task_value() -> Value {
+fn expected_task_value() -> Result<Value, FoundryError> {
     let environment = expected_environment_digest();
-    json!({
+    let initial_state_digest = canonical_digest(&expected_state_before_value())?.to_string();
+    Ok(json!({
         "id": TASK_ID,
         "version": 1,
         "lane": "L00",
@@ -296,10 +298,10 @@ fn expected_task_value() -> Value {
         },
         "world_fixture": {
             "version": 1,
-            "base_artifact_digest": environment,
+            "base_artifact_digest": initial_state_digest.clone(),
             "environment_digest": environment,
             "services": [],
-            "initial_state_digest": sha256_digest(b"task9-initial-state").to_string(),
+            "initial_state_digest": initial_state_digest,
             "extensions": {}
         },
         "authority": {
@@ -336,7 +338,7 @@ fn expected_task_value() -> Value {
             "known_exploits": []
         },
         "extensions": {}
-    })
+    }))
 }
 
 fn expected_plan_value(scenario: NativeScenario, run_id: &str) -> Value {
