@@ -53,6 +53,12 @@ MUTATIONS = (
         "        if False:\n",
     ),
     Mutation(
+        "reflect-huge-integer-value",
+        "json_boundary.py",
+        "                f\"{path}: integer exceeds the interoperable JSON safe range\"\n",
+        "                f\"{path}: integer {value} exceeds the interoperable JSON safe range\"\n",
+    ),
+    Mutation(
         "allow-nonfinite-float",
         "json_boundary.py",
         "        if not math.isfinite(value):\n",
@@ -83,6 +89,12 @@ MUTATIONS = (
         "",
     ),
     Mutation(
+        "trust-exception-type-metadata",
+        "sdk.py",
+        "            f\"adapter {stage} failed: {safe_type_name(error)}: {detail}\"\n",
+        "            f\"adapter {stage} failed: {type(error).__module__}.{type(error).__qualname__}: {detail}\"\n",
+    ),
+    Mutation(
         "allow-incomplete-adapter",
         "registry.py",
         "    if missing:\n",
@@ -95,10 +107,28 @@ MUTATIONS = (
         "    if False:\n",
     ),
     Mutation(
+        "allow-nonstr-registry-lookup",
+        "registry.py",
+        "        if type(name) is not str:\n",
+        "        if False:\n",
+    ),
+    Mutation(
         "allow-scalar-subclass",
         "json_boundary.py",
         "    if value_type is str:\n",
         "    if isinstance(value, str):\n",
+    ),
+    Mutation(
+        "allow-unbounded-descriptor-identity",
+        "model.py",
+        "        if len(self.identity) > _MAX_IDENTITY_LENGTH:\n",
+        "        if False:\n",
+    ),
+    Mutation(
+        "allow-noncanonical-result-identity",
+        "model.py",
+        "        if not _is_canonical_adapter_identity(self.adapter_identity):\n",
+        "        if False:\n",
     ),
     Mutation(
         "drop-result-core-check",
