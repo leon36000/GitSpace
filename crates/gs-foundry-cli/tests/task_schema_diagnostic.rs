@@ -1,10 +1,15 @@
-use gs_canonical_json::sha256_digest;
+use gs_canonical_json::{canonical_digest, sha256_digest};
 use gs_eval_ir::validate_task_json;
 use serde_json::json;
 
 #[test]
 fn native_task_template_is_valid_in_the_rust_schema_boundary() {
-    let env = sha256_digest(b"gitspace-phase00-native-environment-v1").to_string();
+    let environment = sha256_digest(b"gitspace-phase00-native-environment-v1").to_string();
+    let state_before = json!([{
+        "path": "input/message.txt",
+        "digest": sha256_digest(b"hello").to_string()
+    }]);
+    let initial_state_digest = canonical_digest(&state_before).unwrap().to_string();
     let task = json!({
         "id": "GS-TASK-000009",
         "version": 1,
@@ -16,8 +21,12 @@ fn native_task_template_is_valid_in_the_rust_schema_boundary() {
             "latent_requirements":[],"non_goals":[],"allowed_ambiguities":[]
         },
         "world_fixture": {
-            "version":1,"base_artifact_digest":env,"environment_digest":env,
-            "services":[],"initial_state_digest":sha256_digest(b"task9-initial-state").to_string(),"extensions":{}
+            "version":1,
+            "base_artifact_digest":initial_state_digest.clone(),
+            "environment_digest":environment,
+            "services":[],
+            "initial_state_digest":initial_state_digest,
+            "extensions":{}
         },
         "authority": {
             "allowed_actions":["workspace.read","workspace.write"],
