@@ -1,7 +1,7 @@
 use crate::FoundryError;
 use gs_canonical_json::{Digest, canonical_bytes};
 use gs_cas::{Cas, LocalCas};
-use serde::{Serialize, de::DeserializeOwned};
+use serde::Serialize;
 
 pub(crate) fn put_json<T: Serialize>(cas: &LocalCas, value: &T) -> Result<String, FoundryError> {
     let json = serde_json::to_value(value)?;
@@ -17,11 +17,6 @@ pub(crate) fn put_value(cas: &LocalCas, value: &serde_json::Value) -> Result<Str
 pub(crate) fn get_bytes(cas: &LocalCas, uri: &str) -> Result<Vec<u8>, FoundryError> {
     let digest = parse_cas_uri(uri)?;
     Ok(cas.get(&digest)?)
-}
-
-pub(crate) fn get_json<T: DeserializeOwned>(cas: &LocalCas, uri: &str) -> Result<T, FoundryError> {
-    let bytes = get_bytes(cas, uri)?;
-    Ok(serde_json::from_slice(&bytes)?)
 }
 
 pub(crate) fn cas_uri(digest: Digest) -> String {
