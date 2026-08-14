@@ -1,0 +1,125 @@
+name: P00 Task 011 State Finalize
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/p00-task-011-state-finalize.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  verify-and-merge:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          fetch-depth: 0
+      - name: Verify state-only scope and normalize generated documents
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e .github/workflows/p00-task-011-state-bootstrap.yml
+          git fetch origin main
+          mapfile -t changed < <(git diff --name-only origin/main...HEAD | sort)
+          expected=(
+            .github/workflows/p00-task-011-state-finalize.yml
+            00_GITSPACE_START_HERE.md
+            02_GITSPACE_NOW_DECISIONS_ROADMAP.md
+            04_GITSPACE_AGENT_PROTOCOL.md
+            docs/phase-00/evidence/P00-TASK-011-POSTMERGE.md
+          )
+          printf '%s\n' "${expected[@]}" | sort > /tmp/expected
+          printf '%s\n' "${changed[@]}" > /tmp/actual
+          diff -u /tmp/expected /tmp/actual
+
+          python - <<'PY'
+          from pathlib import Path
+
+          paths = [
+              Path("00_GITSPACE_START_HERE.md"),
+              Path("02_GITSPACE_NOW_DECISIONS_ROADMAP.md"),
+              Path("04_GITSPACE_AGENT_PROTOCOL.md"),
+              Path("docs/phase-00/evidence/P00-TASK-011-POSTMERGE.md"),
+          ]
+          prefix = "          "
+          for path in paths:
+              lines = path.read_text(encoding="utf-8").splitlines()
+              normalized = [line[len(prefix):] if line.startswith(prefix) else line for line in lines]
+              path.write_text("\n".join(normalized) + "\n", encoding="utf-8")
+
+          assertions = {
+              "00_GITSPACE_START_HERE.md": [
+                  "version: 0.4.11",
+                  "P00-TASK-001` à `P00-TASK-011",
+                  "La prochaine unité est `P00-TASK-012`",
+              ],
+              "02_GITSPACE_NOW_DECISIONS_ROADMAP.md": [
+                  "P00-TASK-011 : `PROVEN`",
+                  "next_task: P00-TASK-012",
+                  "phase_status: PARTIALLY_VERIFIED",
+              ],
+              "04_GITSPACE_AGENT_PROTOCOL.md": [
+                  "- P00-TASK-011",
+                  "active_task: P00-TASK-012",
+                  "active_task_status: NOT_PACKETIZED",
+              ],
+              "docs/phase-00/evidence/P00-TASK-011-POSTMERGE.md": [
+                  "status: PROVEN_BOUNDED_CONTRACT",
+                  "merge_commit: 0d55958ae2527f91cde0f27fb7cb2c2abceb3bff",
+                  "conclusion: success",
+                  "identity_independent_review: false",
+              ],
+          }
+          for name, needles in assertions.items():
+              text = Path(name).read_text(encoding="utf-8")
+              if not text.startswith("---\n"):
+                  raise SystemExit(f"{name}: invalid front matter start")
+              for needle in needles:
+                  if needle not in text:
+                      raise SystemExit(f"{name}: missing {needle!r}")
+          PY
+
+          git rm .github/workflows/p00-task-011-state-finalize.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add 00_GITSPACE_START_HERE.md 02_GITSPACE_NOW_DECISIONS_ROADMAP.md 04_GITSPACE_AGENT_PROTOCOL.md docs/phase-00/evidence/P00-TASK-011-POSTMERGE.md
+          git commit -m "docs: finalize proven Phase 00 Task 11 state"
+          git push origin "HEAD:${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+
+      - name: Verify final diff and merge signed state PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number || '50' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+          final_sha="$(git rev-parse HEAD)"
+          for _ in $(seq 1 30); do
+            remote_sha="$(curl --fail --silent --show-error "${auth[@]}" "${api}/pulls/${PR_NUMBER}" | jq -er '.head.sha')"
+            test "${remote_sha}" = "${final_sha}" && break
+            sleep 2
+          done
+          test "${remote_sha}" = "${final_sha}"
+
+          git fetch origin main
+          mapfile -t changed < <(git diff --name-only origin/main...HEAD | sort)
+          expected=(
+            00_GITSPACE_START_HERE.md
+            02_GITSPACE_NOW_DECISIONS_ROADMAP.md
+            04_GITSPACE_AGENT_PROTOCOL.md
+            docs/phase-00/evidence/P00-TASK-011-POSTMERGE.md
+          )
+          printf '%s\n' "${expected[@]}" | sort > /tmp/expected-final
+          printf '%s\n' "${changed[@]}" > /tmp/actual-final
+          diff -u /tmp/expected-final /tmp/actual-final
+
+          payload="$(jq -n --arg sha "${final_sha}" '{merge_method:"squash",sha:$sha,commit_title:"docs: promote proven Phase 00 Task 11 state",commit_message:"Promote Task 11 after the signed Inspect adapter merge and fresh successful main replay. Advance the active unit to P00-TASK-012 while keeping M0 and Phase 00 partially verified."}')"
+          response="$(curl --fail --silent --show-error -X PUT "${auth[@]}" "${api}/pulls/${PR_NUMBER}/merge" --data "${payload}")"
+          jq -e '.merged == true' <<<"${response}"
