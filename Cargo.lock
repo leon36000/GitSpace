@@ -247,6 +247,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "gs-foundry-cli"
+version = "0.1.0"
+dependencies = [
+ "gs-canonical-json",
+ "gs-cas",
+ "gs-eval-ir",
+ "gs-event-journal",
+ "gs-local-runner",
+ "gs-verdict",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "gs-local-runner"
 version = "0.1.0"
 dependencies = [
