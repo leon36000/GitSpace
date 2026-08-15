@@ -3,7 +3,7 @@ doc_id: GS-04
 title: GitSpace — Agent Protocol
 authority: OPERATING_PROTOCOL
 status: ACTIVE
-version: 0.4.4
+version: 0.4.5
 updated: 2026-08-14
 read_when: PLANNING_EXECUTION_HANDOFF_OR_MEMORY_UPDATE
 ---
@@ -25,11 +25,11 @@ RETRIEVE
 - `RETRIEVE` : lire `00` et `02`, appliquer le routage, vérifier autorité, fraîcheur et provenance.
 - `FRAME` : objectif, critères, non-scope, contraintes, hypothèses, inconnues et niveau de risque.
 - `DECOMPOSE` : unités indépendantes, réversibles, testables et attribuables.
-- `PLAN` : base exacte, chemins, interfaces, RED, GREEN, preuves, rollback, reviewers et terminaison.
+- `PLAN` : base exacte, paths, interfaces, RED, GREEN, preuves, rollback, reviewers et terminaison.
 - `EXECUTE` : petits changements, outils typés, effets journalisés, portée stricte.
-- `ADVERSARIAL_VERIFY` : chercher contre-exemples, tâche invalide, test faible, corruption, régression, violation d’autorité et preuve circulaire.
-- `DECIDE` : `PROVEN`, `PARTIALLY_VERIFIED`, `BLOCKED_WITH_EVIDENCE`, `RESEARCH_MODE`, `TASK_INVALID`, `REFUTED` ou `SUPERSEDED`.
-- `UPDATE_MEMORY` : patch explicite; aucune promotion implicite d’un chat ou d’une sortie d’outil.
+- `ADVERSARIAL_VERIFY` : chercher contre-exemples, tâche invalide, test faible, corruption, régression, violation d’autorité, preuve circulaire et dépendance externe non calculée.
+- `DECIDE` : `PROVEN`, `PARTIALLY_VERIFIED`, `BLOCKED_WITH_EVIDENCE`, `RESEARCH_MODE`, `TASK_INVALID`, `REFUTED`, `STALE` ou `SUPERSEDED`.
+- `UPDATE_MEMORY` : patch explicite; aucune promotion implicite d’un chat, d’une projection ou d’une sortie d’outil.
 
 ## 2. Séparation des rôles
 
@@ -84,7 +84,7 @@ termination_conditions:
 Invariants :
 
 1. `base_commit` obligatoire.
-2. Chemins autorisés et interdits exhaustifs.
+2. Paths autorisés et interdits exhaustifs.
 3. RED observé pour la bonne raison avant production code.
 4. Une tâche défectueuse devient `TASK_INVALID`; elle n’est pas imputée à l’agent.
 5. GREEN minimal, puis refactor sans nouveau comportement.
@@ -99,7 +99,7 @@ RED
 → confirmer la raison de l’échec
 → GREEN minimal
 → suite complète
-→ mutation/adversarial tests selon le risque
+→ mutations et contre-exemples selon le risque
 → analyse statique
 → formatage
 → propreté du dépôt
@@ -144,9 +144,12 @@ Les logs bruts sont immuables; les secrets sont redacted; modèle, harness, outi
 - Toute frontière d’adaptateur valide l’Evaluation IR avant le premier accès externe.
 - Seuls des builtins JSON exacts, copiés en profondeur, traversent la frontière Python provider-neutral.
 - Une perte sémantique entre requête canonique et requête préparée bloque l’invocation.
-- Classes, exceptions, propriétés, clés et métadonnées externes sont des données non fiables et ne doivent pas contrôler les erreurs ou les permissions.
+- Classes, exceptions, propriétés, clés et métadonnées externes sont des données non fiables et ne doivent pas contrôler les erreurs ou permissions.
 - Les artefacts d’adaptateur sont des références CAS canoniques; leur contenu doit être vérifié par une couche d’autorité distincte.
-- CAS, journal, runner, Foundry et SDK adaptateur locaux sont des pilotes M0, pas des décisions distribuées.
+- Un adaptateur concret doit piner release, commit, packages, mapping, modèle factice et scorer; conserver le log brut; publier un record fermé; et permettre le replay sans le framework.
+- Une API privée exige pin exact, RED ciblé, restauration garantie, sérialisation si état global et requalification à chaque release.
+- Un outil de qualité externe ne devient `PASS` que si le quality gate positif a réellement été calculé. `NOT_COMPUTED_EXTERNAL` reste un risque déclaré avec dérogation explicite et réversible.
+- CAS, journal, runner, Foundry et adaptateurs locaux sont des pilotes M0, pas des décisions distribuées.
 - Un préprint non reproduit reste expérimental.
 - Neon, Temporal, SonarQube, Fallow et AMD sont activés seulement lorsqu’un besoin mesuré les rend pertinents.
 - Une CI verte ne suffit pas sans revue, merge signé et preuve post-merge.
@@ -222,7 +225,8 @@ proven_tasks:
   - P00-TASK-008
   - P00-TASK-009
   - P00-TASK-010
-active_task: P00-TASK-011
+  - P00-TASK-011
+active_task: P00-TASK-012
 active_task_status: NOT_PACKETIZED
 m0_status: PARTIALLY_VERIFIED
 m0_blocker: IDENTITY_INDEPENDENT_REPRODUCTION_MISSING
@@ -231,35 +235,38 @@ phase_status: PARTIALLY_VERIFIED
 
 Preuves récentes :
 
-- Task 9 Foundry : merge signé `b15a2b74f16e8fa6bf1d88832c9191eab44f2a25`, post-merge `31824037711` / `94843810930`.
-- Task 10 SDK adaptateur : merge signé `06e480d8869f4d2e5e5fce1a670f7074c5be854e`, tree `f1c451e1bb5806b46cc680ddf62e1518e9ef9d17`, post-merge `31830147076` / `94863626878`.
+- Task 10 SDK : merge signé `06e480d8869f4d2e5e5fce1a670f7074c5be854e`, post-merge `31830147076` / `94863626878`.
+- Task 11 Inspect : merge correctif signé `0eb361843cb67d798f8030763f1fffbcffd665ca`, tree `3602f5d3ddc7236ab700dcca6d5d2f3d1bd8778b`, post-merge `31861648147` / `94955991327`.
+- Régression Task 10 sur le merge Task 11 : `31861648140` / `94955991418`.
+- Sonar Task 11 pré-merge : zéro annotation, zéro issue, quality gate absent; `NOT_COMPUTED_EXTERNAL`.
 
 ## 11. Handoff courant
 
 ```yaml
-session_id: GS-SESSION-20260814-TASK010
+session_id: GS-SESSION-20260814-TASK011-FINAL
 objective: >-
-  Merge Task 10 state and its byte-identical RAGLite projection,
-  then packetize P00-TASK-011 from the resulting canonical main SHA.
+  Fusionner l’état Task 11 final et sa projection RAGLite byte-identical,
+  puis packetiser P00-TASK-012 depuis le nouveau SHA canonique de main.
 completed:
-  - Tasks 1 through 9 proven in bounded contracts
-  - provider-neutral Python adapter SDK proven
-  - sovereign schemas validated before external access
-  - exact JSON boundary and deep-copy semantics proven
-  - semantic-loss gate proven
-  - five normalized outcomes proven
-  - hostile Python objects and metadata fail closed
-  - exact frozen Python dependency graph
-  - 43 contract/adversarial tests
-  - 19 killed mutations
+  - Tasks 1 through 10 proven in bounded contracts
+  - Inspect AI 0.3.258 fixture qualified
+  - provider-neutral boundary preserved
+  - controlled no-network mockllm run
+  - full log and record CAS binding
+  - replay and exact-match rescoring without Inspect
+  - pinned AnyIO cleanup shim with serialized installation
+  - 49 final Inspect/Sonar tests
+  - 26 killed mutations
   - clean archive replay
-  - signed Task 10 merge
+  - role-separated review
+  - signed corrective Task 11 merge
   - fresh successful main replay
+  - Task 10 regression replay
 blocked:
   - milestone M0 identity-independent reproduction
-  - P00-TASK-011 until state and RAGLite merges
-  - P00-TASK-012 until Task 11 proof
+  - P00-TASK-012 until state and RAGLite merges
+  - P00-TASK-013 until Task 12 proof
 next_exact_action: >-
-  Merge this state synchronization, project 00/02/04 byte-identically,
-  then produce the exact Task 11 execution packet from new main.
+  Merge this final state synchronization, project 00/02/04 byte-identically,
+  then produce the exact Task 12 packet from new main.
 ```
