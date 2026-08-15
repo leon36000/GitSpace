@@ -55,8 +55,8 @@ jobs:
           python -c "import importlib.metadata as m; assert m.version('uv') == '0.12.0'"
       - name: Verify committed Inspect dependency graph
         run: uv lock --check --python 3.12.13
-      - name: Sync frozen Python environment
-        run: uv sync --frozen
+      - name: Sync frozen Python environment without build scripts
+        run: uv sync --frozen --no-build
       - name: Verify exact qualified distributions
         run: |
           uv run --frozen --no-build python -c "import importlib.metadata as m; assert m.version('inspect-ai') == '0.3.258'"
@@ -81,7 +81,7 @@ jobs:
           (
             cd "$archive_dir"
             uv lock --check --python 3.12.13
-            uv sync --frozen
+            uv sync --frozen --no-build
             uv run --frozen --no-build python -c "import importlib.metadata as m; assert m.version('inspect-ai') == '0.3.258'"
             PYTHONPATH=python:tests/adapters/inspect uv run --frozen --no-build python -m unittest discover -s tests/adapters/inspect -p 'test_*.py' -v
             PYTHONPATH=python:tests/adapters uv run --frozen --no-build python -m unittest discover -s tests/adapters -p 'test_*.py' -v
