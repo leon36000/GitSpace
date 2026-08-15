@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import asyncio
 import unittest
+from threading import Barrier, BrokenBarrierError, Thread
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from gs_eval_adapters.inspect_cleanup import (
+    _InspectHookApi,
     _close_receiver,
     _close_sender,
     _load_hook_api,
     _reset_active_streams,
+    inspect_event_stream_cleanup,
 )
 
 
@@ -37,6 +41,46 @@ class CleanupContractTests(unittest.TestCase):
         self.assertEqual(api.sample_active.__module__, "inspect_ai.log._samples")
         self.assertEqual(api.emit_to_all.__name__, "_emit_to_all")
         self.assertEqual(api.anyio.__name__, "anyio")
+
+    def test_cleanup_context_serializes_concurrent_installs(self) -> None:
+        async def original() -> None:
+            return None
+
+        hooks = SimpleNamespace(drain_sample_events=original)
+        api = _InspectHookApi(
+            hooks=hooks,
+            original=original,
+            sample_active=lambda: None,
+            anyio=SimpleNamespace(),
+            emit_to_all=lambda callback: callback,
+            logger=SimpleNamespace(),
+        )
+        start = Barrier(2)
+        simultaneous_entry = Barrier(2)
+        overlaps: list[bool] = []
+
+        def worker() -> None:
+            start.wait()
+            with inspect_event_stream_cleanup():
+                try:
+                    simultaneous_entry.wait(timeout=1.0)
+                except BrokenBarrierError:
+                    return
+                overlaps.append(True)
+
+        with patch(
+            "gs_eval_adapters.inspect_cleanup._load_hook_api",
+            return_value=api,
+        ):
+            threads = [Thread(target=worker), Thread(target=worker)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=3.0)
+
+        self.assertTrue(all(not thread.is_alive() for thread in threads))
+        self.assertEqual(overlaps, [], "cleanup shim was installed concurrently")
+        self.assertIs(hooks.drain_sample_events, original)
 
     def test_receiver_is_closed_exactly_once(self) -> None:
         receiver = Receiver()
