@@ -6,6 +6,7 @@ on:
       - pyproject.toml
       - uv.lock
       - python/gs_eval_adapters/inspect_adapter.py
+      - python/gs_eval_adapters/inspect_cleanup.py
       - python/gs_eval_adapters/inspect_replay.py
       - tests/adapters/inspect/**
       - docs/phase-00/qualifications/inspect-ai-0.3.258.json
@@ -19,6 +20,7 @@ on:
       - pyproject.toml
       - uv.lock
       - python/gs_eval_adapters/inspect_adapter.py
+      - python/gs_eval_adapters/inspect_cleanup.py
       - python/gs_eval_adapters/inspect_replay.py
       - tests/adapters/inspect/**
       - docs/phase-00/qualifications/inspect-ai-0.3.258.json
@@ -29,6 +31,7 @@ on:
 
 permissions:
   contents: read
+  checks: read
 
 jobs:
   verify:
@@ -52,24 +55,24 @@ jobs:
           python -c "import importlib.metadata as m; assert m.version('uv') == '0.12.0'"
       - name: Verify committed Inspect dependency graph
         run: uv lock --check --python 3.12.13
-      - name: Sync frozen Python environment
-        run: uv sync --frozen
+      - name: Sync frozen Python environment without build scripts
+        run: uv sync --frozen --no-build
       - name: Verify exact qualified distributions
         run: |
-          uv run --frozen python -c "import importlib.metadata as m; assert m.version('inspect-ai') == '0.3.258'"
-          uv run --frozen python -c "import importlib.metadata as m; assert m.version('jsonschema') == '4.26.0'"
+          uv run --frozen --no-build python -c "import importlib.metadata as m; assert m.version('inspect-ai') == '0.3.258'"
+          uv run --frozen --no-build python -c "import importlib.metadata as m; assert m.version('jsonschema') == '4.26.0'"
       - name: Test Inspect adapter contract
-        run: PYTHONPATH=python:tests/adapters/inspect uv run --frozen python -m unittest discover -s tests/adapters/inspect -p 'test_*.py' -v
+        run: PYTHONPATH=python:tests/adapters/inspect uv run --frozen --no-build python -m unittest discover -s tests/adapters/inspect -p 'test_*.py' -v
       - name: Kill critical Inspect adapter mutations
-        run: PYTHONPATH=python:tests/adapters/inspect uv run --frozen python tests/adapters/inspect/run_mutations.py
+        run: PYTHONPATH=python:tests/adapters/inspect uv run --frozen --no-build python tests/adapters/inspect/run_mutations.py
       - name: Replay provider-neutral SDK contract
-        run: PYTHONPATH=python:tests/adapters uv run --frozen python -m unittest discover -s tests/adapters -p 'test_*.py' -v
+        run: PYTHONPATH=python:tests/adapters uv run --frozen --no-build python -m unittest discover -s tests/adapters -p 'test_*.py' -v
       - name: Compile Python adapter boundary
-        run: PYTHONPATH=python uv run --frozen python -m compileall -q python/gs_eval_adapters tests/adapters/inspect
+        run: PYTHONPATH=python uv run --frozen --no-build python -m compileall -q python/gs_eval_adapters tests/adapters/inspect
       - name: Replay Python toolchain contract
-        run: uv run --frozen python -m unittest -v tests/contracts/test_toolchains.py
+        run: uv run --frozen --no-build python -m unittest -v tests/contracts/test_toolchains.py
       - name: Replay sovereign schema contract
-        run: uv run --frozen python -m unittest -v tests/contracts/test_eval_ir_schemas.py
+        run: uv run --frozen --no-build python -m unittest -v tests/contracts/test_eval_ir_schemas.py
       - name: Replay Task 11 from a clean archive
         shell: bash
         run: |
@@ -78,13 +81,13 @@ jobs:
           (
             cd "$archive_dir"
             uv lock --check --python 3.12.13
-            uv sync --frozen
-            uv run --frozen python -c "import importlib.metadata as m; assert m.version('inspect-ai') == '0.3.258'"
-            PYTHONPATH=python:tests/adapters/inspect uv run --frozen python -m unittest discover -s tests/adapters/inspect -p 'test_*.py' -v
-            PYTHONPATH=python:tests/adapters uv run --frozen python -m unittest discover -s tests/adapters -p 'test_*.py' -v
-            PYTHONPATH=python uv run --frozen python -m compileall -q python/gs_eval_adapters tests/adapters/inspect
-            uv run --frozen python -m unittest -v tests/contracts/test_toolchains.py
-            uv run --frozen python -m unittest -v tests/contracts/test_eval_ir_schemas.py
+            uv sync --frozen --no-build
+            uv run --frozen --no-build python -c "import importlib.metadata as m; assert m.version('inspect-ai') == '0.3.258'"
+            PYTHONPATH=python:tests/adapters/inspect uv run --frozen --no-build python -m unittest discover -s tests/adapters/inspect -p 'test_*.py' -v
+            PYTHONPATH=python:tests/adapters uv run --frozen --no-build python -m unittest discover -s tests/adapters -p 'test_*.py' -v
+            PYTHONPATH=python uv run --frozen --no-build python -m compileall -q python/gs_eval_adapters tests/adapters/inspect
+            uv run --frozen --no-build python -m unittest -v tests/contracts/test_toolchains.py
+            uv run --frozen --no-build python -m unittest -v tests/contracts/test_eval_ir_schemas.py
           )
           rm -rf "$archive_dir"
       - name: Install Rust 1.97.1
@@ -101,3 +104,13 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Verify repository clean
         run: test -z "$(git status --porcelain=v1)"
+      - name: Classify SonarCloud evidence for exact pull request head
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXACT_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+          SONAR_PROJECT: leon36000_GitSpace
+          ALLOW_NOT_COMPUTED_EXTERNAL: 'true'
+        run: PYTHONPATH=tests/adapters/inspect python tests/adapters/inspect/sonar_evidence_gate.py

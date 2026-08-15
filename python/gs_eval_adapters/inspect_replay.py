@@ -18,6 +18,7 @@ INSPECT_WHEEL_SHA256: Final = (
     "638da28a5f3a021152481c5aa22d440a2855e462804dce2d49a44e6e47be16a4"
 )
 
+_CAS_URI_PREFIX = "cas://sha256/"
 _EXPECTED = {
     "framework": "inspect-ai",
     "framework_version": INSPECT_VERSION,
@@ -209,7 +210,7 @@ def build_replay_record(
     except JsonBoundaryError as error:
         raise AdapterContractError(str(error)) from error
     digest = hashlib.sha256(log_bytes).hexdigest()
-    if uri != f"cas://sha256/{digest}":
+    if uri != f"{_CAS_URI_PREFIX}{digest}":
         raise AdapterContractError("log URI does not match log bytes")
 
     task = clone_object(projected["task"], path="$/projection/task")
@@ -276,7 +277,7 @@ def rescore_inspect_record(
         "events_present": bool(parsed.event_types),
         "log_content_addressed": (
             parsed.log_uri
-            == f"cas://sha256/{parsed.log_sha256.removeprefix('sha256:')}"
+            == f"{_CAS_URI_PREFIX}{parsed.log_sha256.removeprefix('sha256:')}"
         ),
         "output_matches_target": matched,
         "inspect_score_agrees": agrees,
@@ -393,20 +394,34 @@ def _project_full_eval_log(log: JsonObject) -> JsonObject:
 
 def _validate_projection(projection: JsonObject) -> JsonObject:
     _exact_fields(projection, _PROJECTION_FIELDS, "inspect_projection")
+    _validate_projection_header(projection)
+    _validate_projection_task(projection["task"])
+    _validate_projection_model(projection["model"])
+    _validate_projection_solver(projection["solver"])
+    _validate_projection_scorer(projection["scorer"])
+    _validate_projection_sample(projection["sample"])
+    return clone_object(projection, path="$/projection")
+
+
+def _validate_projection_header(projection: JsonObject) -> None:
     if _exact_int(
         projection["projection_version"], "projection_version"
     ) != 1:
         raise AdapterContractError("projection version mismatch")
-    if projection["framework"] != _EXPECTED["framework"]:
-        raise AdapterContractError("projection framework mismatch")
-    if projection["framework_version"] != INSPECT_VERSION:
-        raise AdapterContractError("projection version mismatch")
-    if projection["framework_commit"] != INSPECT_COMMIT:
-        raise AdapterContractError("projection commit mismatch")
+    expected = {
+        "framework": _EXPECTED["framework"],
+        "framework_version": INSPECT_VERSION,
+        "framework_commit": INSPECT_COMMIT,
+    }
+    for field, value in expected.items():
+        if projection[field] != value:
+            raise AdapterContractError(f"projection {field} mismatch")
     if projection["eval_status"] not in {"success", "error", "cancelled"}:
         raise AdapterContractError("projection status invalid")
 
-    task = clone_object(projection["task"], path="$/projection/task")
+
+def _validate_projection_task(value: JsonValue) -> None:
+    task = clone_object(value, path="$/projection/task")
     _exact_fields(task, {"id", "name", "version"}, "projection.task")
     if (
         task["id"] != _EXPECTED["task_id"]
@@ -414,13 +429,21 @@ def _validate_projection(projection: JsonObject) -> JsonObject:
         or _exact_int(task["version"], "task.version") != 1
     ):
         raise AdapterContractError("projection task mismatch")
-    if projection["model"] != _EXPECTED["model"]:
+
+
+def _validate_projection_model(value: JsonValue) -> None:
+    if value != _EXPECTED["model"]:
         raise AdapterContractError("projection model mismatch")
 
-    solver = clone_object(projection["solver"], path="$/projection/solver")
+
+def _validate_projection_solver(value: JsonValue) -> None:
+    solver = clone_object(value, path="$/projection/solver")
     if solver != {"name": _EXPECTED["solver"]}:
         raise AdapterContractError("projection solver mismatch")
-    scorer = clone_object(projection["scorer"], path="$/projection/scorer")
+
+
+def _validate_projection_scorer(value: JsonValue) -> None:
+    scorer = clone_object(value, path="$/projection/scorer")
     _exact_fields(scorer, {"name", "options"}, "projection.scorer")
     if scorer["name"] != _EXPECTED["scorer"]:
         raise AdapterContractError("projection scorer mismatch")
@@ -430,7 +453,9 @@ def _validate_projection(projection: JsonObject) -> JsonObject:
     if options != _OPTIONS:
         raise AdapterContractError("projection scorer options mismatch")
 
-    sample = clone_object(projection["sample"], path="$/projection/sample")
+
+def _validate_projection_sample(value: JsonValue) -> None:
+    sample = clone_object(value, path="$/projection/sample")
     _exact_fields(
         sample,
         {
@@ -458,16 +483,27 @@ def _validate_projection(projection: JsonObject) -> JsonObject:
         raise AdapterContractError("projection event_types invalid")
     for event_type in events:
         _exact_nonempty_string(event_type, "sample.event_type")
-    return clone_object(projection, path="$/projection")
 
 
 def _validate_record(record: InspectReplayRecord) -> None:
+    _validate_record_version_and_identity(record)
+    _validate_record_options(record)
+    _validate_record_text(record)
+    _validate_record_status_and_score(record)
+    _validate_record_events(record)
+    _validate_record_log_reference(record)
+
+
+def _validate_record_version_and_identity(record: InspectReplayRecord) -> None:
     if type(record.version) is not int or record.version != 1:
         raise AdapterContractError("record version mismatch")
     for field, expected in _EXPECTED.items():
         actual = getattr(record, field)
         if type(actual) is not str or actual != expected:
             raise AdapterContractError(f"record {field} mismatch")
+
+
+def _validate_record_options(record: InspectReplayRecord) -> None:
     if type(record.scorer_options) is not dict:
         raise AdapterContractError("record scorer options must be an exact dict")
     try:
@@ -478,8 +514,14 @@ def _validate_record(record: InspectReplayRecord) -> None:
         raise AdapterContractError(str(error)) from error
     if options != _OPTIONS:
         raise AdapterContractError("record scorer options mismatch")
+
+
+def _validate_record_text(record: InspectReplayRecord) -> None:
     for field in ("input", "target", "output"):
         _exact_nonempty_string(getattr(record, field), f"record.{field}")
+
+
+def _validate_record_status_and_score(record: InspectReplayRecord) -> None:
     if type(record.inspect_status) is not str or record.inspect_status not in {
         "success",
         "error",
@@ -491,10 +533,16 @@ def _validate_record(record: InspectReplayRecord) -> None:
         "I",
     }:
         raise AdapterContractError("record score invalid")
+
+
+def _validate_record_events(record: InspectReplayRecord) -> None:
     if type(record.event_types) is not tuple or not record.event_types:
         raise AdapterContractError("record event_types invalid")
     for event_type in record.event_types:
         _exact_nonempty_string(event_type, "record.event_type")
+
+
+def _validate_record_log_reference(record: InspectReplayRecord) -> None:
     if type(record.log_sha256) is not str or not _DIGEST.fullmatch(
         record.log_sha256
     ):
@@ -505,7 +553,8 @@ def _validate_record(record: InspectReplayRecord) -> None:
         )
     except JsonBoundaryError as error:
         raise AdapterContractError(str(error)) from error
-    if log_uri != f"cas://sha256/{record.log_sha256.removeprefix('sha256:')}":
+    expected_uri = f"{_CAS_URI_PREFIX}{record.log_sha256.removeprefix('sha256:')}"
+    if log_uri != expected_uri:
         raise AdapterContractError("record log digest and URI disagree")
 
 
@@ -547,7 +596,7 @@ def _canonical_json_bytes(value: object) -> bytes:
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")
-    except (TypeError, ValueError, UnicodeError) as error:
+    except (TypeError, ValueError) as error:
         raise AdapterContractError("value is not canonical JSON") from error
 
 

@@ -73,15 +73,27 @@ MUTATIONS = (
         "            if False:\n",
     ),
     Mutation(
+        "bind-wrong-cleanup-api",
+        "inspect_cleanup.py",
+        '        sample_active = getattr(hooks, "sample_active")\n',
+        '        sample_active = getattr(\n            import_module("inspect_ai.util._sandbox.context"), "sample_active"\n        )\n',
+    ),
+    Mutation(
+        "drop-cleanup-serialization",
+        "inspect_cleanup.py",
+        "    with _INSPECT_CLEANUP_LOCK:\n",
+        "    if True:\n",
+    ),
+    Mutation(
         "drop-event-receiver-close",
-        "inspect_adapter.py",
-        "                await receive.aclose()\n",
+        "inspect_cleanup.py",
+        "        await receive.aclose()\n",
         "",
     ),
     Mutation(
         "drop-cleanup-shim-restore",
-        "inspect_adapter.py",
-        '        setattr(hooks, "drain_sample_events", original)\n',
+        "inspect_cleanup.py",
+        '            setattr(api.hooks, "drain_sample_events", api.original)\n',
         "",
     ),
     Mutation(
