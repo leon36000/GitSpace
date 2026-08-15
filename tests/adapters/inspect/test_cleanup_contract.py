@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from gs_eval_adapters.inspect_cleanup import (
     _close_receiver,
     _close_sender,
+    _load_hook_api,
     _reset_active_streams,
 )
 
@@ -28,6 +29,15 @@ class Sender:
 
 
 class CleanupContractTests(unittest.TestCase):
+    def test_hook_api_matches_the_pinned_official_release(self) -> None:
+        api = _load_hook_api()
+
+        self.assertEqual(api.hooks.__name__, "inspect_ai.hooks._hooks")
+        self.assertEqual(api.original.__name__, "drain_sample_events")
+        self.assertEqual(api.sample_active.__module__, "inspect_ai.log._samples")
+        self.assertEqual(api.emit_to_all.__name__, "_emit_to_all")
+        self.assertEqual(api.anyio.__name__, "anyio")
+
     def test_receiver_is_closed_exactly_once(self) -> None:
         receiver = Receiver()
         anyio = SimpleNamespace(
@@ -51,14 +61,14 @@ class CleanupContractTests(unittest.TestCase):
         active = SimpleNamespace(
             event_receive=object(),
             event_send=object(),
-            event_emitter=object(),
+            event_done=object(),
         )
 
         _reset_active_streams(active)
 
         self.assertIsNone(active.event_receive)
         self.assertIsNone(active.event_send)
-        self.assertIsNone(active.event_emitter)
+        self.assertIsNone(active.event_done)
 
 
 if __name__ == "__main__":
