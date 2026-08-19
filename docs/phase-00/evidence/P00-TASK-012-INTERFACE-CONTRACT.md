@@ -52,6 +52,7 @@ class HarborReplayRecord:
     oracle_exit_code: int | None
     job_id: str
     trial_id: str
+    harbor_process_return_code: int
     harbor_status: str
     observed_reward: int | None
     exception_type: str | None
@@ -76,12 +77,17 @@ Règles :
 - `verifier_environment_mode == "shared"`;
 - `verifier_python == "3.13.15"` pour `qualification_oracle`;
 - `agent == "oracle"` pour `qualification_oracle`;
+- `harbor_process_return_code` exact int non-bool;
+- `harbor_status` exactement `completed | exception` et dérivé de la présence de `TrialResult.exception_info`, jamais d'un message texte;
 - reward `None | exact int 0 | exact int 1`, jamais bool/float;
+- `exception_stage` vaut `None | environment_setup | agent_setup | agent_execution | verifier | unknown`;
 - IDs non vides, bornés et sans contrôle Unicode;
 - maps exactes, builtins JSON profonds uniquement;
 - URI artefact `cas://sha256/<64hex>` uniquement;
 - chaque `artifact_sha256[name]` vaut `sha256:<64hex>` et possède la même key que l'artefact correspondant;
 - `cleanup_obligations` contient un set fermé de bool exacts.
+
+Un `harbor_process_return_code != 0` est toujours `INFRA`, même si des fichiers partiels semblent fonctionnels. `harbor_status="exception"` n'est jamais à lui seul un `FAIL`: la classification dépend du type structuré, du stage et des gates supérieures.
 
 ## 3. Replay result
 
@@ -101,6 +107,7 @@ Obligations fermées :
 ```text
 qualification_pinned
 run_purpose_valid
+process_exit_zero
 network_closed
 job_cardinality_one
 trial_cardinality_one
@@ -121,12 +128,14 @@ timeout_attribution_valid
 def project_harbor_capture(capture: object) -> JsonObject: ...
 ```
 
-Entrée : builtins JSON profonds uniquement, produits par la couche adapter après extraction de `job/config.json`, `job/result.json`, `trial/config.json`, `trial/result.json`, reward, exception, timings, oracle exit status, ressources et cleanup.
+Entrée : builtins JSON profonds uniquement, produits par la couche adapter après extraction de `job/config.json`, `job/result.json`, `trial/config.json`, `trial/result.json`, return code Harbor, reward, exception, timings, oracle exit status, ressources et cleanup.
 
 Le projecteur :
 
-- exige exactement un job et un trial;
+- exige exactement un job et un trial pour un record complet;
 - extrait seulement les champs explicitement qualifiés;
+- dérive `harbor_status` de `TrialResult.exception_info is None`;
+- attribue `exception_stage` depuis types structurés et timings fermés; si le stage ne peut pas être démontré, il vaut `unknown` et la classification est `INFRA`;
 - ignore aucune clé inconnue : champ inconnu dans le noyau fermé => erreur contrat;
 - traite les noms/types/messages Harbor comme données non fiables;
 - ne lit aucun fichier, ne lance aucun process, ne contacte aucun runtime;
@@ -150,10 +159,11 @@ Règles :
 3. Chaque valeur `artifact_bytes` est `bytes` exact.
 4. SHA-256 recalculé depuis les bytes.
 5. Chaque URI CAS doit correspondre exactement au digest recalculé.
-6. `oracle_exit_status` est toujours obligatoire; le raw `oracle_exit_code` n'existe que si `present=true`.
-7. Si `present=false`, `oracle_exit_code` raw doit être absent.
-8. Si `present=true`, le raw doit exister, parser en exact int non-bool et égaler `value`.
-9. Le record contient seulement les URI et digests, jamais les blobs.
+6. `harbor_stdout` et `harbor_stderr` sont toujours conservés, même vides.
+7. `oracle_exit_status` est toujours obligatoire; le raw `oracle_exit_code` n'existe que si `present=true`.
+8. Si `present=false`, `oracle_exit_code` raw doit être absent.
+9. Si `present=true`, le raw doit exister, parser en exact int non-bool et égaler `value`.
+10. Le record contient seulement les URI et digests, jamais les blobs.
 
 ## 6. Canonical record
 
@@ -184,6 +194,8 @@ Règles :
 - loader absent, exception loader, blob non-bytes, blob manquant ou digest divergent => `INFRA`;
 - aucune écriture/réparation CAS;
 - précédence : `POLICY → INFRA → TIMEOUT → terminal`;
+- `harbor_process_return_code != 0` => `INFRA` avant toute reward;
+- `exception_stage="unknown"` avec exception présente => `INFRA`;
 - `qualification_oracle` : terminal fonctionnel admissible = PASS seulement; reward 0 ou oracle exit non-zéro => INFRA + `task_invalid_candidate=true`;
 - `status_control` : PASS ou FAIL selon reward 1/0 après gates;
 - TIMEOUT uniquement exact `AgentTimeoutError` attribué à `agent_execution`;
@@ -209,6 +221,8 @@ class HarborExecutionRequest:
 @dataclass(frozen=True, slots=True)
 class HarborExecutionCapture:
     process_return_code: int
+    harbor_stdout: bytes
+    harbor_stderr: bytes
     job_config_bytes: bytes
     job_result_bytes: bytes
     trial_config_bytes: bytes
@@ -252,7 +266,7 @@ class HarborAdapter:
     def collect(self, raw: dict[str, JsonValue]) -> dict[str, JsonValue]: ...
 ```
 
-- `prepare` utilise la validation Task 10 avant tout accès Harbor/runtime;
+- `prepare` reçoit déjà une requête validée par Task 10; il la copie sans perte avant tout accès Harbor/runtime;
 - `invoke` revalide le snapshot préparé avant real/fake executor;
 - `collect` reconstruit le record, vérifie le binding CAS, appelle le replay avec loader, puis retourne un payload Task 10 JSON;
 - classes/exceptions Harbor ne traversent jamais ces retours;
@@ -260,18 +274,29 @@ class HarborAdapter:
 
 ## 10. Compatibilité Task 10
 
-Le payload final `collect` doit pouvoir être consommé par `AdapterResult` :
+`execute_adapter` valide Task + Agent avant `prepare`, force l'égalité du `canonical_request` avant `invoke`, puis normalise `collect` vers `AdapterResult`.
+
+Le payload final `collect` doit donc contenir exactement :
 
 ```text
-adapter_identity : identité canonique Task 10
-status           : AdapterStatus
-summary          : texte Unicode mono-ligne borné
-artifacts        : URI CAS uniquement
-metrics          : exact int/float fini non-bool uniquement
-extensions       : JSON profond namespacé gitspace.harbor
+status
+summary
+artifacts
+metrics
+extensions
 ```
 
-Aucun score Harbor ne devient autorité; les métriques sont observatoires.
+avec :
+
+```text
+status     : une valeur AdapterStatus
+summary    : texte Unicode mono-ligne borné
+artifacts  : URI CAS uniquement
+metrics    : exact int/float fini non-bool uniquement
+extensions : JSON profond namespacé gitspace.harbor
+```
+
+L'`adapter_identity` est injectée par le SDK depuis `descriptor.identity`; `collect` ne la duplique pas. Aucun score Harbor ne devient autorité; les métriques sont observatoires.
 
 ## 11. RED lié à ce contrat
 
