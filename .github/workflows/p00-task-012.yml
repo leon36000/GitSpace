@@ -57,8 +57,10 @@ jobs:
           PYTHONPATH=python uv run --frozen --no-build python -c "from gs_eval_adapters.harbor_replay import HARBOR_VERSION, HARBOR_COMMIT, HARBOR_WHEEL_SHA256; assert (HARBOR_VERSION, HARBOR_COMMIT, HARBOR_WHEEL_SHA256) == ('0.21.0', '64afbbcb62165950301e1a6407c729aa26d844ff', 'c77d779a03f1a9e8ecb3c449e17f39a9728b82238832f1fd28632eb9426c0a21')"
       - name: Verify normalized offline Terminal-Bench fixture
         run: PYTHONPATH=python:tests/adapters:tests/adapters/harbor uv run --frozen --no-build python -m unittest tests.adapters.harbor.test_fixture_normalization -v
-      - name: Test Harbor adapter, SDK seam, and provider-neutral replay
+      - name: Test Harbor adapter, executor seam, and provider-neutral replay
         run: PYTHONPATH=python:tests/adapters:tests/adapters/harbor uv run --frozen --no-build python -m unittest discover -s tests/adapters/harbor -p 'test_harbor_*.py' -v
+      - name: Run Harbor mutation suite
+        run: PYTHONPATH=python:tests/adapters:tests/adapters/harbor uv run --frozen --no-build python tests/adapters/harbor/run_mutations.py
       - name: Test complete provider-neutral adapter suite
         run: PYTHONPATH=python uv run --frozen --no-build python -m unittest discover -s tests/adapters -p 'test_*.py' -v
       - name: Compile adapter boundary

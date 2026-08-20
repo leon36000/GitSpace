@@ -14,6 +14,7 @@ from gs_eval_adapters.harbor_adapter import (
     HarborAdapter,
     HarborExecutionCapture,
     HarborExecutionRequest,
+    HarborProcessResult,
     HarborSdkExecutor,
 )
 
@@ -284,6 +285,59 @@ class HarborAdapterTests(unittest.TestCase):
         with self.assertRaises(AdapterContractError):
             adapter.invoke(prepared)
 
+    def test_prepared_job_config_cannot_expand_attempts_or_retries(self) -> None:
+        adapter = HarborAdapter(MemoryCas().publish, executor=FakeHarborExecutor())
+        request = task12_request()
+        prepared = adapter.prepare(
+            {
+                "version": 1,
+                "task": deepcopy(request.task),
+                "agent": deepcopy(request.agent),
+                "seed": request.seed,
+                "extensions": deepcopy(request.extensions),
+            }
+        )
+        job_config = prepared["framework_request"]["job_config"]
+        job_config["n_attempts"] = 2
+
+        with self.assertRaises(AdapterContractError):
+            adapter.invoke(prepared)
+
+    def test_prepared_job_config_rejects_boolean_cardinality(self) -> None:
+        adapter = HarborAdapter(MemoryCas().publish, executor=FakeHarborExecutor())
+        request = task12_request()
+        prepared = adapter.prepare(
+            {
+                "version": 1,
+                "task": deepcopy(request.task),
+                "agent": deepcopy(request.agent),
+                "seed": request.seed,
+                "extensions": deepcopy(request.extensions),
+            }
+        )
+        prepared["framework_request"]["job_config"]["agents"][0]["n_concurrent"] = True
+
+        with self.assertRaises(AdapterContractError):
+            adapter.invoke(prepared)
+
+    def test_harbor_job_result_must_report_one_total_trial(self) -> None:
+        capture = _capture()
+        job_result = json.loads(capture.job_result_bytes)
+        job_result["n_total_trials"] = 2
+        capture = replace(capture, job_result_bytes=_json_bytes(job_result))
+        cas = MemoryCas()
+
+        result = execute_adapter(
+            HarborAdapter(
+                cas.publish,
+                executor=FakeHarborExecutor(capture),
+                read_artifact=cas.read,
+            ),
+            task12_request(),
+        )
+
+        self.assertIs(result.status, AdapterStatus.INFRA)
+
     def test_sdk_trial_config_without_a_top_level_id_is_still_bound_to_result(
         self,
     ) -> None:
@@ -375,6 +429,111 @@ class HarborSdkExecutorTests(unittest.TestCase):
             self.assertEqual(capture.oracle_exit_code_bytes, None)
             self.assertEqual(capture.verifier_reward_json_bytes, b'{"reward":1}')
             self.assertIn(b"terminal-bench/regex-log", capture.trial_result_bytes)
+
+    def test_default_executor_uses_exact_cli_and_minimal_worker_environment(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = root / "fixture"
+            fixture.mkdir()
+            qualified_venv = root / "qualified-venv"
+            seen: dict[str, object] = {}
+
+            def runner(
+                argv: tuple[str, ...], cwd: str, environment: dict[str, str]
+            ) -> HarborProcessResult:
+                seen["argv"] = argv
+                seen["cwd"] = cwd
+                seen["environment"] = environment
+                config_path = Path(argv[-1])
+                config = json.loads(config_path.read_bytes())
+                job_dir = Path(str(config["jobs_dir"])) / str(config["job_name"])
+                trial_dir = job_dir / "trial-1"
+                (trial_dir / "agent").mkdir(parents=True)
+                (trial_dir / "verifier").mkdir(parents=True)
+                job_dir.mkdir(parents=True, exist_ok=True)
+                (job_dir / "result.json").write_bytes(
+                    _json_bytes(
+                        {
+                            "id": "job-1",
+                            "n_total_trials": 1,
+                            "trial_results": [
+                                {
+                                    "id": "trial-1",
+                                    "trial_uri": trial_dir.resolve().as_uri(),
+                                }
+                            ],
+                        }
+                    )
+                )
+                (trial_dir / "config.json").write_bytes(_json_bytes({"id": "trial-1"}))
+                (trial_dir / "result.json").write_bytes(
+                    _json_bytes(
+                        {
+                            "id": "trial-1",
+                            "task_name": "terminal-bench/regex-log",
+                            "exception_info": None,
+                        }
+                    )
+                )
+                return HarborProcessResult(0, b"harbor stdout", b"")
+
+            request = HarborExecutionRequest(
+                run_root=str(root / "run"),
+                fixture_root=str(fixture),
+                job_config=self._job_config(),
+                environment_image_ref="local://gitspace/regex-log@sha256:" + "e" * 64,
+                environment_image_id="sha256:" + "e" * 64,
+                egress_sidecar_image_ref="local://gitspace/harbor-egress@sha256:"
+                + "f" * 64,
+                egress_sidecar_image_id="sha256:" + "f" * 64,
+            )
+            capture = HarborSdkExecutor(
+                qualified_venv=str(qualified_venv),
+                worker_environment={
+                    "DOCKER_HOST": "unix:///run/gitspace-docker.sock",
+                    "XDG_RUNTIME_DIR": str(root / "runtime"),
+                },
+                process_runner=runner,
+            ).run_oracle(request)
+
+            self.assertEqual(capture.process_return_code, 0)
+            self.assertEqual(capture.harbor_stdout, b"harbor stdout")
+            self.assertEqual(
+                seen["argv"],
+                (
+                    str(qualified_venv / "bin" / "harbor"),
+                    "run",
+                    "--config",
+                    str(root / "run" / "job-config.json"),
+                ),
+            )
+            self.assertEqual(seen["cwd"], str(root / "run"))
+            self.assertEqual(
+                set(seen["environment"]),
+                {
+                    "PATH",
+                    "HOME",
+                    "TMPDIR",
+                    "XDG_CONFIG_HOME",
+                    "XDG_CACHE_HOME",
+                    "HARBOR_TELEMETRY",
+                    "DOCKER_HOST",
+                    "XDG_RUNTIME_DIR",
+                },
+            )
+            self.assertEqual(seen["environment"]["HARBOR_TELEMETRY"], "0")
+            self.assertNotIn("SECRET_TOKEN", seen["environment"])
+
+    def test_executor_rejects_worker_environment_outside_qualification_allowlist(
+        self,
+    ) -> None:
+        with self.assertRaises(AdapterContractError):
+            HarborSdkExecutor(
+                qualified_venv="/qualified/venv",
+                worker_environment={"SECRET_TOKEN": "must-not-cross"},
+            )
 
     def test_sdk_executor_turns_worker_exception_into_infra_capture(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

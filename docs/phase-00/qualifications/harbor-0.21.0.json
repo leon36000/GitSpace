@@ -18,7 +18,8 @@
     "frozen_sync": "pass",
     "distribution_import": "pass",
     "harbor_cli_help_without_job": "pass",
-    "adapter_fake_sdk_seam": "pass",
+    "adapter_fake_executor_seam": "pass",
+    "real_executor_cli_contract": "unit_verified",
     "runtime_harbor_docker": "not_run"
   },
   "qualification_status": "implementation_ready_external_runtime_blocked",

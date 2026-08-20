@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import json
-import os
+import subprocess
 import tempfile
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Callable, Protocol
+from typing import Callable, Mapping, Protocol
 from urllib.parse import unquote, urlparse
 
 from .errors import AdapterContractError
@@ -128,27 +127,71 @@ class HarborExecutionCapture:
                 raise AdapterContractError(f"{name} must be bytes or None")
 
 
+@dataclass(frozen=True, slots=True)
+class HarborProcessResult:
+    return_code: int
+    stdout: bytes
+    stderr: bytes
+
+    def __post_init__(self) -> None:
+        if type(self.return_code) is not int:
+            raise AdapterContractError(
+                "Harbor process return code must be an exact integer"
+            )
+        if type(self.stdout) is not bytes or type(self.stderr) is not bytes:
+            raise AdapterContractError("Harbor process output must be exact bytes")
+
+
+HarborProcessRunner = Callable[
+    [tuple[str, ...], str, dict[str, str]], HarborProcessResult
+]
+
+
 class HarborExecutor(Protocol):
     def run_oracle(self, request: HarborExecutionRequest) -> HarborExecutionCapture: ...
 
 
 class HarborSdkExecutor:
-    """Run the pinned Harbor SDK and reduce its filesystem result to the seam.
+    """Run the pinned Harbor CLI and reduce its filesystem result to the seam.
 
-    The default runner is the only production path that can start Harbor. It
-    is deliberately lazy: importing the adapter and running replay tests never
-    imports or starts Docker. Tests and qualification harnesses can inject a
-    runner that writes a Harbor-shaped job directory.
+    The default process runner is the only production path that can start
+    Harbor. It is deliberately lazy: importing the adapter and running replay
+    tests never starts Docker. Tests and qualification harnesses can inject a
+    job or process runner that writes a Harbor-shaped job directory.
     """
 
     def __init__(
         self,
         *,
         job_runner: Callable[[JsonObject], None] | None = None,
+        qualified_venv: str | None = None,
+        worker_environment: Mapping[str, str] | None = None,
+        process_runner: HarborProcessRunner | None = None,
     ) -> None:
         if job_runner is not None and not callable(job_runner):
             raise AdapterContractError("job_runner must be callable or None")
+        if job_runner is not None and process_runner is not None:
+            raise AdapterContractError(
+                "job_runner and process_runner cannot both be supplied"
+            )
+        self._qualified_venv: Path | None
+        if qualified_venv is not None:
+            qualified_path = Path(_exact_string(qualified_venv, "qualified_venv"))
+            if not qualified_path.is_absolute():
+                raise AdapterContractError("qualified_venv must be absolute")
+            self._qualified_venv = qualified_path
+        else:
+            self._qualified_venv = None
+        worker_values = dict(worker_environment or {})
+        if set(worker_values) - {"DOCKER_HOST", "XDG_RUNTIME_DIR"}:
+            raise AdapterContractError(
+                "worker_environment contains an unauthorized variable"
+            )
+        for name, value in worker_values.items():
+            _exact_string(value, f"worker_environment.{name}")
         self._job_runner = job_runner
+        self._worker_environment = worker_values
+        self._process_runner = process_runner
 
     def run_oracle(self, request: HarborExecutionRequest) -> HarborExecutionCapture:
         if type(request) is not HarborExecutionRequest:
@@ -182,16 +225,54 @@ class HarborSdkExecutor:
         task_config["path"] = str(fixture_root)
         job_config["tasks"] = [task_config]
         job_config_bytes = _json_bytes(job_config)
-        (root / "executor-job-config.json").write_bytes(job_config_bytes)
+        config_path = root / "job-config.json"
+        config_path.write_bytes(job_config_bytes)
 
+        process_result: HarborProcessResult | None = None
         try:
             if self._job_runner is None:
-                _run_harbor_job(job_config)
+                if self._qualified_venv is None:
+                    raise AdapterContractError(
+                        "qualified_venv is required for the real Harbor executor"
+                    )
+                process_result = self._run_harbor_cli(root, config_path)
             else:
                 self._job_runner(job_config)
-            return self._capture_from_job(root, jobs_dir, job_name, job_config_bytes)
+                process_result = HarborProcessResult(0, b"", b"")
+            return self._capture_from_job(
+                root, jobs_dir, job_name, job_config_bytes, process_result
+            )
         except Exception as error:
-            return _failure_capture(job_config_bytes, error)
+            return _failure_capture(job_config_bytes, error, process_result)
+
+    def _run_harbor_cli(self, root: Path, config_path: Path) -> HarborProcessResult:
+        if self._qualified_venv is None:
+            raise AdapterContractError(
+                "qualified_venv is required for the real Harbor executor"
+            )
+        venv_bin = self._qualified_venv / "bin"
+        for name in ("home", "tmp", "xdg-config", "xdg-cache"):
+            (root / name).mkdir(parents=True, exist_ok=True)
+        environment = {
+            "PATH": f"{venv_bin}:/usr/bin:/bin",
+            "HOME": str(root / "home"),
+            "TMPDIR": str(root / "tmp"),
+            "XDG_CONFIG_HOME": str(root / "xdg-config"),
+            "XDG_CACHE_HOME": str(root / "xdg-cache"),
+            "HARBOR_TELEMETRY": "0",
+            **self._worker_environment,
+        }
+        argv = (
+            str(venv_bin / "harbor"),
+            "run",
+            "--config",
+            str(config_path),
+        )
+        runner = self._process_runner or _run_harbor_process
+        result = runner(argv, str(root), environment)
+        if type(result) is not HarborProcessResult:
+            raise AdapterContractError("process runner returned an unsupported result")
+        return result
 
     @staticmethod
     def _capture_from_job(
@@ -199,6 +280,7 @@ class HarborSdkExecutor:
         jobs_dir: Path,
         job_name: str,
         job_config_bytes: bytes,
+        process_result: HarborProcessResult,
     ) -> HarborExecutionCapture:
         job_dir = (jobs_dir / job_name).resolve()
         try:
@@ -237,9 +319,10 @@ class HarborSdkExecutor:
         agent_dir = trial_dir / "agent"
         verifier_dir = trial_dir / "verifier"
         return HarborExecutionCapture(
-            process_return_code=0,
-            harbor_stdout=_read_or_empty(job_dir / "job.log"),
-            harbor_stderr=_read_or_empty(job_dir / "harbor-stderr.txt"),
+            process_return_code=process_result.return_code,
+            harbor_stdout=process_result.stdout or _read_or_empty(job_dir / "job.log"),
+            harbor_stderr=process_result.stderr
+            or _read_or_empty(job_dir / "harbor-stderr.txt"),
             job_config_bytes=_read_or_empty(job_dir / "config.json")
             or job_config_bytes,
             job_result_bytes=job_result_bytes,
@@ -263,38 +346,41 @@ class HarborSdkExecutor:
         )
 
 
-def _run_harbor_job(job_config: JsonObject) -> None:
-    """Invoke Harbor 0.21.0 without going through a shell or CLI wrapper."""
-
-    from harbor import Job, JobConfig
-
-    async def run() -> None:
-        config = JobConfig.model_validate(job_config)
-        job = await Job.create(config)
-        await job.run()
-
-    previous = os.environ.get("HARBOR_TELEMETRY")
-    os.environ["HARBOR_TELEMETRY"] = "0"
-    try:
-        asyncio.run(run())
-    finally:
-        if previous is None:
-            os.environ.pop("HARBOR_TELEMETRY", None)
-        else:
-            os.environ["HARBOR_TELEMETRY"] = previous
+def _run_harbor_process(
+    argv: tuple[str, ...], cwd: str, environment: dict[str, str]
+) -> HarborProcessResult:
+    completed = subprocess.run(
+        argv,
+        cwd=cwd,
+        env=environment,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        shell=False,
+    )
+    return HarborProcessResult(
+        return_code=completed.returncode,
+        stdout=completed.stdout,
+        stderr=completed.stderr,
+    )
 
 
 def _failure_capture(
-    job_config_bytes: bytes, error: Exception
+    job_config_bytes: bytes,
+    error: Exception,
+    process_result: HarborProcessResult | None = None,
 ) -> HarborExecutionCapture:
     message = f"{type(error).__name__}: {error}".encode("utf-8", errors="replace")
     job_id = "job-failed"
     trial_id = "trial-failed"
     cleanup = _false_cleanup_bytes()
     return HarborExecutionCapture(
-        process_return_code=1,
-        harbor_stdout=b"",
-        harbor_stderr=message,
+        process_return_code=process_result.return_code if process_result else 1,
+        harbor_stdout=process_result.stdout if process_result else b"",
+        harbor_stderr=(process_result.stderr + b"\n" + message)
+        if process_result
+        else message,
         job_config_bytes=job_config_bytes,
         job_result_bytes=_json_bytes(
             {
@@ -556,6 +642,11 @@ def _capture_projection(
     trial_results = job_result.get("trial_results")
     if type(trial_results) is not list or len(trial_results) != 1:
         raise AdapterContractError("Harbor job must contain exactly one trial result")
+    if (
+        type(job_result.get("n_total_trials")) is not int
+        or job_result["n_total_trials"] != 1
+    ):
+        raise AdapterContractError("Harbor job must report exactly one total trial")
     trial_summary = _exact_object(trial_results[0], "job_result.trial_results[0]")
     summary_id = _exact_string(
         trial_summary.get("id"), "job_result.trial_results[0].id"
@@ -567,12 +658,10 @@ def _capture_projection(
     if trial_id != summary_id:
         raise AdapterContractError("Harbor job/result trial IDs differ")
     for config_id_name in ("id", "trial_id"):
-        if config_id_name in trial_config:
-            if trial_id != _exact_string(
-                trial_config[config_id_name], f"trial_config.{config_id_name}"
-            ):
-                raise AdapterContractError("Harbor trial config/result IDs differ")
-            break
+        if config_id_name in trial_config and trial_id != _exact_string(
+            trial_config[config_id_name], f"trial_config.{config_id_name}"
+        ):
+            raise AdapterContractError("Harbor trial config/result IDs differ")
     task_name = _exact_string(trial_result.get("task_name"), "trial_result.task_name")
     if task_name != TERMINAL_BENCH_TASK:
         raise AdapterContractError("Harbor trial task name is not pinned")
@@ -724,7 +813,69 @@ def _validate_framework_request(value: JsonObject) -> None:
     _digest_string(value["egress_sidecar_image_id"], "egress_sidecar_image_id")
     _bounded_string(value["environment_image_ref"], "environment_image_ref")
     _bounded_string(value["egress_sidecar_image_ref"], "egress_sidecar_image_ref")
-    clone_object(value["job_config"], path="$/framework_request/job_config")
+    _validate_job_config(value["job_config"])
+
+
+def _validate_job_config(value: object) -> None:
+    job = _exact_object(value, "job_config")
+    _require_exact_keys(
+        job,
+        {
+            "job_name",
+            "n_attempts",
+            "n_concurrent_trials",
+            "retry",
+            "environment",
+            "agents",
+            "datasets",
+            "tasks",
+        },
+        "job_config",
+    )
+    _exact_string(job["job_name"], "job_config.job_name")
+    if type(job["n_attempts"]) is not int or job["n_attempts"] != 1:
+        raise AdapterContractError("Harbor job must use exactly one attempt")
+    if type(job["n_concurrent_trials"]) is not int or job["n_concurrent_trials"] != 1:
+        raise AdapterContractError("Harbor job must use exactly one concurrent trial")
+
+    retry = _exact_object(job["retry"], "job_config.retry")
+    _require_exact_keys(retry, {"max_retries"}, "job_config.retry")
+    if type(retry["max_retries"]) is not int or retry["max_retries"] != 0:
+        raise AdapterContractError("Harbor job retries must be disabled")
+
+    environment = _exact_object(job["environment"], "job_config.environment")
+    _require_exact_keys(
+        environment,
+        {"type", "force_build", "delete"},
+        "job_config.environment",
+    )
+    if environment["type"] != "docker":
+        raise AdapterContractError("Harbor environment must use Docker")
+    if environment["force_build"] is not False:
+        raise AdapterContractError("Harbor environment force_build must be false")
+    if environment["delete"] is not True:
+        raise AdapterContractError("Harbor environment delete must be true")
+
+    agents = job["agents"]
+    if type(agents) is not list or len(agents) != 1 or type(agents[0]) is not dict:
+        raise AdapterContractError("Harbor job must contain exactly one agent")
+    agent = _exact_object(agents[0], "job_config.agents[0]")
+    _require_exact_keys(agent, {"name", "n_concurrent"}, "job_config.agents[0]")
+    if (
+        agent["name"] != "oracle"
+        or type(agent["n_concurrent"]) is not int
+        or agent["n_concurrent"] != 1
+    ):
+        raise AdapterContractError("Harbor job must use one concurrent oracle")
+
+    if type(job["datasets"]) is not list or job["datasets"] != []:
+        raise AdapterContractError("Harbor job datasets must be empty")
+    tasks = job["tasks"]
+    if type(tasks) is not list or len(tasks) != 1 or type(tasks[0]) is not dict:
+        raise AdapterContractError("Harbor job must contain exactly one task")
+    task = _exact_object(tasks[0], "job_config.tasks[0]")
+    _require_exact_keys(task, {"path"}, "job_config.tasks[0]")
+    _exact_string(task["path"], "job_config.tasks[0].path")
 
 
 def _parse_reward(value: bytes | None) -> tuple[int | None, bool]:
