@@ -1,6 +1,6 @@
 {
   "task": "P00-TASK-012",
-  "implementation_commit": "380fbe1",
+  "implementation_commit": "500a7d382133d0a2d948356d9c4eff6f6a393540",
   "dataset": {
     "repository": "harbor-framework/terminal-bench-2-1",
     "commit": "7131e4375048a0e408a8fb404b5f499d726b695b",
@@ -17,6 +17,17 @@
     "reward_artifact": "reward.json",
     "result_artifact": "gitspace-result.json",
     "source_manifest": "source-manifest.json",
+    "fixture_inventory_schema": "gitspace.harbor.fixture-inventory.v1",
+    "runtime_file_digests": {
+      "task.toml": "sha256:eb71853de4f613a6ad4e2650f12c9d5af39908b20082f6206c3378d5f67538d7",
+      "instruction.md": "sha256:4f7ac05e70cf9220ea0f1e5a052c5f908cd0fa884e847d80b0bd51bae2e96f9c",
+      "solution/solve.sh": "sha256:7e670d4f2b4bccb1e4db38f2a173e085ceda028c38167912b466b0a84fcc0999",
+      "tests/test_outputs.py": "sha256:345c3bd09ab6f6fe8c8361a58c0a47bf0a13b3fcb38a5ac7824e44ff855e8f72",
+      "tests/run_test.py": "sha256:249dd2c3896af27b943c4eb7df6d3026da388be064c940a05c812d9b2d99dcce",
+      "tests/test.sh": "sha256:32d0433e8eeee0271eb275f6a976f2704530ed3d5de6074535eab9dc01e7f88d",
+      "environment/Dockerfile": "sha256:31fa4625b97ec859d0a26b9df931eb0de5b9d313a17413dfadd528e9e9c48cb6"
+    },
+    "normalized_task_sha256": "sha256:326420682198ec5d0f07d5e28e1fdbce1549531068a086bfa19cd8c28d3cac11",
     "normalized_protocol_files": {
       "tests/run_test.py": "sha256:249dd2c3896af27b943c4eb7df6d3026da388be064c940a05c812d9b2d99dcce",
       "tests/test.sh": "sha256:32d0433e8eeee0271eb275f6a976f2704530ed3d5de6074535eab9dc01e7f88d"

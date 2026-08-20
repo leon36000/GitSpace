@@ -1,6 +1,6 @@
 {
   "task": "P00-TASK-012",
-  "implementation_commit": "380fbe1",
+  "implementation_commit": "500a7d382133d0a2d948356d9c4eff6f6a393540",
   "framework": "harbor",
   "version": "0.21.0",
   "repository": "harbor-framework/harbor",
@@ -19,7 +19,12 @@
     "exact_exception_discriminant": true,
     "stage_obligations_closed": true,
     "cleanup_obligations_physical": true,
-    "exception_boundary_cas_artifact": true
+    "exception_boundary_cas_artifact": true,
+    "effective_job_config_revalidated": true,
+    "effective_trial_config_revalidated": true,
+    "fixture_inventory_cas_bound": true,
+    "resource_observer_required_for_qualified_executor": true,
+    "internal_pythonpath_bound": true
   },
   "local_evidence": {
     "lock_check": "pass",
@@ -34,6 +39,9 @@
     "stage_obligation_classification": "pass",
     "normalized_verifier_protocol": "pass",
     "normalized_manifest_binding": "pass",
+    "fixture_inventory_binding": "pass",
+    "effective_config_adversarial_mutations": "pass",
+    "resource_observer_qualified_path": "unit_verified",
     "runtime_harbor_docker": "not_run"
   },
   "qualification_status": "implementation_ready_external_runtime_blocked",
