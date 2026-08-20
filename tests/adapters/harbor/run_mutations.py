@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import shutil
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -12,6 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 SOURCE = ROOT / "python" / "gs_eval_adapters"
 TESTS = ROOT / "tests" / "adapters" / "harbor"
+SCHEMAS = ROOT / "schemas"
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,10 +31,10 @@ MUTATIONS = (
         "    if False:\n",
     ),
     Mutation(
-        "allow-multiple-total-trials",
-        "harbor_adapter.py",
-        '    if (\n        type(job_result.get("n_total_trials")) is not int\n        or job_result["n_total_trials"] != 1\n    ):\n',
-        "    if False:\n",
+        "trust-mismatched-verifier-result",
+        "harbor_replay.py",
+        '    if reward == 1:\n        return (\n            kind == "functional_pass"\n            and result["exception_type_or_null"] is None\n            and result["exception_message_or_null"] is None\n        )\n',
+        "    if reward == 1:\n        return True\n",
     ),
     Mutation(
         "allow-boolean-agent-concurrency",
@@ -74,14 +75,14 @@ MUTATIONS = (
     Mutation(
         "skip-stage-obligation-gate",
         "harbor_replay.py",
-        '    elif not obligations["stage_obligations_consistent"]:\n',
-        "    elif False:\n",
+        '        or not obligations["stage_obligations_consistent"]\n',
+        "        or False\n",
     ),
     Mutation(
         "skip-exception-boundary-gate",
         "harbor_replay.py",
-        '    elif not obligations["exception_boundary_consistent"]:\n',
-        "    elif False:\n",
+        '        or not obligations["exception_boundary_consistent"]\n',
+        "        or False\n",
     ),
     Mutation(
         "trust-invalid-timeout-attribution",
@@ -95,10 +96,13 @@ MUTATIONS = (
 def prepare_mutant(root: Path) -> None:
     package_root = root / "python" / "gs_eval_adapters"
     tests_root = root / "tests" / "adapters" / "harbor"
+    schemas_root = root / "schemas"
     package_root.parent.mkdir(parents=True)
     tests_root.parent.mkdir(parents=True)
+    schemas_root.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(SOURCE, package_root)
     shutil.copytree(TESTS, tests_root)
+    shutil.copytree(SCHEMAS, schemas_root)
 
 
 def mutate(root: Path, mutation: Mutation) -> None:
@@ -149,6 +153,13 @@ def main() -> int:
     survivors: list[str] = []
     with tempfile.TemporaryDirectory(prefix="gitspace-task12-mutations-") as temporary:
         temporary_root = Path(temporary)
+        baseline_root = temporary_root / "baseline"
+        prepare_mutant(baseline_root)
+        baseline = run_suite(baseline_root)
+        if baseline.returncode != 0:
+            print("BASELINE FAILED")
+            print(baseline.stdout)
+            return 1
         for mutation in MUTATIONS:
             mutant_root = temporary_root / mutation.name
             prepare_mutant(mutant_root)

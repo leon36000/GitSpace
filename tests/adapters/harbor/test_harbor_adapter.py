@@ -7,6 +7,7 @@ import unittest
 from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
+from uuid import uuid4
 
 from gs_eval_adapters import AdapterRequest, AdapterStatus, execute_adapter
 from gs_eval_adapters.errors import AdapterContractError
@@ -17,6 +18,19 @@ from gs_eval_adapters.harbor_adapter import (
     HarborProcessResult,
     HarborSdkExecutor,
 )
+from gs_eval_adapters.harbor_replay import (
+    HARBOR_ENVIRONMENT_IMPORT_PATH,
+    TERMINAL_BENCH_NORMALIZED_TASK_SHA256,
+    TERMINAL_BENCH_SOURCE_TASK_SHA256,
+)
+
+SOURCE_MANIFEST_PATH = (
+    Path(__file__).resolve().parent
+    / "fixtures"
+    / "terminal-bench-2.1-regex-log"
+    / "source-manifest.json"
+)
+FIXTURE_ROOT = SOURCE_MANIFEST_PATH.parent
 
 
 def _json_bytes(value: object) -> bytes:
@@ -31,6 +45,34 @@ def _json_bytes(value: object) -> bytes:
 
 def _digest(value: bytes) -> str:
     return "sha256:" + hashlib.sha256(value).hexdigest()
+
+
+def _fixture_inventory_bytes(task_path: str = "/fixture") -> bytes:
+    relative_paths = (
+        "source-manifest.json",
+        "task.toml",
+        "instruction.md",
+        "solution/solve.sh",
+        "tests/test_outputs.py",
+        "tests/run_test.py",
+        "tests/test.sh",
+        "environment/Dockerfile",
+    )
+    files = {}
+    for relative in relative_paths:
+        content = (FIXTURE_ROOT / relative).read_bytes()
+        files[relative] = {
+            "sha256": _digest(content),
+            "bytes": len(content),
+            "mode": "0644",
+        }
+    return _json_bytes(
+        {
+            "schema": "gitspace.harbor.fixture-inventory.v1",
+            "task_path": task_path,
+            "files": files,
+        }
+    )
 
 
 def task12_request() -> AdapterRequest:
@@ -110,11 +152,13 @@ def task12_request() -> AdapterRequest:
     }
     profile = {
         "run_purpose": "qualification_oracle",
-        "source_task_sha256": "sha256:" + "c" * 64,
-        "normalized_task_sha256": "sha256:" + "d" * 64,
-        "environment_image_ref": "local://gitspace/regex-log@sha256:" + "e" * 64,
+        "source_task_sha256": TERMINAL_BENCH_SOURCE_TASK_SHA256,
+        "normalized_task_sha256": TERMINAL_BENCH_NORMALIZED_TASK_SHA256,
+        "environment_image_ref": "registry.invalid/gitspace/regex-log@sha256:"
+        + "e" * 64,
         "environment_image_id": "sha256:" + "e" * 64,
-        "egress_sidecar_image_ref": "local://gitspace/harbor-egress@sha256:" + "f" * 64,
+        "egress_sidecar_image_ref": "registry.invalid/gitspace/harbor-egress@sha256:"
+        + "f" * 64,
         "egress_sidecar_image_id": "sha256:" + "f" * 64,
     }
     return AdapterRequest(
@@ -134,6 +178,18 @@ def _capture(
     exception_discriminant: str | None = None,
     stage_obligations: dict[str, bool] | None = None,
 ) -> HarborExecutionCapture:
+    environment_image_ref = "registry.invalid/gitspace/regex-log@sha256:" + "e" * 64
+    environment_image_id = "sha256:" + "e" * 64
+    sidecar_image_ref = "registry.invalid/gitspace/harbor-egress@sha256:" + "f" * 64
+    sidecar_image_id = "sha256:" + "f" * 64
+    effective_stage = stage_obligations or {
+        "environment_started": True,
+        "agent_setup_completed": True,
+        "agent_execution_started": True,
+        "agent_execution_completed": True,
+        "verifier_started": True,
+        "verifier_completed": True,
+    }
     job_result = {
         "id": "job-1",
         "n_total_trials": 1,
@@ -142,16 +198,37 @@ def _capture(
     trial_result = {
         "id": "trial-1",
         "task_name": "terminal-bench/regex-log",
+        "trial_name": "regex-log__trial-1",
         "exception_info": exception_info,
         "exception_stage": "agent_execution" if exception_info else None,
+        "environment_setup": {
+            "started_at": "2026-08-20T00:00:00Z",
+            "finished_at": "2026-08-20T00:00:00Z",
+        }
+        if effective_stage["environment_started"]
+        else None,
+        "agent_setup": {
+            "started_at": "2026-08-20T00:00:00Z",
+            "finished_at": "2026-08-20T00:00:00Z",
+        }
+        if effective_stage["agent_setup_completed"]
+        else None,
         "agent_execution": {
             "started_at": "2026-08-20T00:00:00Z",
-            "finished_at": "2026-08-20T00:00:01Z",
-        },
+            "finished_at": "2026-08-20T00:00:01Z"
+            if effective_stage["agent_execution_completed"]
+            else None,
+        }
+        if effective_stage["agent_execution_started"]
+        else None,
         "verifier": {
             "started_at": "2026-08-20T00:00:01Z",
-            "finished_at": "2026-08-20T00:00:02Z",
-        },
+            "finished_at": "2026-08-20T00:00:02Z"
+            if effective_stage["verifier_completed"]
+            else None,
+        }
+        if effective_stage["verifier_started"]
+        else None,
     }
     cleanup = {
         "process_group_absent": True,
@@ -161,14 +238,125 @@ def _capture(
         "derived_images_absent": True,
         "foreign_resources_untouched": True,
     }
+    job_config = {
+        "job_name": "gitspace-p00-task-012-oracle",
+        "n_attempts": 1,
+        "n_concurrent_trials": 1,
+        "retry": {"max_retries": 0},
+        "environment": {
+            "import_path": HARBOR_ENVIRONMENT_IMPORT_PATH,
+            "kwargs": {
+                "gitspace_environment_image_ref": environment_image_ref,
+                "gitspace_environment_image_id": environment_image_id,
+                "gitspace_egress_sidecar_image_ref": sidecar_image_ref,
+                "gitspace_egress_sidecar_image_id": sidecar_image_id,
+            },
+        },
+        "agents": [{"name": "oracle", "n_concurrent": 1}],
+        "datasets": [],
+        "tasks": [{"path": "/fixture"}],
+    }
+    result_kind = (
+        "harness_infra"
+        if reward_json is None
+        else (
+            "functional_assertion"
+            if reward_json == b'{"reward":0}'
+            else "functional_pass"
+        )
+    )
+    result_value = {
+        "exception_message_or_null": str(
+            exception_info.get("exception_message", "harness")
+        )
+        if exception_info or reward_json is None
+        else None,
+        "exception_type_or_null": str(
+            exception_info.get("exception_type", "VerifierFailure")
+        )
+        if exception_info or reward_json is None
+        else None,
+        "kind": result_kind,
+        "schema": "gitspace.verifier.v1",
+        "test_source_sha256": TERMINAL_BENCH_SOURCE_TASK_SHA256,
+    }
+    runtime_identity = {
+        "environment_image_ref": environment_image_ref,
+        "environment_image_id": environment_image_id,
+        "egress_sidecar_image_ref": sidecar_image_ref,
+        "egress_sidecar_image_id": sidecar_image_id,
+        "environment_platform": "linux/amd64",
+        "runtime_network_mode": "no-network",
+    }
+    before_resources = [
+        {
+            "kind": "process_group",
+            "id": "gitspace-harbor-runner",
+            "owner": "gitspace",
+            "state_digest": "sha256:" + "1" * 64,
+        },
+        {
+            "kind": "temp_root",
+            "id": "gitspace-harbor-run",
+            "owner": "gitspace",
+            "state_digest": "sha256:" + "2" * 64,
+        },
+    ]
+    after_resources: list[dict[str, str]] = []
+    inventory_scope = [
+        "process_group",
+        "temp_root",
+        "container",
+        "network",
+        "derived_image",
+    ]
+
+    def inventory_digest(resources: object) -> str:
+        return _digest(_json_bytes(resources))
+
+    before_manifest = {
+        "schema": "gitspace.harbor.resource-manifest.v1",
+        "phase": "before",
+        "identity": None,
+        "resources": before_resources,
+        "inventory_complete": True,
+        "inventory_scope": inventory_scope,
+        "collector": "gitspace.harbor.resource-observer.v1",
+        "inventory_digest": inventory_digest(before_resources),
+    }
+    after_manifest = {
+        "schema": "gitspace.harbor.resource-manifest.v1",
+        "phase": "after",
+        "identity": runtime_identity,
+        "resources": after_resources,
+        "inventory_complete": True,
+        "inventory_scope": inventory_scope,
+        "collector": "gitspace.harbor.resource-observer.v1",
+        "inventory_digest": inventory_digest(after_resources),
+    }
     return HarborExecutionCapture(
         process_return_code=process_return_code,
         harbor_stdout=b"harbor stdout\n",
         harbor_stderr=b"",
-        job_config_bytes=_json_bytes({"job_name": "gitspace-p00-task-012-oracle"}),
+        job_config_bytes=_json_bytes(job_config),
         job_result_bytes=_json_bytes(job_result),
         trial_config_bytes=_json_bytes(
-            {"id": "trial-1", "task_name": "terminal-bench/regex-log"}
+            {
+                "task": {"path": "/fixture"},
+                "trial_name": "regex-log__trial-1",
+                "trials_dir": "/fixture/jobs",
+                "agent": {"name": "oracle", "n_concurrent": 1},
+                "environment": {
+                    "import_path": HARBOR_ENVIRONMENT_IMPORT_PATH,
+                    "kwargs": {
+                        "gitspace_environment_image_ref": environment_image_ref,
+                        "gitspace_environment_image_id": environment_image_id,
+                        "gitspace_egress_sidecar_image_ref": sidecar_image_ref,
+                        "gitspace_egress_sidecar_image_id": sidecar_image_id,
+                    },
+                },
+                "job_id": "job-1",
+            }
         ),
         trial_result_bytes=_json_bytes(trial_result),
         agent_stdout=b"oracle stdout\n",
@@ -177,8 +365,20 @@ def _capture(
         verifier_stdout=b"verifier stdout\n",
         verifier_stderr=b"",
         verifier_reward_json_bytes=reward_json,
-        resource_manifest_before_bytes=_json_bytes({"containers": []}),
-        resource_manifest_after_bytes=_json_bytes({"containers": []}),
+        verifier_result_json_bytes=_json_bytes(result_value),
+        source_manifest_bytes=(FIXTURE_ROOT / "source-manifest.json").read_bytes(),
+        task_toml_bytes=(FIXTURE_ROOT / "task.toml").read_bytes(),
+        instruction_md_bytes=(FIXTURE_ROOT / "instruction.md").read_bytes(),
+        solution_solve_sh_bytes=(FIXTURE_ROOT / "solution" / "solve.sh").read_bytes(),
+        test_source_bytes=(FIXTURE_ROOT / "tests" / "test_outputs.py").read_bytes(),
+        verifier_script_bytes=(FIXTURE_ROOT / "tests" / "run_test.py").read_bytes(),
+        verifier_test_script_bytes=(FIXTURE_ROOT / "tests" / "test.sh").read_bytes(),
+        environment_dockerfile_bytes=(
+            FIXTURE_ROOT / "environment" / "Dockerfile"
+        ).read_bytes(),
+        fixture_inventory_bytes=_fixture_inventory_bytes(),
+        resource_manifest_before_bytes=_json_bytes(before_manifest),
+        resource_manifest_after_bytes=_json_bytes(after_manifest),
         cleanup_report_bytes=_json_bytes(cleanup),
         exception_boundary_bytes=_json_bytes(
             {
@@ -209,6 +409,18 @@ class FakeHarborExecutor:
         return self.capture
 
 
+class FakeResourceObserver:
+    def capture_before(self, _request: HarborExecutionRequest) -> dict[str, object]:
+        return json.loads(_capture().resource_manifest_before_bytes)
+
+    def capture_after(
+        self,
+        _request: HarborExecutionRequest,
+        _process_result: HarborProcessResult,
+    ) -> dict[str, object]:
+        return json.loads(_capture().resource_manifest_after_bytes)
+
+
 class MemoryCas:
     def __init__(self) -> None:
         self.objects: dict[str, bytes] = {}
@@ -235,8 +447,28 @@ class HarborAdapterTests(unittest.TestCase):
         self.assertEqual(len(executor.requests), 1)
         self.assertEqual(executor.requests[0].job_config["n_attempts"], 1)
         self.assertEqual(executor.requests[0].job_config["n_concurrent_trials"], 1)
+        self.assertEqual(
+            executor.requests[0].job_config["environment"]["import_path"],
+            HARBOR_ENVIRONMENT_IMPORT_PATH,
+        )
+        self.assertEqual(
+            executor.requests[0].job_config["environment"]["kwargs"][
+                "gitspace_environment_image_ref"
+            ],
+            task12_request().extensions["gitspace.harbor"]["environment_image_ref"],
+        )
+        from harbor.models.job.config import JobConfig
+
+        effective = JobConfig.model_validate(
+            executor.requests[0].job_config
+        ).model_dump(exclude_defaults=True)
+        self.assertEqual(
+            effective["environment"],
+            executor.requests[0].job_config["environment"],
+        )
         self.assertIn("harbor_record", result.artifacts)
         self.assertIn("oracle_exit_status", result.artifacts)
+        self.assertIn("verifier_result_json", result.artifacts)
 
     def test_harbor_process_failure_is_infra_before_reward(self) -> None:
         cas = MemoryCas()
@@ -361,8 +593,8 @@ class HarborAdapterTests(unittest.TestCase):
         adapter = HarborAdapter(MemoryCas().publish, executor=FakeHarborExecutor())
 
         for reference in (
-            "local://gitspace/regex-log:latest",
-            "local://gitspace/regex-log@sha256:" + "0" * 64,
+            "registry.invalid/gitspace/regex-log:latest",
+            "registry.invalid/gitspace/regex-log@sha256:" + "0" * 64,
         ):
             with self.subTest(reference=reference):
                 request = task12_request()
@@ -438,8 +670,8 @@ class HarborAdapterTests(unittest.TestCase):
     ) -> None:
         capture = _capture()
         trial_config = json.loads(capture.trial_config_bytes)
-        trial_config.pop("id")
-        trial_config["trial_name"] = "trial-1"
+        self.assertNotIn("id", trial_config)
+        trial_config["trial_name"] = "regex-log__trial-1"
         capture = replace(capture, trial_config_bytes=_json_bytes(trial_config))
         cas = MemoryCas()
 
@@ -463,17 +695,61 @@ class HarborSdkExecutorTests(unittest.TestCase):
             "n_attempts": 1,
             "n_concurrent_trials": 1,
             "retry": {"max_retries": 0},
-            "environment": {"type": "docker", "force_build": False, "delete": True},
+            "environment": {
+                "import_path": HARBOR_ENVIRONMENT_IMPORT_PATH,
+                "kwargs": {
+                    "gitspace_environment_image_ref": (
+                        "registry.invalid/gitspace/regex-log@sha256:" + "e" * 64
+                    ),
+                    "gitspace_environment_image_id": "sha256:" + "e" * 64,
+                    "gitspace_egress_sidecar_image_ref": (
+                        "registry.invalid/gitspace/harbor-egress@sha256:" + "f" * 64
+                    ),
+                    "gitspace_egress_sidecar_image_id": "sha256:" + "f" * 64,
+                },
+            },
             "agents": [{"name": "oracle", "n_concurrent": 1}],
             "datasets": [],
             "tasks": [{"path": "/fixture"}],
         }
 
+    def test_pinned_harbor_trial_config_serialization_is_the_closed_effective_shape(
+        self,
+    ) -> None:
+        from harbor.models.job.config import JobConfig
+        from harbor.models.trial.config import TrialConfig
+
+        job = JobConfig.model_validate(self._job_config())
+        trial = TrialConfig(
+            task=job.tasks[0],
+            trials_dir=Path("/qualified-worker/jobs"),
+            agent=job.agents[0],
+            environment=job.environment,
+            verifier=job.verifier,
+            artifacts=job.artifacts,
+            extra_instruction_paths=job.extra_instruction_paths,
+            job_id=uuid4(),
+        )
+
+        effective = trial.model_dump(mode="json", exclude_defaults=True)
+
+        self.assertEqual(
+            set(effective),
+            {"task", "trial_name", "trials_dir", "agent", "environment", "job_id"},
+        )
+        self.assertEqual(set(effective["task"]), {"path"})
+        self.assertEqual(set(effective["agent"]), {"name", "n_concurrent"})
+        self.assertEqual(
+            set(effective["environment"]),
+            {"import_path", "kwargs"},
+        )
+        self.assertIsInstance(effective["job_id"], str)
+        self.assertTrue(effective["trial_name"])
+
     def test_sdk_executor_projects_one_trial_from_harbor_job_files(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            fixture = root / "fixture"
-            fixture.mkdir()
+            fixture = FIXTURE_ROOT
 
             def runner(config: dict[str, object]) -> None:
                 job_dir = Path(str(config["jobs_dir"])) / str(config["job_name"])
@@ -512,13 +788,17 @@ class HarborSdkExecutorTests(unittest.TestCase):
                 run_root=str(root / "run"),
                 fixture_root=str(fixture),
                 job_config=self._job_config(),
-                environment_image_ref="local://gitspace/regex-log@sha256:" + "e" * 64,
+                environment_image_ref="registry.invalid/gitspace/regex-log@sha256:"
+                + "e" * 64,
                 environment_image_id="sha256:" + "e" * 64,
-                egress_sidecar_image_ref="local://gitspace/harbor-egress@sha256:"
+                egress_sidecar_image_ref="registry.invalid/gitspace/harbor-egress@sha256:"
                 + "f" * 64,
                 egress_sidecar_image_id="sha256:" + "f" * 64,
             )
-            capture = HarborSdkExecutor(job_runner=runner).run_oracle(request)
+            capture = HarborSdkExecutor(
+                job_runner=runner,
+                resource_observer=FakeResourceObserver(),
+            ).run_oracle(request)
 
             self.assertEqual(capture.process_return_code, 0)
             self.assertEqual(capture.oracle_exit_code_bytes, None)
@@ -530,8 +810,7 @@ class HarborSdkExecutorTests(unittest.TestCase):
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            fixture = root / "fixture"
-            fixture.mkdir()
+            fixture = FIXTURE_ROOT
             qualified_venv = root / "qualified-venv"
             seen: dict[str, object] = {}
 
@@ -578,9 +857,10 @@ class HarborSdkExecutorTests(unittest.TestCase):
                 run_root=str(root / "run"),
                 fixture_root=str(fixture),
                 job_config=self._job_config(),
-                environment_image_ref="local://gitspace/regex-log@sha256:" + "e" * 64,
+                environment_image_ref="registry.invalid/gitspace/regex-log@sha256:"
+                + "e" * 64,
                 environment_image_id="sha256:" + "e" * 64,
-                egress_sidecar_image_ref="local://gitspace/harbor-egress@sha256:"
+                egress_sidecar_image_ref="registry.invalid/gitspace/harbor-egress@sha256:"
                 + "f" * 64,
                 egress_sidecar_image_id="sha256:" + "f" * 64,
             )
@@ -591,6 +871,7 @@ class HarborSdkExecutorTests(unittest.TestCase):
                     "XDG_RUNTIME_DIR": str(root / "runtime"),
                 },
                 process_runner=runner,
+                resource_observer=FakeResourceObserver(),
             ).run_oracle(request)
 
             self.assertEqual(capture.process_return_code, 0)
@@ -609,6 +890,7 @@ class HarborSdkExecutorTests(unittest.TestCase):
                 set(seen["environment"]),
                 {
                     "PATH",
+                    "PYTHONPATH",
                     "HOME",
                     "TMPDIR",
                     "XDG_CONFIG_HOME",
@@ -619,7 +901,28 @@ class HarborSdkExecutorTests(unittest.TestCase):
                 },
             )
             self.assertEqual(seen["environment"]["HARBOR_TELEMETRY"], "0")
+            self.assertEqual(
+                seen["environment"]["PYTHONPATH"],
+                str(Path(__file__).resolve().parents[3] / "python"),
+            )
             self.assertNotIn("SECRET_TOKEN", seen["environment"])
+
+    def test_executor_requires_an_independent_resource_observer(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            def runner(
+                _argv: tuple[str, ...], _cwd: str, _environment: dict[str, str]
+            ) -> HarborProcessResult:
+                return HarborProcessResult(0, b"", b"")
+
+            with self.assertRaisesRegex(
+                AdapterContractError, "resource_observer is required"
+            ):
+                HarborSdkExecutor(
+                    qualified_venv=str(root / "qualified-venv"),
+                    process_runner=runner,
+                )
 
     def test_executor_rejects_worker_environment_outside_qualification_allowlist(
         self,
@@ -628,6 +931,7 @@ class HarborSdkExecutorTests(unittest.TestCase):
             HarborSdkExecutor(
                 qualified_venv="/qualified/venv",
                 worker_environment={"SECRET_TOKEN": "must-not-cross"},
+                resource_observer=FakeResourceObserver(),
             )
 
     def test_sdk_executor_turns_worker_exception_into_infra_capture(self) -> None:
@@ -643,17 +947,23 @@ class HarborSdkExecutorTests(unittest.TestCase):
                 run_root=str(root / "run"),
                 fixture_root=str(fixture),
                 job_config=self._job_config(),
-                environment_image_ref="local://gitspace/regex-log@sha256:" + "e" * 64,
+                environment_image_ref="registry.invalid/gitspace/regex-log@sha256:"
+                + "e" * 64,
                 environment_image_id="sha256:" + "e" * 64,
-                egress_sidecar_image_ref="local://gitspace/harbor-egress@sha256:"
+                egress_sidecar_image_ref="registry.invalid/gitspace/harbor-egress@sha256:"
                 + "f" * 64,
                 egress_sidecar_image_id="sha256:" + "f" * 64,
             )
-            capture = HarborSdkExecutor(job_runner=runner).run_oracle(request)
+            capture = HarborSdkExecutor(
+                job_runner=runner,
+                resource_observer=FakeResourceObserver(),
+            ).run_oracle(request)
 
             self.assertEqual(capture.process_return_code, 1)
             self.assertIn(b"RuntimeError", capture.harbor_stderr)
             self.assertIn(b"qualified worker unavailable", capture.trial_result_bytes)
+            self.assertEqual(capture.resource_manifest_before_bytes, b"")
+            self.assertEqual(capture.resource_manifest_after_bytes, b"")
 
 
 if __name__ == "__main__":

@@ -6,7 +6,6 @@ import pathlib
 import tomllib
 import unittest
 
-
 FIXTURE = (
     pathlib.Path(__file__).resolve().parent
     / "fixtures"
@@ -99,8 +98,10 @@ class HarborFixtureNormalizationTests(unittest.TestCase):
             str(path.relative_to(FIXTURE))
             for path in FIXTURE.rglob("*")
             if path.is_file()
+            and "__pycache__" not in path.relative_to(FIXTURE).parts
+            and path.suffix != ".pyc"
         }
-        self.assertTrue(required <= present)
+        self.assertEqual(present, required)
 
     def test_normalized_manifest_binds_generated_protocol_files(self) -> None:
         manifest = json.loads(_bytes("source-manifest.json"))
@@ -113,6 +114,25 @@ class HarborFixtureNormalizationTests(unittest.TestCase):
             )
             self.assertEqual(entry["bytes"], len(content))
             self.assertEqual(entry["mode"], "0644")
+
+    def test_runtime_manifest_binds_every_runtime_fixture_file(self) -> None:
+        manifest = json.loads(_bytes("source-manifest.json"))
+        runtime_files = manifest["runtime_files"]
+        expected = {
+            "task.toml",
+            "instruction.md",
+            "solution/solve.sh",
+            "tests/test_outputs.py",
+            "tests/run_test.py",
+            "tests/test.sh",
+            "environment/Dockerfile",
+        }
+        self.assertEqual(set(runtime_files), expected)
+        for relative, digest in runtime_files.items():
+            self.assertEqual(
+                digest,
+                "sha256:" + hashlib.sha256(_bytes(relative)).hexdigest(),
+            )
 
 
 if __name__ == "__main__":

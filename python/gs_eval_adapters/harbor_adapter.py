@@ -2,20 +2,27 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
 import tempfile
-from pathlib import Path
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Callable, Mapping, Protocol
+from pathlib import Path
+from typing import Protocol
 from urllib.parse import unquote, urlparse
 
 from .errors import AdapterContractError
 from .harbor_replay import (
+    HARBOR_ARTIFACT_FIELDS,
     HARBOR_COMMIT,
+    HARBOR_ENVIRONMENT_IMPORT_PATH,
     HARBOR_VERSION,
     HARBOR_WHEEL_SHA256,
     TERMINAL_BENCH_COMMIT,
+    TERMINAL_BENCH_NORMALIZED_TASK_SHA256,
     TERMINAL_BENCH_REPOSITORY,
+    TERMINAL_BENCH_RUNTIME_FILE_DIGESTS,
+    TERMINAL_BENCH_SOURCE_TASK_SHA256,
     TERMINAL_BENCH_TASK,
     HarborReplayRecord,
     canonical_record_bytes,
@@ -26,6 +33,11 @@ from .json_boundary import JsonObject, JsonValue, clone_object, validate_cas_uri
 from .model import AdapterDescriptor, AdapterStatus
 
 _CAS_URI_PREFIX = "cas://sha256/"
+_ADAPTER_PACKAGE_ROOT = str(Path(__file__).resolve().parents[1])
+_DOCKER_IMAGE_REFERENCE = re.compile(
+    r"^(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]+)?/)?"
+    r"[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?@sha256:[0-9a-f]{64}$"
+)
 _TASK_ID = "GS-TASK-000012"
 _PROFILE_FIELDS = {
     "run_purpose",
@@ -38,24 +50,7 @@ _PROFILE_FIELDS = {
 }
 _PREPARED_FIELDS = {"canonical_request", "framework_request", "extensions"}
 _RAW_FIELDS = {"capture"}
-_ARTIFACT_FIELDS = {
-    "harbor_stdout",
-    "harbor_stderr",
-    "job_config",
-    "job_result",
-    "trial_config",
-    "trial_result",
-    "agent_stdout",
-    "agent_stderr",
-    "oracle_exit_status",
-    "verifier_stdout",
-    "verifier_stderr",
-    "verifier_reward_json",
-    "exception_boundary",
-    "resource_manifest_before",
-    "resource_manifest_after",
-    "cleanup_report",
-}
+_ARTIFACT_FIELDS = HARBOR_ARTIFACT_FIELDS
 _DIGEST = "sha256:"
 _STAGE_FIELDS = {
     "environment_started",
@@ -112,6 +107,16 @@ class HarborExecutionCapture:
     verifier_stdout: bytes
     verifier_stderr: bytes
     verifier_reward_json_bytes: bytes | None
+    verifier_result_json_bytes: bytes | None
+    source_manifest_bytes: bytes
+    task_toml_bytes: bytes
+    instruction_md_bytes: bytes
+    solution_solve_sh_bytes: bytes
+    test_source_bytes: bytes
+    verifier_script_bytes: bytes
+    verifier_test_script_bytes: bytes
+    environment_dockerfile_bytes: bytes
+    fixture_inventory_bytes: bytes
     resource_manifest_before_bytes: bytes
     resource_manifest_after_bytes: bytes
     cleanup_report_bytes: bytes
@@ -135,6 +140,15 @@ class HarborExecutionCapture:
             "agent_stderr",
             "verifier_stdout",
             "verifier_stderr",
+            "source_manifest_bytes",
+            "task_toml_bytes",
+            "instruction_md_bytes",
+            "solution_solve_sh_bytes",
+            "test_source_bytes",
+            "verifier_script_bytes",
+            "verifier_test_script_bytes",
+            "environment_dockerfile_bytes",
+            "fixture_inventory_bytes",
             "resource_manifest_before_bytes",
             "resource_manifest_after_bytes",
             "cleanup_report_bytes",
@@ -142,7 +156,11 @@ class HarborExecutionCapture:
         ):
             if type(getattr(self, name)) is not bytes:
                 raise AdapterContractError(f"{name} must be exact bytes")
-        for name in ("oracle_exit_code_bytes", "verifier_reward_json_bytes"):
+        for name in (
+            "oracle_exit_code_bytes",
+            "verifier_reward_json_bytes",
+            "verifier_result_json_bytes",
+        ):
             value = getattr(self, name)
             if value is not None and type(value) is not bytes:
                 raise AdapterContractError(f"{name} must be bytes or None")
@@ -185,6 +203,14 @@ class HarborExecutor(Protocol):
     def run_oracle(self, request: HarborExecutionRequest) -> HarborExecutionCapture: ...
 
 
+class HarborResourceObserver(Protocol):
+    def capture_before(self, request: HarborExecutionRequest) -> JsonObject: ...
+
+    def capture_after(
+        self, request: HarborExecutionRequest, process_result: HarborProcessResult
+    ) -> JsonObject: ...
+
+
 class HarborSdkExecutor:
     """Run the pinned Harbor CLI and reduce its filesystem result to the seam.
 
@@ -201,6 +227,7 @@ class HarborSdkExecutor:
         qualified_venv: str | None = None,
         worker_environment: Mapping[str, str] | None = None,
         process_runner: HarborProcessRunner | None = None,
+        resource_observer: HarborResourceObserver | None = None,
     ) -> None:
         if job_runner is not None and not callable(job_runner):
             raise AdapterContractError("job_runner must be callable or None")
@@ -226,6 +253,15 @@ class HarborSdkExecutor:
         self._job_runner = job_runner
         self._worker_environment = worker_values
         self._process_runner = process_runner
+        if resource_observer is None:
+            raise AdapterContractError("resource_observer is required")
+        if not callable(
+            getattr(resource_observer, "capture_before", None)
+        ) or not callable(getattr(resource_observer, "capture_after", None)):
+            raise AdapterContractError(
+                "resource_observer must provide capture_before/capture_after"
+            )
+        self._resource_observer = resource_observer
 
     def run_oracle(self, request: HarborExecutionRequest) -> HarborExecutionCapture:
         if type(request) is not HarborExecutionRequest:
@@ -264,6 +300,10 @@ class HarborSdkExecutor:
 
         process_result: HarborProcessResult | None = None
         try:
+            resource_manifest_before_bytes = _observer_manifest_bytes(
+                self._resource_observer.capture_before(request),
+                "resource_observer.capture_before",
+            )
             if self._job_runner is None:
                 if self._qualified_venv is None:
                     raise AdapterContractError(
@@ -273,10 +313,23 @@ class HarborSdkExecutor:
             else:
                 self._job_runner(job_config)
                 process_result = HarborProcessResult(0, b"", b"")
-            return self._capture_from_job(
-                root, jobs_dir, job_name, job_config_bytes, process_result
+            if process_result is None:
+                raise AdapterContractError("Harbor process result was not captured")
+            resource_manifest_after_bytes = _observer_manifest_bytes(
+                self._resource_observer.capture_after(request, process_result),
+                "resource_observer.capture_after",
             )
-        except Exception as error:
+            return self._capture_from_job(
+                root,
+                fixture_root,
+                jobs_dir,
+                job_name,
+                job_config_bytes,
+                process_result,
+                resource_manifest_before_bytes,
+                resource_manifest_after_bytes,
+            )
+        except Exception as error:  # noqa: BLE001 - worker failures become infra evidence
             return _failure_capture(job_config_bytes, error, process_result)
 
     def _run_harbor_cli(self, root: Path, config_path: Path) -> HarborProcessResult:
@@ -289,6 +342,7 @@ class HarborSdkExecutor:
             (root / name).mkdir(parents=True, exist_ok=True)
         environment = {
             "PATH": f"{venv_bin}:/usr/bin:/bin",
+            "PYTHONPATH": _ADAPTER_PACKAGE_ROOT,
             "HOME": str(root / "home"),
             "TMPDIR": str(root / "tmp"),
             "XDG_CONFIG_HOME": str(root / "xdg-config"),
@@ -311,10 +365,13 @@ class HarborSdkExecutor:
     @staticmethod
     def _capture_from_job(
         root: Path,
+        fixture_root: Path,
         jobs_dir: Path,
         job_name: str,
         job_config_bytes: bytes,
         process_result: HarborProcessResult,
+        resource_manifest_before_bytes: bytes,
+        resource_manifest_after_bytes: bytes,
     ) -> HarborExecutionCapture:
         job_dir = (jobs_dir / job_name).resolve()
         try:
@@ -375,12 +432,32 @@ class HarborSdkExecutor:
             verifier_stdout=_read_or_empty(verifier_dir / "test-stdout.txt"),
             verifier_stderr=_read_or_empty(verifier_dir / "test-stderr.txt"),
             verifier_reward_json_bytes=_read_optional(verifier_dir / "reward.json"),
-            resource_manifest_before_bytes=_read_or_default(
-                root / "resource-manifest-before.json", _json_bytes({"present": False})
+            verifier_result_json_bytes=_read_optional(
+                verifier_dir / "gitspace-result.json"
             ),
-            resource_manifest_after_bytes=_read_or_default(
-                root / "resource-manifest-after.json", _json_bytes({"present": False})
+            source_manifest_bytes=_read_or_default(
+                fixture_root / "source-manifest.json", b""
             ),
+            task_toml_bytes=_read_or_default(fixture_root / "task.toml", b""),
+            instruction_md_bytes=_read_or_default(fixture_root / "instruction.md", b""),
+            solution_solve_sh_bytes=_read_or_default(
+                fixture_root / "solution" / "solve.sh", b""
+            ),
+            test_source_bytes=_read_or_default(
+                fixture_root / "tests" / "test_outputs.py", b""
+            ),
+            verifier_script_bytes=_read_or_default(
+                fixture_root / "tests" / "run_test.py", b""
+            ),
+            verifier_test_script_bytes=_read_or_default(
+                fixture_root / "tests" / "test.sh", b""
+            ),
+            environment_dockerfile_bytes=_read_or_default(
+                fixture_root / "environment" / "Dockerfile", b""
+            ),
+            fixture_inventory_bytes=_fixture_inventory_bytes(fixture_root),
+            resource_manifest_before_bytes=resource_manifest_before_bytes,
+            resource_manifest_after_bytes=resource_manifest_after_bytes,
             cleanup_report_bytes=_read_or_default(
                 root / "cleanup-report.json", _false_cleanup_bytes()
             ),
@@ -398,8 +475,7 @@ def _run_harbor_process(
         cwd=cwd,
         env=environment,
         stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
         check=False,
         shell=False,
     )
@@ -453,8 +529,18 @@ def _failure_capture(
         verifier_stdout=b"",
         verifier_stderr=b"",
         verifier_reward_json_bytes=None,
-        resource_manifest_before_bytes=_json_bytes({"present": False}),
-        resource_manifest_after_bytes=_json_bytes({"present": False}),
+        verifier_result_json_bytes=None,
+        source_manifest_bytes=b"",
+        task_toml_bytes=b"",
+        instruction_md_bytes=b"",
+        solution_solve_sh_bytes=b"",
+        test_source_bytes=b"",
+        verifier_script_bytes=b"",
+        verifier_test_script_bytes=b"",
+        environment_dockerfile_bytes=b"",
+        fixture_inventory_bytes=b"",
+        resource_manifest_before_bytes=b"",
+        resource_manifest_after_bytes=b"",
         cleanup_report_bytes=cleanup,
         exception_boundary_bytes=_json_bytes(
             {"discriminant": "other_exception", "stage": "unknown"}
@@ -485,6 +571,46 @@ def _false_cleanup_bytes() -> bytes:
             "networks_absent": False,
             "derived_images_absent": False,
             "foreign_resources_untouched": False,
+        }
+    )
+
+
+def _observer_manifest_bytes(value: object, label: str) -> bytes:
+    if type(value) is not dict:
+        raise AdapterContractError(f"{label} must return an exact dict")
+    return _json_bytes(clone_object(value, path=f"$/{label}"))
+
+
+def _fixture_inventory_bytes(fixture_root: Path) -> bytes:
+    root = fixture_root.resolve()
+    if not root.is_dir():
+        raise AdapterContractError("Harbor fixture root must be an existing directory")
+    files: dict[str, JsonValue] = {}
+    for path in sorted(root.rglob("*"), key=lambda item: str(item.relative_to(root))):
+        relative = path.relative_to(root)
+        if "__pycache__" in relative.parts or path.suffix == ".pyc":
+            continue
+        if path.is_dir():
+            continue
+        if path.is_symlink() or not path.is_file():
+            raise AdapterContractError(
+                f"Harbor fixture contains an unsupported runtime entry: {relative}"
+            )
+        content = path.read_bytes()
+        files[str(relative)] = {
+            "sha256": _DIGEST + hashlib.sha256(content).hexdigest(),
+            "bytes": len(content),
+            "mode": "0644",
+        }
+    if set(files) != {"source-manifest.json", *TERMINAL_BENCH_RUNTIME_FILE_DIGESTS}:
+        raise AdapterContractError(
+            "Harbor fixture inventory is not the locked file set"
+        )
+    return _json_bytes(
+        {
+            "schema": "gitspace.harbor.fixture-inventory.v1",
+            "task_path": str(root),
+            "files": files,
         }
     )
 
@@ -526,6 +652,18 @@ class HarborAdapter:
             raise AdapterContractError(f"Harbor adapter requires {_TASK_ID}")
         profile = _profile(canonical["extensions"])
         fixture_root = str(_fixture_root())
+        environment_image_ref = _exact_string(
+            profile["environment_image_ref"], "environment_image_ref"
+        )
+        environment_image_id = _exact_string(
+            profile["environment_image_id"], "environment_image_id"
+        )
+        egress_sidecar_image_ref = _exact_string(
+            profile["egress_sidecar_image_ref"], "egress_sidecar_image_ref"
+        )
+        egress_sidecar_image_id = _exact_string(
+            profile["egress_sidecar_image_id"], "egress_sidecar_image_id"
+        )
         framework_request: JsonObject = {
             "framework": "harbor",
             "framework_version": HARBOR_VERSION,
@@ -546,7 +684,13 @@ class HarborAdapter:
             "agent": "oracle",
             "egress_sidecar_image_ref": profile["egress_sidecar_image_ref"],
             "egress_sidecar_image_id": profile["egress_sidecar_image_id"],
-            "job_config": _job_config(fixture_root),
+            "job_config": _job_config(
+                fixture_root,
+                environment_image_ref=environment_image_ref,
+                environment_image_id=environment_image_id,
+                egress_sidecar_image_ref=egress_sidecar_image_ref,
+                egress_sidecar_image_id=egress_sidecar_image_id,
+            ),
         }
         return {
             "canonical_request": canonical,
@@ -638,6 +782,16 @@ class HarborAdapter:
             "verifier_stdout": capture.verifier_stdout,
             "verifier_stderr": capture.verifier_stderr,
             "verifier_reward_json": capture.verifier_reward_json_bytes or b"",
+            "verifier_result_json": capture.verifier_result_json_bytes or b"",
+            "source_manifest": capture.source_manifest_bytes,
+            "task_toml": capture.task_toml_bytes,
+            "instruction_md": capture.instruction_md_bytes,
+            "solution_solve_sh": capture.solution_solve_sh_bytes,
+            "test_source": capture.test_source_bytes,
+            "verifier_script": capture.verifier_script_bytes,
+            "verifier_test_script": capture.verifier_test_script_bytes,
+            "environment_dockerfile": capture.environment_dockerfile_bytes,
+            "fixture_inventory": capture.fixture_inventory_bytes,
             "exception_boundary": capture.exception_boundary_bytes,
             "resource_manifest_before": capture.resource_manifest_before_bytes,
             "resource_manifest_after": capture.resource_manifest_after_bytes,
@@ -818,13 +972,28 @@ def _profile(extensions: object) -> JsonObject:
     return profile_object
 
 
-def _job_config(fixture_root: str) -> JsonObject:
+def _job_config(
+    fixture_root: str,
+    *,
+    environment_image_ref: str,
+    environment_image_id: str,
+    egress_sidecar_image_ref: str,
+    egress_sidecar_image_id: str,
+) -> JsonObject:
     return {
         "job_name": "gitspace-p00-task-012-oracle",
         "n_attempts": 1,
         "n_concurrent_trials": 1,
         "retry": {"max_retries": 0},
-        "environment": {"type": "docker", "force_build": False, "delete": True},
+        "environment": {
+            "import_path": HARBOR_ENVIRONMENT_IMPORT_PATH,
+            "kwargs": {
+                "gitspace_environment_image_ref": environment_image_ref,
+                "gitspace_environment_image_id": environment_image_id,
+                "gitspace_egress_sidecar_image_ref": egress_sidecar_image_ref,
+                "gitspace_egress_sidecar_image_id": egress_sidecar_image_id,
+            },
+        },
         "agents": [{"name": "oracle", "n_concurrent": 1}],
         "datasets": [],
         "tasks": [{"path": fixture_root}],
@@ -880,8 +1049,10 @@ def _validate_framework_request(value: JsonObject) -> None:
         raise AdapterContractError("Harbor verifier environment is not pinned")
     if value["agent"] != "oracle":
         raise AdapterContractError("Harbor qualification must use oracle")
-    _digest_string(value["source_task_sha256"], "source_task_sha256")
-    _digest_string(value["normalized_task_sha256"], "normalized_task_sha256")
+    if value["source_task_sha256"] != TERMINAL_BENCH_SOURCE_TASK_SHA256:
+        raise AdapterContractError("source task digest is not locked")
+    if value["normalized_task_sha256"] != TERMINAL_BENCH_NORMALIZED_TASK_SHA256:
+        raise AdapterContractError("normalized task digest is not locked")
     _digest_string(value["environment_image_id"], "environment_image_id")
     _digest_string(value["egress_sidecar_image_id"], "egress_sidecar_image_id")
     _image_reference(
@@ -894,10 +1065,23 @@ def _validate_framework_request(value: JsonObject) -> None:
         "egress_sidecar_image_ref",
         value["egress_sidecar_image_id"],
     )
-    _validate_job_config(value["job_config"])
+    _validate_job_config(
+        value["job_config"],
+        environment_image_ref=value["environment_image_ref"],
+        environment_image_id=value["environment_image_id"],
+        egress_sidecar_image_ref=value["egress_sidecar_image_ref"],
+        egress_sidecar_image_id=value["egress_sidecar_image_id"],
+    )
 
 
-def _validate_job_config(value: object) -> None:
+def _validate_job_config(
+    value: object,
+    *,
+    environment_image_ref: object | None = None,
+    environment_image_id: object | None = None,
+    egress_sidecar_image_ref: object | None = None,
+    egress_sidecar_image_id: object | None = None,
+) -> None:
     job = _exact_object(value, "job_config")
     _require_exact_keys(
         job,
@@ -927,15 +1111,73 @@ def _validate_job_config(value: object) -> None:
     environment = _exact_object(job["environment"], "job_config.environment")
     _require_exact_keys(
         environment,
-        {"type", "force_build", "delete"},
+        {"import_path", "kwargs"},
         "job_config.environment",
     )
-    if environment["type"] != "docker":
-        raise AdapterContractError("Harbor environment must use Docker")
-    if environment["force_build"] is not False:
-        raise AdapterContractError("Harbor environment force_build must be false")
-    if environment["delete"] is not True:
-        raise AdapterContractError("Harbor environment delete must be true")
+    if environment["import_path"] != HARBOR_ENVIRONMENT_IMPORT_PATH:
+        raise AdapterContractError("Harbor environment import path is not pinned")
+    gitspace = _exact_object(environment["kwargs"], "job_config.environment.kwargs")
+    _require_exact_keys(
+        gitspace,
+        {
+            "gitspace_environment_image_ref",
+            "gitspace_environment_image_id",
+            "gitspace_egress_sidecar_image_ref",
+            "gitspace_egress_sidecar_image_id",
+        },
+        "job_config.environment.kwargs",
+    )
+    environment_ref = _exact_string(
+        gitspace["gitspace_environment_image_ref"],
+        "job_config.environment.kwargs.gitspace_environment_image_ref",
+    )
+    environment_image_id_value = _exact_string(
+        gitspace["gitspace_environment_image_id"],
+        "job_config.environment.kwargs.gitspace_environment_image_id",
+    )
+    sidecar_image_id = _exact_string(
+        gitspace["gitspace_egress_sidecar_image_id"],
+        "job_config.environment.kwargs.gitspace_egress_sidecar_image_id",
+    )
+    sidecar_image_ref = _exact_string(
+        gitspace["gitspace_egress_sidecar_image_ref"],
+        "job_config.environment.kwargs.gitspace_egress_sidecar_image_ref",
+    )
+    _image_reference(
+        environment_ref,
+        "job_config.environment.kwargs.gitspace_environment_image_ref",
+        environment_image_id_value,
+    )
+    _image_reference(
+        sidecar_image_ref,
+        "job_config.environment.kwargs.gitspace_egress_sidecar_image_ref",
+        sidecar_image_id,
+    )
+    if environment_image_ref is not None and environment_ref != environment_image_ref:
+        raise AdapterContractError(
+            "Harbor job environment image differs from the framework request"
+        )
+    if (
+        environment_image_id is not None
+        and environment_image_id_value != environment_image_id
+    ):
+        raise AdapterContractError(
+            "Harbor job environment image identity differs from the framework request"
+        )
+    if (
+        egress_sidecar_image_ref is not None
+        and sidecar_image_ref != egress_sidecar_image_ref
+    ):
+        raise AdapterContractError(
+            "Harbor job sidecar image differs from the framework request"
+        )
+    if (
+        egress_sidecar_image_id is not None
+        and sidecar_image_id != egress_sidecar_image_id
+    ):
+        raise AdapterContractError(
+            "Harbor job sidecar identity differs from the framework request"
+        )
 
     agents = job["agents"]
     if type(agents) is not list or len(agents) != 1 or type(agents[0]) is not dict:
@@ -1121,6 +1363,8 @@ def _image_reference(value: object, label: str, image_id: object) -> str:
     digest = _digest_string(image_id, f"{label}.id")
     if "@" not in reference or reference.rsplit("@", 1)[1] != digest:
         raise AdapterContractError(f"{label} must be bound to its image digest")
+    if _DOCKER_IMAGE_REFERENCE.fullmatch(reference) is None:
+        raise AdapterContractError(f"{label} must be a valid Docker reference")
     return reference
 
 
