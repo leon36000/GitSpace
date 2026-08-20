@@ -1,0 +1,27 @@
+{
+  "task": "P00-TASK-012",
+  "framework": "harbor",
+  "version": "0.21.0",
+  "repository": "harbor-framework/harbor",
+  "commit": "64afbbcb62165950301e1a6407c729aa26d844ff",
+  "distribution": {
+    "wheel_sha256": "c77d779a03f1a9e8ecb3c449e17f39a9728b82238832f1fd28632eb9426c0a21",
+    "sdist_sha256": "93f7c2e4b150b2983a90b226c61daf071c35a9dd0f76e1053413d9ee0d738395"
+  },
+  "toolchain": {
+    "python": "3.12.13",
+    "uv": "0.12.0",
+    "verifier_python": "3.13.15"
+  },
+  "local_evidence": {
+    "lock_check": "pass",
+    "frozen_sync": "pass",
+    "distribution_import": "pass",
+    "harbor_cli_help_without_job": "pass",
+    "adapter_fake_sdk_seam": "pass",
+    "runtime_harbor_docker": "not_run"
+  },
+  "qualification_status": "implementation_ready_external_runtime_blocked",
+  "runtime_blocker": "The project forbids starting Harbor/Docker on the shared PC1 host; a dedicated qualified worker must provide no-network, egress-sidecar, cleanup, and independent identity evidence.",
+  "checked_at": "2026-08-20"
+}

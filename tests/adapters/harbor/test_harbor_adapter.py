@@ -1,0 +1,406 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import tempfile
+import unittest
+from copy import deepcopy
+from dataclasses import replace
+from pathlib import Path
+
+from gs_eval_adapters import AdapterRequest, AdapterStatus, execute_adapter
+from gs_eval_adapters.errors import AdapterContractError
+from gs_eval_adapters.harbor_adapter import (
+    HarborAdapter,
+    HarborExecutionCapture,
+    HarborExecutionRequest,
+    HarborSdkExecutor,
+)
+
+
+def _json_bytes(value: object) -> bytes:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        allow_nan=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def _digest(value: bytes) -> str:
+    return "sha256:" + hashlib.sha256(value).hexdigest()
+
+
+def task12_request() -> AdapterRequest:
+    task = {
+        "id": "GS-TASK-000012",
+        "version": 1,
+        "lane": "L01",
+        "origin": {
+            "kind": "imported",
+            "source": "terminal-bench-2.1@7131e437",
+            "license": "UNKNOWN",
+            "contamination_risk": "low",
+        },
+        "intent": {
+            "owner_outcome": "Create the regex-log solution file.",
+            "explicit_requirements": ["use the normalized regex-log fixture"],
+            "latent_requirements": [],
+            "non_goals": ["network access", "external model"],
+            "allowed_ambiguities": [],
+        },
+        "world_fixture": {
+            "version": 1,
+            "base_artifact_digest": "sha256:" + "a" * 64,
+            "environment_digest": "sha256:" + "b" * 64,
+            "services": [],
+            "initial_state_digest": "sha256:" + "a" * 64,
+            "extensions": {},
+        },
+        "authority": {
+            "allowed_actions": ["adapter.invoke", "artifact.publish"],
+            "forbidden_actions": ["network.use", "external_model.invoke"],
+            "scope_boundaries": ["adapter://harbor/controlled"],
+            "required_approvals": [],
+        },
+        "obligations": {
+            "visible": ["oracle reward is one"],
+            "protected": ["replay agrees"],
+            "runtime": ["no network", "cleanup"],
+        },
+        "budgets": {
+            "wall_time_seconds": 60,
+            "token_limit": 0,
+            "cost_limit_usd": 0.0,
+            "tool_calls": 4,
+        },
+        "evaluation": {
+            "version": 1,
+            "public_checks": ["check://harbor/regex-log"],
+            "hidden_oracles": ["oracle://harbor/replay"],
+            "mutation_set": ["mutation://harbor/reward"],
+            "adversarial_variants": ["variant://harbor/no-network"],
+            "cleanup_oracle": "oracle://harbor/cleanup",
+            "replay_oracle": "oracle://harbor/replay",
+            "extensions": {},
+        },
+        "qa": {
+            "author_id": "reviewer://task12/author",
+            "independent_reviewer_id": "reviewer://task12/verifier",
+            "human_solution_digest": "sha256:" + "a" * 64,
+            "known_exploits": [],
+        },
+        "extensions": {},
+    }
+    agent = {
+        "version": 1,
+        "harness": "harbor",
+        "harness_version": "0.21.0",
+        "model": "none",
+        "model_version": "none",
+        "provider": "none",
+        "model_parameters": {},
+        "system_instructions_digest": "sha256:" + "a" * 64,
+        "tools_digest": "sha256:" + "b" * 64,
+        "context_digest": "sha256:" + "a" * 64,
+        "memory_digest": "sha256:" + "b" * 64,
+        "extensions": {},
+    }
+    profile = {
+        "run_purpose": "qualification_oracle",
+        "source_task_sha256": "sha256:" + "c" * 64,
+        "normalized_task_sha256": "sha256:" + "d" * 64,
+        "environment_image_ref": "local://gitspace/regex-log@sha256:" + "e" * 64,
+        "environment_image_id": "sha256:" + "e" * 64,
+        "egress_sidecar_image_ref": "local://gitspace/harbor-egress@sha256:" + "f" * 64,
+        "egress_sidecar_image_id": "sha256:" + "f" * 64,
+    }
+    return AdapterRequest(
+        task=task,
+        agent=agent,
+        seed=12,
+        extensions={"gitspace.harbor": profile},
+    )
+
+
+def _capture(
+    *,
+    process_return_code: int = 0,
+    reward_json: bytes | None = b'{"reward":1}',
+    oracle_exit: bytes | None = None,
+    exception_info: dict[str, object] | None = None,
+) -> HarborExecutionCapture:
+    job_result = {
+        "id": "job-1",
+        "n_total_trials": 1,
+        "trial_results": [{"id": "trial-1"}],
+    }
+    trial_result = {
+        "id": "trial-1",
+        "task_name": "terminal-bench/regex-log",
+        "exception_info": exception_info,
+        "exception_stage": "agent_execution" if exception_info else None,
+        "agent_execution": {
+            "started_at": "2026-08-20T00:00:00Z",
+            "finished_at": "2026-08-20T00:00:01Z",
+        },
+        "verifier": {
+            "started_at": "2026-08-20T00:00:01Z",
+            "finished_at": "2026-08-20T00:00:02Z",
+        },
+    }
+    cleanup = {
+        "run_root_clean": True,
+        "agent_processes_clean": True,
+        "containers_clean": True,
+        "foreign_resources_unchanged": True,
+        "workspace_removed": True,
+    }
+    return HarborExecutionCapture(
+        process_return_code=process_return_code,
+        harbor_stdout=b"harbor stdout\n",
+        harbor_stderr=b"",
+        job_config_bytes=_json_bytes({"job_name": "gitspace-p00-task-012-oracle"}),
+        job_result_bytes=_json_bytes(job_result),
+        trial_config_bytes=_json_bytes(
+            {"id": "trial-1", "task_name": "terminal-bench/regex-log"}
+        ),
+        trial_result_bytes=_json_bytes(trial_result),
+        agent_stdout=b"oracle stdout\n",
+        agent_stderr=b"",
+        oracle_exit_code_bytes=oracle_exit,
+        verifier_stdout=b"verifier stdout\n",
+        verifier_stderr=b"",
+        verifier_reward_json_bytes=reward_json,
+        resource_manifest_before_bytes=_json_bytes({"containers": []}),
+        resource_manifest_after_bytes=_json_bytes({"containers": []}),
+        cleanup_report_bytes=_json_bytes(cleanup),
+    )
+
+
+class FakeHarborExecutor:
+    def __init__(self, capture: HarborExecutionCapture | None = None) -> None:
+        self.capture = capture or _capture()
+        self.requests: list[HarborExecutionRequest] = []
+
+    def run_oracle(self, request: HarborExecutionRequest) -> HarborExecutionCapture:
+        self.requests.append(request)
+        return self.capture
+
+
+class MemoryCas:
+    def __init__(self) -> None:
+        self.objects: dict[str, bytes] = {}
+
+    def publish(self, content: bytes) -> str:
+        uri = "cas://sha256/" + _digest(content).removeprefix("sha256:")
+        self.objects[uri] = content
+        return uri
+
+    def read(self, uri: str) -> bytes:
+        return self.objects[uri]
+
+
+class HarborAdapterTests(unittest.TestCase):
+    def test_fake_oracle_passes_through_sdk_and_publishes_cas_evidence(self) -> None:
+        cas = MemoryCas()
+        executor = FakeHarborExecutor()
+        result = execute_adapter(
+            HarborAdapter(cas.publish, executor=executor, read_artifact=cas.read),
+            task12_request(),
+        )
+
+        self.assertIs(result.status, AdapterStatus.PASS)
+        self.assertEqual(len(executor.requests), 1)
+        self.assertEqual(executor.requests[0].job_config["n_attempts"], 1)
+        self.assertEqual(executor.requests[0].job_config["n_concurrent_trials"], 1)
+        self.assertIn("harbor_record", result.artifacts)
+        self.assertIn("oracle_exit_status", result.artifacts)
+
+    def test_harbor_process_failure_is_infra_before_reward(self) -> None:
+        cas = MemoryCas()
+        result = execute_adapter(
+            HarborAdapter(
+                cas.publish,
+                executor=FakeHarborExecutor(_capture(process_return_code=17)),
+                read_artifact=cas.read,
+            ),
+            task12_request(),
+        )
+
+        self.assertIs(result.status, AdapterStatus.INFRA)
+
+    def test_malformed_reward_is_infra(self) -> None:
+        cas = MemoryCas()
+        result = execute_adapter(
+            HarborAdapter(
+                cas.publish,
+                executor=FakeHarborExecutor(_capture(reward_json=b'{"reward":1.0}')),
+                read_artifact=cas.read,
+            ),
+            task12_request(),
+        )
+
+        self.assertIs(result.status, AdapterStatus.INFRA)
+
+    def test_oracle_nonzero_is_infra_and_candidate_invalid(self) -> None:
+        cas = MemoryCas()
+        result = execute_adapter(
+            HarborAdapter(
+                cas.publish,
+                executor=FakeHarborExecutor(_capture(oracle_exit=b"7\n")),
+                read_artifact=cas.read,
+            ),
+            task12_request(),
+        )
+
+        self.assertIs(result.status, AdapterStatus.INFRA)
+        self.assertEqual(
+            result.extensions["gitspace.harbor"]["task_invalid_candidate"], True
+        )
+
+    def test_missing_cas_reader_is_infra_not_pass(self) -> None:
+        result = execute_adapter(
+            HarborAdapter(MemoryCas().publish, executor=FakeHarborExecutor()),
+            task12_request(),
+        )
+
+        self.assertIs(result.status, AdapterStatus.INFRA)
+
+    def test_prepared_request_is_not_authorized_to_change_profile(self) -> None:
+        adapter = HarborAdapter(MemoryCas().publish, executor=FakeHarborExecutor())
+        prepared = adapter.prepare(
+            {
+                "version": 1,
+                "task": deepcopy(task12_request().task),
+                "agent": deepcopy(task12_request().agent),
+                "seed": 12,
+                "extensions": deepcopy(task12_request().extensions),
+            }
+        )
+        prepared["framework_request"]["environment_platform"] = "windows"
+
+        with self.assertRaises(AdapterContractError):
+            adapter.invoke(prepared)
+
+    def test_sdk_trial_config_without_a_top_level_id_is_still_bound_to_result(
+        self,
+    ) -> None:
+        capture = _capture()
+        trial_config = json.loads(capture.trial_config_bytes)
+        trial_config.pop("id")
+        trial_config["trial_name"] = "trial-1"
+        capture = replace(capture, trial_config_bytes=_json_bytes(trial_config))
+        cas = MemoryCas()
+
+        result = execute_adapter(
+            HarborAdapter(
+                cas.publish,
+                executor=FakeHarborExecutor(capture),
+                read_artifact=cas.read,
+            ),
+            task12_request(),
+        )
+
+        self.assertIs(result.status, AdapterStatus.PASS)
+
+
+class HarborSdkExecutorTests(unittest.TestCase):
+    @staticmethod
+    def _job_config() -> dict[str, object]:
+        return {
+            "job_name": "gitspace-p00-task-012-oracle",
+            "n_attempts": 1,
+            "n_concurrent_trials": 1,
+            "retry": {"max_retries": 0},
+            "environment": {"type": "docker", "force_build": False, "delete": True},
+            "agents": [{"name": "oracle", "n_concurrent": 1}],
+            "datasets": [],
+            "tasks": [{"path": "/fixture"}],
+        }
+
+    def test_sdk_executor_projects_one_trial_from_harbor_job_files(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = root / "fixture"
+            fixture.mkdir()
+
+            def runner(config: dict[str, object]) -> None:
+                job_dir = Path(str(config["jobs_dir"])) / str(config["job_name"])
+                trial_dir = job_dir / "trial-1"
+                (trial_dir / "agent").mkdir(parents=True)
+                (trial_dir / "verifier").mkdir(parents=True)
+                trial_uri = trial_dir.resolve().as_uri()
+                job_result = {
+                    "id": "job-1",
+                    "n_total_trials": 1,
+                    "trial_results": [{"id": "trial-1", "trial_uri": trial_uri}],
+                }
+                trial_result = {
+                    "id": "trial-1",
+                    "task_name": "terminal-bench/regex-log",
+                    "exception_info": None,
+                    "agent_execution": {"started_at": "a", "finished_at": "b"},
+                    "verifier": {"started_at": "b", "finished_at": "c"},
+                }
+                trial_config = {
+                    "id": "trial-1",
+                    "task_name": "terminal-bench/regex-log",
+                }
+                job_dir.mkdir(parents=True, exist_ok=True)
+                (job_dir / "config.json").write_bytes(_json_bytes(config))
+                (job_dir / "result.json").write_bytes(_json_bytes(job_result))
+                (trial_dir / "config.json").write_bytes(_json_bytes(trial_config))
+                (trial_dir / "result.json").write_bytes(_json_bytes(trial_result))
+                (trial_dir / "agent" / "oracle.txt").write_bytes(b"oracle\n")
+                (trial_dir / "verifier" / "test-stdout.txt").write_bytes(b"ok\n")
+                (trial_dir / "verifier" / "test-stderr.txt").write_bytes(b"")
+                (trial_dir / "verifier" / "reward.json").write_bytes(b'{"reward":1}')
+                (job_dir / "job.log").write_bytes(b"harbor\n")
+
+            request = HarborExecutionRequest(
+                run_root=str(root / "run"),
+                fixture_root=str(fixture),
+                job_config=self._job_config(),
+                environment_image_ref="local://gitspace/regex-log@sha256:" + "e" * 64,
+                environment_image_id="sha256:" + "e" * 64,
+                egress_sidecar_image_ref="local://gitspace/harbor-egress@sha256:"
+                + "f" * 64,
+                egress_sidecar_image_id="sha256:" + "f" * 64,
+            )
+            capture = HarborSdkExecutor(job_runner=runner).run_oracle(request)
+
+            self.assertEqual(capture.process_return_code, 0)
+            self.assertEqual(capture.oracle_exit_code_bytes, None)
+            self.assertEqual(capture.verifier_reward_json_bytes, b'{"reward":1}')
+            self.assertIn(b"terminal-bench/regex-log", capture.trial_result_bytes)
+
+    def test_sdk_executor_turns_worker_exception_into_infra_capture(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = root / "fixture"
+            fixture.mkdir()
+
+            def runner(_config: dict[str, object]) -> None:
+                raise RuntimeError("qualified worker unavailable")
+
+            request = HarborExecutionRequest(
+                run_root=str(root / "run"),
+                fixture_root=str(fixture),
+                job_config=self._job_config(),
+                environment_image_ref="local://gitspace/regex-log@sha256:" + "e" * 64,
+                environment_image_id="sha256:" + "e" * 64,
+                egress_sidecar_image_ref="local://gitspace/harbor-egress@sha256:"
+                + "f" * 64,
+                egress_sidecar_image_id="sha256:" + "f" * 64,
+            )
+            capture = HarborSdkExecutor(job_runner=runner).run_oracle(request)
+
+            self.assertEqual(capture.process_return_code, 1)
+            self.assertIn(b"RuntimeError", capture.harbor_stderr)
+            self.assertIn(b"qualified worker unavailable", capture.trial_result_bytes)
+
+
+if __name__ == "__main__":
+    unittest.main()
