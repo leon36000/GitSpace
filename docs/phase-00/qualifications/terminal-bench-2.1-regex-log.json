@@ -1,30 +1,38 @@
 {
   "task": "P00-TASK-012",
-  "dataset_repository": "harbor-framework/terminal-bench-2-1",
-  "dataset_commit": "7131e4375048a0e408a8fb404b5f499d726b695b",
-  "task_name": "terminal-bench/regex-log",
-  "source_tree_sha256": "sha256:02cd82b8494829665eef681e7642127e253817903d03cc057d6292e13013fa7c",
-  "normalized_tree_sha256": "sha256:20924bdf80c6503ef2f5f5865214f18d17277e052349f22b6365f475a3fcce1e",
-  "normalization": {
-    "schema_version": "1.4",
-    "runtime_network_mode": "no-network",
-    "verifier_environment_mode": "shared",
-    "verifier_python": "3.13.15",
-    "reward_file": "/logs/verifier/reward.json",
-    "legacy_reward_file_forbidden": true,
-    "network_install_commands_removed": true,
-    "source_instruction_solution_tests_preserved": true,
-    "canary_preserved": true
+  "implementation_commit": "380fbe1",
+  "dataset": {
+    "repository": "harbor-framework/terminal-bench-2-1",
+    "commit": "7131e4375048a0e408a8fb404b5f499d726b695b",
+    "task": "terminal-bench/regex-log",
+    "upstream_test_outputs_sha256": "sha256:345c3bd09ab6f6fe8c8361a58c0a47bf0a13b3fcb38a5ac7824e44ff855e8f72",
+    "upstream_test_outputs_bytes": 3730,
+    "upstream_test_outputs_git_blob": "38c51719f480d2e852262ed2453842d5ea1ca79f"
   },
-  "environment_base": {
+  "fixture": {
+    "path": "tests/adapters/harbor/fixtures/terminal-bench-2.1-regex-log",
+    "kind": "gitspace-normalized",
+    "normalized_network": "no-network",
+    "verifier_environment_mode": "shared",
+    "reward_artifact": "reward.json",
+    "result_artifact": "gitspace-result.json",
+    "source_manifest": "source-manifest.json",
+    "normalized_protocol_files": {
+      "tests/run_test.py": "sha256:249dd2c3896af27b943c4eb7df6d3026da388be064c940a05c812d9b2d99dcce",
+      "tests/test.sh": "sha256:32d0433e8eeee0271eb275f6a976f2704530ed3d5de6074535eab9dc01e7f88d"
+    }
+  },
+  "runtime_base": {
     "reference": "python:3.13.15-slim-bookworm@sha256:0f16c5d35fe6464ee471792ab3bb9116f911b65b3fbf10120c98d2bdc6332f48",
     "platform": "linux/amd64",
-    "qualification_status": "digest_observed_not_executed_on_dedicated_worker"
+    "qualification_status": "blocked_not_executed_on_dedicated_worker"
   },
-  "offline_evidence": {
-    "fixture_normalization_tests": "pass",
-    "runtime_verifier_execution": "not_run",
-    "qualification_status": "fixture_ready_external_runtime_blocked"
+  "local_evidence": {
+    "source_provenance": "pass",
+    "normalization_manifest": "pass",
+    "verifier_pass_fail_infra_protocol": "pass",
+    "runtime_harbor_docker": "not_run"
   },
-  "checked_at": "2026-08-20"
+  "qualification_status": "implementation_ready_external_runtime_blocked",
+  "blocker": "A dedicated disposable or rootless linux/amd64 worker must qualify the runtime base, SBOM, scanner/database freshness, egress sidecar, no-network execution and physical cleanup before Harbor oracle execution."
 }

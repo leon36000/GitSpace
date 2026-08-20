@@ -1,5 +1,6 @@
 {
   "task": "P00-TASK-012",
+  "implementation_commit": "380fbe1",
   "framework": "harbor",
   "version": "0.21.0",
   "repository": "harbor-framework/harbor",
@@ -13,6 +14,13 @@
     "uv": "0.12.0",
     "verifier_python": "3.13.15"
   },
+  "replay_record_schema": 2,
+  "replay_contract": {
+    "exact_exception_discriminant": true,
+    "stage_obligations_closed": true,
+    "cleanup_obligations_physical": true,
+    "exception_boundary_cas_artifact": true
+  },
   "local_evidence": {
     "lock_check": "pass",
     "frozen_sync": "pass",
@@ -22,6 +30,10 @@
     "real_executor_cli_contract": "unit_verified",
     "image_reference_digest_binding": "pass",
     "replay_sidecar_identity_binding": "pass",
+    "replay_exception_boundary_binding": "pass",
+    "stage_obligation_classification": "pass",
+    "normalized_verifier_protocol": "pass",
+    "normalized_manifest_binding": "pass",
     "runtime_harbor_docker": "not_run"
   },
   "qualification_status": "implementation_ready_external_runtime_blocked",
