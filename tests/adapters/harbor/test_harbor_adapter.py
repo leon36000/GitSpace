@@ -131,6 +131,8 @@ def _capture(
     reward_json: bytes | None = b'{"reward":1}',
     oracle_exit: bytes | None = None,
     exception_info: dict[str, object] | None = None,
+    exception_discriminant: str | None = None,
+    stage_obligations: dict[str, bool] | None = None,
 ) -> HarborExecutionCapture:
     job_result = {
         "id": "job-1",
@@ -152,11 +154,12 @@ def _capture(
         },
     }
     cleanup = {
-        "run_root_clean": True,
-        "agent_processes_clean": True,
-        "containers_clean": True,
-        "foreign_resources_unchanged": True,
-        "workspace_removed": True,
+        "process_group_absent": True,
+        "temp_root_absent": True,
+        "containers_absent": True,
+        "networks_absent": True,
+        "derived_images_absent": True,
+        "foreign_resources_untouched": True,
     }
     return HarborExecutionCapture(
         process_return_code=process_return_code,
@@ -177,6 +180,22 @@ def _capture(
         resource_manifest_before_bytes=_json_bytes({"containers": []}),
         resource_manifest_after_bytes=_json_bytes({"containers": []}),
         cleanup_report_bytes=_json_bytes(cleanup),
+        exception_boundary_bytes=_json_bytes(
+            {
+                "discriminant": exception_discriminant,
+                "stage": "agent_execution" if exception_discriminant else None,
+            }
+        ),
+        exception_discriminant=exception_discriminant,
+        stage_obligations=stage_obligations
+        or {
+            "environment_started": True,
+            "agent_setup_completed": True,
+            "agent_execution_started": True,
+            "agent_execution_completed": True,
+            "verifier_started": True,
+            "verifier_completed": True,
+        },
     )
 
 
@@ -238,6 +257,59 @@ class HarborAdapterTests(unittest.TestCase):
             HarborAdapter(
                 cas.publish,
                 executor=FakeHarborExecutor(_capture(reward_json=b'{"reward":1.0}')),
+                read_artifact=cas.read,
+            ),
+            task12_request(),
+        )
+
+        self.assertIs(result.status, AdapterStatus.INFRA)
+
+    def test_exact_agent_timeout_boundary_is_timeout(self) -> None:
+        cas = MemoryCas()
+        result = execute_adapter(
+            HarborAdapter(
+                cas.publish,
+                executor=FakeHarborExecutor(
+                    _capture(
+                        reward_json=None,
+                        exception_info={"exception_type": "AgentTimeoutError"},
+                        exception_discriminant="agent_timeout_exact",
+                        stage_obligations={
+                            "environment_started": True,
+                            "agent_setup_completed": True,
+                            "agent_execution_started": True,
+                            "agent_execution_completed": False,
+                            "verifier_started": False,
+                            "verifier_completed": False,
+                        },
+                    )
+                ),
+                read_artifact=cas.read,
+            ),
+            task12_request(),
+        )
+
+        self.assertIs(result.status, AdapterStatus.TIMEOUT)
+
+    def test_diagnostic_agent_timeout_without_boundary_is_infra(self) -> None:
+        cas = MemoryCas()
+        result = execute_adapter(
+            HarborAdapter(
+                cas.publish,
+                executor=FakeHarborExecutor(
+                    _capture(
+                        reward_json=None,
+                        exception_info={"exception_type": "AgentTimeoutError"},
+                        stage_obligations={
+                            "environment_started": True,
+                            "agent_setup_completed": True,
+                            "agent_execution_started": True,
+                            "agent_execution_completed": False,
+                            "verifier_started": False,
+                            "verifier_completed": False,
+                        },
+                    )
+                ),
                 read_artifact=cas.read,
             ),
             task12_request(),

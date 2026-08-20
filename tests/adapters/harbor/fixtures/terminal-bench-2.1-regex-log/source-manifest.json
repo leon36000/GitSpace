@@ -25,6 +25,18 @@
       "sha256": "sha256:5f264ff0bf62a49aee3c6398447de5108df141e7a2ad35c6de8ef39fa62049c6"
     }
   },
+  "normalized_files": {
+    "tests/run_test.py": {
+      "sha256": "sha256:249dd2c3896af27b943c4eb7df6d3026da388be064c940a05c812d9b2d99dcce",
+      "bytes": 4994,
+      "mode": "0644"
+    },
+    "tests/test.sh": {
+      "sha256": "sha256:32d0433e8eeee0271eb275f6a976f2704530ed3d5de6074535eab9dc01e7f88d",
+      "bytes": 352,
+      "mode": "0644"
+    }
+  },
   "normalization": {
     "schema_version": "1.4",
     "network_mode": "no-network",

@@ -71,6 +71,24 @@ MUTATIONS = (
         '    if "@" not in reference or reference.rsplit("@", 1)[1] != digest:\n        raise AdapterContractError(f"{label} must be bound to its image digest")\n',
         '    if False:\n        raise AdapterContractError(f"{label} must be bound to its image digest")\n',
     ),
+    Mutation(
+        "skip-stage-obligation-gate",
+        "harbor_replay.py",
+        '    elif not obligations["stage_obligations_consistent"]:\n',
+        "    elif False:\n",
+    ),
+    Mutation(
+        "skip-exception-boundary-gate",
+        "harbor_replay.py",
+        '    elif not obligations["exception_boundary_consistent"]:\n',
+        "    elif False:\n",
+    ),
+    Mutation(
+        "trust-invalid-timeout-attribution",
+        "harbor_replay.py",
+        '            if obligations["timeout_attribution_valid"]\n            else AdapterStatus.INFRA\n',
+        "            if True\n            else AdapterStatus.INFRA\n",
+    ),
 )
 
 

@@ -51,11 +51,20 @@ _ARTIFACT_FIELDS = {
     "verifier_stdout",
     "verifier_stderr",
     "verifier_reward_json",
+    "exception_boundary",
     "resource_manifest_before",
     "resource_manifest_after",
     "cleanup_report",
 }
 _DIGEST = "sha256:"
+_STAGE_FIELDS = {
+    "environment_started",
+    "agent_setup_completed",
+    "agent_execution_started",
+    "agent_execution_completed",
+    "verifier_started",
+    "verifier_completed",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,6 +115,9 @@ class HarborExecutionCapture:
     resource_manifest_before_bytes: bytes
     resource_manifest_after_bytes: bytes
     cleanup_report_bytes: bytes
+    exception_boundary_bytes: bytes
+    exception_discriminant: str | None
+    stage_obligations: dict[str, bool]
 
     def __post_init__(self) -> None:
         if type(self.process_return_code) is not int:
@@ -126,6 +138,7 @@ class HarborExecutionCapture:
             "resource_manifest_before_bytes",
             "resource_manifest_after_bytes",
             "cleanup_report_bytes",
+            "exception_boundary_bytes",
         ):
             if type(getattr(self, name)) is not bytes:
                 raise AdapterContractError(f"{name} must be exact bytes")
@@ -133,6 +146,19 @@ class HarborExecutionCapture:
             value = getattr(self, name)
             if value is not None and type(value) is not bytes:
                 raise AdapterContractError(f"{name} must be bytes or None")
+        if (
+            self.exception_discriminant is not None
+            and type(self.exception_discriminant) is not str
+        ):
+            raise AdapterContractError(
+                "exception discriminant must be an exact string or None"
+            )
+        if type(self.stage_obligations) is not dict:
+            raise AdapterContractError("stage obligations must be an exact dict")
+        if set(self.stage_obligations) != _STAGE_FIELDS or any(
+            type(value) is not bool for value in self.stage_obligations.values()
+        ):
+            raise AdapterContractError("stage obligations are not closed booleans")
 
 
 @dataclass(frozen=True, slots=True)
@@ -323,6 +349,13 @@ class HarborSdkExecutor:
             raise AdapterContractError(
                 "Harbor trial configuration/result is incomplete"
             )
+        trial_result = _json_object_bytes(
+            trial_result_path.read_bytes(), "trial_result"
+        )
+        exception_boundary_bytes = _read_or_default(
+            root / "exception-boundary.json", b""
+        )
+        exception_discriminant = _parse_exception_boundary(exception_boundary_bytes)
 
         agent_dir = trial_dir / "agent"
         verifier_dir = trial_dir / "verifier"
@@ -351,6 +384,9 @@ class HarborSdkExecutor:
             cleanup_report_bytes=_read_or_default(
                 root / "cleanup-report.json", _false_cleanup_bytes()
             ),
+            exception_boundary_bytes=exception_boundary_bytes,
+            exception_discriminant=exception_discriminant,
+            stage_obligations=_stage_obligations_from_trial_result(trial_result),
         )
 
 
@@ -420,6 +456,11 @@ def _failure_capture(
         resource_manifest_before_bytes=_json_bytes({"present": False}),
         resource_manifest_after_bytes=_json_bytes({"present": False}),
         cleanup_report_bytes=cleanup,
+        exception_boundary_bytes=_json_bytes(
+            {"discriminant": "other_exception", "stage": "unknown"}
+        ),
+        exception_discriminant="other_exception",
+        stage_obligations={name: False for name in _STAGE_FIELDS},
     )
 
 
@@ -438,11 +479,12 @@ def _read_or_default(path: Path, default: bytes) -> bytes:
 def _false_cleanup_bytes() -> bytes:
     return _json_bytes(
         {
-            "run_root_clean": False,
-            "agent_processes_clean": False,
-            "containers_clean": False,
-            "foreign_resources_unchanged": False,
-            "workspace_removed": False,
+            "process_group_absent": False,
+            "temp_root_absent": False,
+            "containers_absent": False,
+            "networks_absent": False,
+            "derived_images_absent": False,
+            "foreign_resources_untouched": False,
         }
     )
 
@@ -596,6 +638,7 @@ class HarborAdapter:
             "verifier_stdout": capture.verifier_stdout,
             "verifier_stderr": capture.verifier_stderr,
             "verifier_reward_json": capture.verifier_reward_json_bytes or b"",
+            "exception_boundary": capture.exception_boundary_bytes,
             "resource_manifest_before": capture.resource_manifest_before_bytes,
             "resource_manifest_after": capture.resource_manifest_after_bytes,
             "cleanup_report": capture.cleanup_report_bytes,
@@ -676,12 +719,14 @@ def _capture_projection(
     exception_info = trial_result.get("exception_info")
     if exception_info is None:
         exception_present = False
-        exception_type = None
+        exception_type_diagnostic = None
         exception_stage = None
     else:
         info = _exact_object(exception_info, "trial_result.exception_info")
         exception_present = True
-        exception_type = _exact_string(info.get("exception_type"), "exception_type")
+        exception_type_diagnostic = _exact_string(
+            info.get("exception_type"), "exception_type"
+        )
         raw_stage = trial_result.get("exception_stage")
         exception_stage = (
             "unknown"
@@ -692,8 +737,11 @@ def _capture_projection(
     observed_reward, reward_error = _parse_reward(capture.verifier_reward_json_bytes)
     if reward_error and not exception_present:
         exception_present = True
-        exception_type = "VerifierOutputParseError"
+        exception_type_diagnostic = "VerifierOutputParseError"
         exception_stage = "verifier"
+    exception_discriminant = capture.exception_discriminant
+    if reward_error and exception_discriminant is None:
+        exception_discriminant = "other_exception"
     stage_timings: dict[str, JsonValue] = {}
     for stage in ("environment_setup", "agent_setup", "agent_execution", "verifier"):
         if stage in trial_result and trial_result[stage] is not None:
@@ -705,7 +753,7 @@ def _capture_projection(
         key: value for key, value in artifact_sha256.items()
     }
     projection: JsonObject = {
-        "version": 1,
+        "version": 2,
         "run_purpose": framework["run_purpose"],
         "framework": framework["framework"],
         "framework_version": framework["framework_version"],
@@ -733,9 +781,11 @@ def _capture_projection(
         "harbor_process_return_code": capture.process_return_code,
         "trial_exception_present": exception_present,
         "observed_reward": observed_reward,
-        "exception_type": exception_type,
+        "exception_discriminant": exception_discriminant,
+        "exception_type_diagnostic": exception_type_diagnostic,
         "exception_stage": exception_stage,
         "stage_timings": stage_timings,
+        "stage_obligations": dict(capture.stage_obligations),
         "artifacts": artifact_values,
         "artifact_sha256": artifact_digest_values,
         "cleanup_obligations": cleanup,
@@ -922,6 +972,55 @@ def _parse_reward(value: bytes | None) -> tuple[int | None, bool]:
     if type(reward) is not int or reward not in {0, 1}:
         return None, True
     return reward, False
+
+
+def _parse_exception_boundary(value: bytes) -> str | None:
+    if value == b"":
+        return None
+    try:
+        data = _json_object_bytes(value, "exception_boundary")
+    except AdapterContractError:
+        return None
+    if set(data) != {"discriminant", "stage"}:
+        return None
+    discriminant = data["discriminant"]
+    stage = data["stage"]
+    if discriminant is not None and type(discriminant) is not str:
+        return None
+    if stage is not None and type(stage) is not str:
+        return None
+    return discriminant
+
+
+def _stage_obligations_from_trial_result(
+    trial_result: JsonObject,
+) -> dict[str, bool]:
+    environment_started, _ = _timing_obligations(trial_result.get("environment_setup"))
+    agent_setup_started, agent_setup_completed = _timing_obligations(
+        trial_result.get("agent_setup")
+    )
+    agent_started, agent_completed = _timing_obligations(
+        trial_result.get("agent_execution")
+    )
+    verifier_started, verifier_completed = _timing_obligations(
+        trial_result.get("verifier")
+    )
+    return {
+        "environment_started": environment_started,
+        "agent_setup_completed": agent_setup_started and agent_setup_completed,
+        "agent_execution_started": agent_started,
+        "agent_execution_completed": agent_completed,
+        "verifier_started": verifier_started,
+        "verifier_completed": verifier_completed,
+    }
+
+
+def _timing_obligations(value: object) -> tuple[bool, bool]:
+    if type(value) is not dict:
+        return False, False
+    started = value.get("started_at") is not None
+    completed = value.get("finished_at") is not None
+    return started, completed
 
 
 def _parse_exit_code(value: bytes) -> int:

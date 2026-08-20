@@ -21,7 +21,7 @@ CAS_DIGEST = "a" * 64
 
 def valid_record_json() -> dict[str, object]:
     return {
-        "version": 1,
+        "version": 2,
         "run_purpose": "qualification_oracle",
         "framework": "harbor",
         "framework_version": "0.21.0",
@@ -47,17 +47,27 @@ def valid_record_json() -> dict[str, object]:
         "harbor_process_return_code": 0,
         "harbor_status": "completed",
         "observed_reward": 1,
-        "exception_type": None,
+        "exception_discriminant": None,
+        "exception_type_diagnostic": None,
         "exception_stage": None,
         "stage_timings": {"agent_execution": 1.0},
+        "stage_obligations": {
+            "environment_started": True,
+            "agent_setup_completed": True,
+            "agent_execution_started": True,
+            "agent_execution_completed": True,
+            "verifier_started": True,
+            "verifier_completed": True,
+        },
         "artifacts": {"oracle_exit_status": f"cas://sha256/{CAS_DIGEST}"},
         "artifact_sha256": {"oracle_exit_status": f"sha256:{CAS_DIGEST}"},
         "cleanup_obligations": {
-            "run_root_clean": True,
-            "agent_processes_clean": True,
-            "containers_clean": True,
-            "foreign_resources_unchanged": True,
-            "workspace_removed": True,
+            "process_group_absent": True,
+            "temp_root_absent": True,
+            "containers_absent": True,
+            "networks_absent": True,
+            "derived_images_absent": True,
+            "foreign_resources_untouched": True,
         },
     }
 
@@ -67,6 +77,8 @@ def record_with_content(
 ) -> tuple[HarborReplayRecord, dict[str, bytes]]:
     content = b'{"present":false,"value":null}\n'
     digest = hashlib.sha256(content).hexdigest()
+    boundary_content = b'{"discriminant":null,"stage":null}'
+    boundary_digest = hashlib.sha256(boundary_content).hexdigest()
     value = valid_record_json()
     value["run_purpose"] = run_purpose
     value["agent"] = "fake" if run_purpose == "status_control" else "oracle"
@@ -74,6 +86,9 @@ def record_with_content(
     artifact_bytes = {"oracle_exit_status": content}
     artifacts = {"oracle_exit_status": f"cas://sha256/{digest}"}
     artifact_sha256 = {"oracle_exit_status": f"sha256:{digest}"}
+    artifact_bytes["exception_boundary"] = boundary_content
+    artifacts["exception_boundary"] = f"cas://sha256/{boundary_digest}"
+    artifact_sha256["exception_boundary"] = f"sha256:{boundary_digest}"
     if reward is not None:
         reward_content = json.dumps(
             {"reward": reward}, sort_keys=True, separators=(",", ":")
@@ -90,6 +105,28 @@ def record_with_content(
         artifact_uris=artifacts,
     )
     return record, {uri: artifact_bytes[name] for name, uri in artifacts.items()}
+
+
+def replace_boundary(
+    value: dict[str, object], store: dict[str, bytes], discriminant: str, stage: str
+) -> None:
+    content = json.dumps(
+        {"discriminant": discriminant, "stage": stage},
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    digest = hashlib.sha256(content).hexdigest()
+    artifacts = value["artifacts"]
+    artifact_sha256 = value["artifact_sha256"]
+    assert isinstance(artifacts, dict)
+    assert isinstance(artifact_sha256, dict)
+    old_uri = artifacts["exception_boundary"]
+    assert isinstance(old_uri, str)
+    store.pop(old_uri, None)
+    new_uri = f"cas://sha256/{digest}"
+    artifacts["exception_boundary"] = new_uri
+    artifact_sha256["exception_boundary"] = f"sha256:{digest}"
+    store[new_uri] = content
 
 
 class HarborReplayRedTests(unittest.TestCase):
@@ -214,10 +251,20 @@ class HarborReplayRedTests(unittest.TestCase):
             {
                 "harbor_status": "exception",
                 "observed_reward": None,
-                "exception_type": "AgentTimeoutError",
+                "exception_discriminant": "agent_timeout_exact",
+                "exception_type_diagnostic": "AgentTimeoutError",
                 "exception_stage": "agent_execution",
+                "stage_obligations": {
+                    "environment_started": True,
+                    "agent_setup_completed": True,
+                    "agent_execution_started": True,
+                    "agent_execution_completed": False,
+                    "verifier_started": False,
+                    "verifier_completed": False,
+                },
             }
         )
+        replace_boundary(value, store, "agent_timeout_exact", "agent_execution")
         record = HarborReplayRecord.from_json(value)
 
         result = classify_harbor_record(record, read_artifact=store.__getitem__)
@@ -231,8 +278,37 @@ class HarborReplayRedTests(unittest.TestCase):
             {
                 "harbor_status": "exception",
                 "observed_reward": None,
-                "exception_type": "AgentTimeoutError",
+                "exception_discriminant": "verifier_timeout_exact",
+                "exception_type_diagnostic": "VerifierTimeoutError",
                 "exception_stage": "verifier",
+            }
+        )
+        replace_boundary(value, store, "verifier_timeout_exact", "verifier")
+        record = HarborReplayRecord.from_json(value)
+
+        result = classify_harbor_record(record, read_artifact=store.__getitem__)
+
+        self.assertIs(result.status, AdapterStatus.INFRA)
+        self.assertFalse(result.obligations["timeout_attribution_valid"])
+
+    def test_timeout_diagnostic_name_without_exact_discriminant_is_infra(self) -> None:
+        record, store = record_with_content(reward=None)
+        value = record.to_json()
+        value.update(
+            {
+                "harbor_status": "exception",
+                "observed_reward": None,
+                "exception_discriminant": None,
+                "exception_type_diagnostic": "AgentTimeoutError",
+                "exception_stage": "agent_execution",
+                "stage_obligations": {
+                    "environment_started": True,
+                    "agent_setup_completed": True,
+                    "agent_execution_started": True,
+                    "agent_execution_completed": False,
+                    "verifier_started": False,
+                    "verifier_completed": False,
+                },
             }
         )
         record = HarborReplayRecord.from_json(value)
@@ -240,7 +316,67 @@ class HarborReplayRedTests(unittest.TestCase):
         result = classify_harbor_record(record, read_artifact=store.__getitem__)
 
         self.assertIs(result.status, AdapterStatus.INFRA)
+
+    def test_agent_setup_timeout_discriminant_is_infra(self) -> None:
+        record, store = record_with_content(reward=None)
+        value = record.to_json()
+        value.update(
+            {
+                "harbor_status": "exception",
+                "observed_reward": None,
+                "exception_discriminant": "agent_setup_timeout_exact",
+                "exception_type_diagnostic": "AgentSetupTimeoutError",
+                "exception_stage": "agent_setup",
+            }
+        )
+        replace_boundary(value, store, "agent_setup_timeout_exact", "agent_setup")
+        record = HarborReplayRecord.from_json(value)
+
+        result = classify_harbor_record(record, read_artifact=store.__getitem__)
+
+        self.assertIs(result.status, AdapterStatus.INFRA)
+
+    def test_agent_timeout_discriminant_at_verifier_is_infra(self) -> None:
+        record, store = record_with_content(reward=None)
+        value = record.to_json()
+        value.update(
+            {
+                "harbor_status": "exception",
+                "observed_reward": None,
+                "exception_discriminant": "agent_timeout_exact",
+                "exception_type_diagnostic": "AgentTimeoutError",
+                "exception_stage": "verifier",
+            }
+        )
+        replace_boundary(value, store, "agent_timeout_exact", "verifier")
+        record = HarborReplayRecord.from_json(value)
+
+        result = classify_harbor_record(record, read_artifact=store.__getitem__)
+
+        self.assertIs(result.status, AdapterStatus.INFRA)
         self.assertFalse(result.obligations["timeout_attribution_valid"])
+
+    def test_completed_record_requires_all_stage_obligations(self) -> None:
+        record, store = record_with_content()
+        value = record.to_json()
+        stage_obligations = dict(value["stage_obligations"])
+        stage_obligations["verifier_completed"] = False
+        value["stage_obligations"] = stage_obligations
+        record = HarborReplayRecord.from_json(value)
+
+        result = classify_harbor_record(record, read_artifact=store.__getitem__)
+
+        self.assertIs(result.status, AdapterStatus.INFRA)
+        self.assertFalse(result.obligations["stage_obligations_consistent"])
+
+    def test_stage_obligations_require_exact_boolean_closed_map(self) -> None:
+        value = valid_record_json()
+        stage_obligations = dict(value["stage_obligations"])
+        stage_obligations["verifier_completed"] = 1
+        value["stage_obligations"] = stage_obligations
+
+        with self.assertRaises(AdapterContractError):
+            HarborReplayRecord.from_json(value)
 
     def test_oracle_exit_artifact_must_match_record_presence_and_value(self) -> None:
         record, store = record_with_content(run_purpose="qualification_oracle")
@@ -311,10 +447,12 @@ class HarborReplayRedTests(unittest.TestCase):
         value = record.to_json()
         value.update(
             {
-                "exception_type": "SomeHarborError",
+                "exception_discriminant": "other_exception",
+                "exception_type_diagnostic": "SomeHarborError",
                 "exception_stage": "agent_execution",
             }
         )
+        replace_boundary(value, store, "other_exception", "agent_execution")
         record = HarborReplayRecord.from_json(value)
 
         result = classify_harbor_record(record, read_artifact=store.__getitem__)
@@ -348,8 +486,10 @@ class HarborReplayRedTests(unittest.TestCase):
                     "trial_cardinality_one",
                     "reward_well_typed",
                     "oracle_exit_consistent",
+                    "exception_boundary_consistent",
                     "artifact_integrity",
                     "cleanup_complete",
+                    "stage_obligations_consistent",
                     "policy_clear",
                     "infra_clear",
                     "timeout_attribution_valid",
@@ -370,10 +510,12 @@ class HarborReplayRedTests(unittest.TestCase):
             {
                 "harbor_status": "exception",
                 "observed_reward": None,
-                "exception_type": "GitSpacePolicyViolation",
+                "exception_discriminant": "other_exception",
+                "exception_type_diagnostic": "GitSpacePolicyViolation",
                 "exception_stage": "agent_execution",
             }
         )
+        replace_boundary(value, store, "other_exception", "agent_execution")
         record = HarborReplayRecord.from_json(value)
 
         result = classify_harbor_record(record, read_artifact=store.__getitem__)

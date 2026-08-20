@@ -12,6 +12,7 @@ from .json_boundary import JsonObject, JsonValue, clone_object, validate_cas_uri
 from .model import AdapterStatus
 
 HARBOR_VERSION = "0.21.0"
+HARBOR_RECORD_VERSION = 2
 HARBOR_COMMIT = "64afbbcb62165950301e1a6407c729aa26d844ff"
 HARBOR_WHEEL_SHA256 = "c77d779a03f1a9e8ecb3c449e17f39a9728b82238832f1fd28632eb9426c0a21"
 TERMINAL_BENCH_COMMIT = "7131e4375048a0e408a8fb404b5f499d726b695b"
@@ -29,12 +30,28 @@ _EXCEPTION_STAGES = {
     "verifier",
     "unknown",
 }
+_EXCEPTION_DISCRIMINANTS = {
+    "agent_timeout_exact",
+    "agent_setup_timeout_exact",
+    "verifier_timeout_exact",
+    "environment_start_timeout_exact",
+    "other_exception",
+}
+_STAGE_FIELDS = {
+    "environment_started",
+    "agent_setup_completed",
+    "agent_execution_started",
+    "agent_execution_completed",
+    "verifier_started",
+    "verifier_completed",
+}
 _CLEANUP_FIELDS = {
-    "run_root_clean",
-    "agent_processes_clean",
-    "containers_clean",
-    "foreign_resources_unchanged",
-    "workspace_removed",
+    "process_group_absent",
+    "temp_root_absent",
+    "containers_absent",
+    "networks_absent",
+    "derived_images_absent",
+    "foreign_resources_untouched",
 }
 _RECORD_FIELDS = {
     "version",
@@ -63,9 +80,11 @@ _RECORD_FIELDS = {
     "harbor_process_return_code",
     "harbor_status",
     "observed_reward",
-    "exception_type",
+    "exception_discriminant",
+    "exception_type_diagnostic",
     "exception_stage",
     "stage_timings",
+    "stage_obligations",
     "artifacts",
     "artifact_sha256",
     "cleanup_obligations",
@@ -102,9 +121,11 @@ class HarborReplayRecord:
     harbor_process_return_code: int
     harbor_status: str
     observed_reward: int | None
-    exception_type: str | None
+    exception_discriminant: str | None
+    exception_type_diagnostic: str | None
     exception_stage: str | None
     stage_timings: dict[str, JsonValue]
+    stage_obligations: dict[str, bool]
     artifacts: dict[str, str]
     artifact_sha256: dict[str, str]
     cleanup_obligations: dict[str, bool]
@@ -112,6 +133,7 @@ class HarborReplayRecord:
     def __post_init__(self) -> None:
         _validate_record(self)
         object.__setattr__(self, "stage_timings", dict(self.stage_timings))
+        object.__setattr__(self, "stage_obligations", dict(self.stage_obligations))
         object.__setattr__(self, "artifacts", dict(self.artifacts))
         object.__setattr__(self, "artifact_sha256", dict(self.artifact_sha256))
         object.__setattr__(self, "cleanup_obligations", dict(self.cleanup_obligations))
@@ -177,11 +199,17 @@ class HarborReplayRecord:
             ),
             harbor_status=_bounded_string(data["harbor_status"], "harbor_status"),
             observed_reward=_optional_reward(data["observed_reward"]),
-            exception_type=_optional_string(data["exception_type"], "exception_type"),
+            exception_discriminant=_optional_string(
+                data["exception_discriminant"], "exception_discriminant"
+            ),
+            exception_type_diagnostic=_optional_string(
+                data["exception_type_diagnostic"], "exception_type_diagnostic"
+            ),
             exception_stage=_optional_string(
                 data["exception_stage"], "exception_stage"
             ),
             stage_timings=_json_object(data["stage_timings"], "stage_timings"),
+            stage_obligations=_bool_map(data["stage_obligations"], "stage_obligations"),
             artifacts=_string_map(data["artifacts"], "artifacts"),
             artifact_sha256=_string_map(data["artifact_sha256"], "artifact_sha256"),
             cleanup_obligations=_bool_map(
@@ -221,9 +249,11 @@ class HarborReplayRecord:
                 "harbor_process_return_code": self.harbor_process_return_code,
                 "harbor_status": self.harbor_status,
                 "observed_reward": self.observed_reward,
-                "exception_type": self.exception_type,
+                "exception_discriminant": self.exception_discriminant,
+                "exception_type_diagnostic": self.exception_type_diagnostic,
                 "exception_stage": self.exception_stage,
                 "stage_timings": self.stage_timings,
+                "stage_obligations": self.stage_obligations,
                 "artifacts": self.artifacts,
                 "artifact_sha256": self.artifact_sha256,
                 "cleanup_obligations": self.cleanup_obligations,
@@ -319,6 +349,8 @@ def classify_harbor_record(
     obligations["process_exit_zero"] = record.harbor_process_return_code == 0
     obligations["oracle_exit_consistent"] = record.oracle_exit_code in {None, 0}
     obligations["cleanup_complete"] = all(record.cleanup_obligations.values())
+    obligations["stage_obligations_consistent"] = _stage_obligations_consistent(record)
+    obligations["timeout_attribution_valid"] = _timeout_attribution_valid(record)
     artifact_contents: dict[str, bytes] = {}
 
     if read_artifact is None:
@@ -352,19 +384,19 @@ def classify_harbor_record(
         status = AdapterStatus.INFRA
     elif not obligations["reward_well_typed"]:
         status = AdapterStatus.INFRA
+    elif not obligations["exception_boundary_consistent"]:
+        status = AdapterStatus.INFRA
     elif not obligations["cleanup_complete"]:
         status = AdapterStatus.INFRA
-    elif record.exception_type == "AgentTimeoutError":
-        if (
-            record.harbor_status == "exception"
-            and record.exception_stage == "agent_execution"
-            and record.observed_reward is None
-        ):
-            status = AdapterStatus.TIMEOUT
-        else:
-            obligations["timeout_attribution_valid"] = False
-            status = AdapterStatus.INFRA
-    elif record.exception_type is not None:
+    elif not obligations["stage_obligations_consistent"]:
+        status = AdapterStatus.INFRA
+    elif record.exception_discriminant == "agent_timeout_exact":
+        status = (
+            AdapterStatus.TIMEOUT
+            if obligations["timeout_attribution_valid"]
+            else AdapterStatus.INFRA
+        )
+    elif record.exception_discriminant is not None:
         status = AdapterStatus.INFRA
     elif record.harbor_status == "exception":
         status = AdapterStatus.INFRA
@@ -387,6 +419,41 @@ def classify_harbor_record(
         obligations=obligations,
         record_sha256=record_digest,
         task_invalid_candidate=task_invalid_candidate,
+    )
+
+
+def _stage_obligations_consistent(record: HarborReplayRecord) -> bool:
+    if record.harbor_status == "completed":
+        return (
+            record.exception_discriminant is None
+            and record.exception_type_diagnostic is None
+            and record.exception_stage is None
+            and all(record.stage_obligations.values())
+        )
+    if record.harbor_status != "exception":
+        return False
+    if record.exception_discriminant is None:
+        return False
+    if record.exception_type_diagnostic is None or record.exception_stage is None:
+        return False
+    return record.exception_discriminant in _EXCEPTION_DISCRIMINANTS
+
+
+def _timeout_attribution_valid(record: HarborReplayRecord) -> bool:
+    return (
+        record.exception_discriminant == "agent_timeout_exact"
+        and record.harbor_status == "exception"
+        and record.exception_stage == "agent_execution"
+        and record.observed_reward is None
+        and record.stage_obligations
+        == {
+            "environment_started": True,
+            "agent_setup_completed": True,
+            "agent_execution_started": True,
+            "agent_execution_completed": False,
+            "verifier_started": False,
+            "verifier_completed": False,
+        }
     )
 
 
@@ -438,16 +505,45 @@ def _validate_observed_artifacts(
             ):
                 obligations["reward_well_typed"] = False
 
+    boundary_content = contents.get("exception_boundary")
+    if boundary_content is None or boundary_content == b"":
+        obligations["exception_boundary_consistent"] = False
+    else:
+        try:
+            boundary = json.loads(boundary_content)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            obligations["exception_boundary_consistent"] = False
+        else:
+            if type(boundary) is not dict or set(boundary) != {
+                "discriminant",
+                "stage",
+            }:
+                obligations["exception_boundary_consistent"] = False
+            elif (
+                boundary["discriminant"] != record.exception_discriminant
+                or boundary["stage"] != record.exception_stage
+                or (
+                    boundary["discriminant"] is not None
+                    and type(boundary["discriminant"]) is not str
+                )
+                or (
+                    boundary["stage"] is not None and type(boundary["stage"]) is not str
+                )
+            ):
+                obligations["exception_boundary_consistent"] = False
+
 
 def _validate_record(record: HarborReplayRecord) -> None:
     if type(record.stage_timings) is not dict:
         raise AdapterContractError("stage_timings must be an exact dict")
+    if type(record.stage_obligations) is not dict:
+        raise AdapterContractError("stage_obligations must be an exact dict")
     if type(record.artifacts) is not dict or type(record.artifact_sha256) is not dict:
         raise AdapterContractError("artifacts must be exact dicts")
     if type(record.cleanup_obligations) is not dict:
         raise AdapterContractError("cleanup_obligations must be an exact dict")
-    if record.version != 1:
-        raise AdapterContractError("version must be exactly 1")
+    if record.version != HARBOR_RECORD_VERSION:
+        raise AdapterContractError(f"version must be exactly {HARBOR_RECORD_VERSION}")
     if record.run_purpose not in _RUN_PURPOSES:
         raise AdapterContractError("run_purpose is invalid")
     if record.framework != "harbor" or record.framework_version != HARBOR_VERSION:
@@ -492,13 +588,15 @@ def _validate_record(record: HarborReplayRecord) -> None:
         raise AdapterContractError("qualification_oracle must use the oracle agent")
     if record.harbor_status not in _HARBOR_STATUSES:
         raise AdapterContractError("Harbor status is invalid")
+    if record.exception_discriminant is not None and not isinstance(
+        record.exception_discriminant, str
+    ):
+        raise AdapterContractError("exception discriminant must be a string or None")
     if (
         record.exception_stage is not None
         and record.exception_stage not in _EXCEPTION_STAGES
     ):
         raise AdapterContractError("exception stage is invalid")
-    if record.exception_type is None and record.exception_stage is not None:
-        raise AdapterContractError("exception stage requires exception type")
     if set(record.artifacts) != set(record.artifact_sha256):
         raise AdapterContractError("artifact and digest keys differ")
     for name, uri in record.artifacts.items():
@@ -511,6 +609,10 @@ def _validate_record(record: HarborReplayRecord) -> None:
             raise AdapterContractError(f"artifact digest is invalid for {name}")
         if uri != _CAS_URI_PREFIX + digest.removeprefix("sha256:"):
             raise AdapterContractError(f"artifact URI and digest differ for {name}")
+    if set(record.stage_obligations) != _STAGE_FIELDS:
+        raise AdapterContractError("stage obligation fields differ")
+    if any(type(value) is not bool for value in record.stage_obligations.values()):
+        raise AdapterContractError("stage obligations must be exact booleans")
     if set(record.cleanup_obligations) != _CLEANUP_FIELDS:
         raise AdapterContractError("cleanup obligation fields differ")
     if any(type(value) is not bool for value in record.cleanup_obligations.values()):
@@ -539,8 +641,10 @@ _OBLIGATION_FIELDS = {
     "trial_cardinality_one",
     "reward_well_typed",
     "oracle_exit_consistent",
+    "exception_boundary_consistent",
     "artifact_integrity",
     "cleanup_complete",
+    "stage_obligations_consistent",
     "policy_clear",
     "infra_clear",
     "timeout_attribution_valid",
