@@ -34,6 +34,8 @@ def valid_record_json() -> dict[str, object]:
         "normalized_task_sha256": f"sha256:{'c' * 64}",
         "environment_image_ref": "local://gitspace/regex-log@sha256:" + "d" * 64,
         "environment_image_id": "sha256:" + "d" * 64,
+        "egress_sidecar_image_ref": "local://gitspace/harbor-egress@sha256:" + "e" * 64,
+        "egress_sidecar_image_id": "sha256:" + "e" * 64,
         "environment_platform": "linux/amd64",
         "runtime_network_mode": "no-network",
         "verifier_environment_mode": "shared",
@@ -98,6 +100,20 @@ class HarborReplayRedTests(unittest.TestCase):
         record = HarborReplayRecord.from_json(valid_record_json())
 
         self.assertEqual(record.to_json(), valid_record_json())
+
+    def test_replay_record_rejects_image_reference_digest_mismatch(self) -> None:
+        value = valid_record_json()
+        value["environment_image_ref"] = "local://gitspace/regex-log@sha256:" + "0" * 64
+
+        with self.assertRaisesRegex(AdapterContractError, "digest"):
+            HarborReplayRecord.from_json(value)
+
+    def test_replay_record_rejects_mutable_sidecar_reference(self) -> None:
+        value = valid_record_json()
+        value["egress_sidecar_image_ref"] = "local://gitspace/harbor-egress:latest"
+
+        with self.assertRaisesRegex(AdapterContractError, "digest"):
+            HarborReplayRecord.from_json(value)
 
     def test_record_rejects_boolean_version(self) -> None:
         value = valid_record_json()

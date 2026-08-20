@@ -74,10 +74,18 @@ class HarborExecutionRequest:
         object.__setattr__(
             self, "job_config", clone_object(self.job_config, path="$/job_config")
         )
-        _bounded_string(self.environment_image_ref, "environment_image_ref")
         _digest_string(self.environment_image_id, "environment_image_id")
-        _bounded_string(self.egress_sidecar_image_ref, "egress_sidecar_image_ref")
+        _image_reference(
+            self.environment_image_ref,
+            "environment_image_ref",
+            self.environment_image_id,
+        )
         _digest_string(self.egress_sidecar_image_id, "egress_sidecar_image_id")
+        _image_reference(
+            self.egress_sidecar_image_ref,
+            "egress_sidecar_image_ref",
+            self.egress_sidecar_image_id,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -547,31 +555,31 @@ class HarborAdapter:
         record = HarborReplayRecord.from_json(projection)
         replay = classify_harbor_record(record, read_artifact=self._read_artifact)
         record_uri = self._publish_verified(canonical_record_bytes(record))
-        artifacts = {"harbor_record": record_uri, **record.artifacts}
-        metrics: dict[str, int] = {
+        artifacts: JsonObject = {"harbor_record": record_uri, **record.artifacts}
+        metrics: JsonObject = {
             "task_invalid_candidate": int(replay.task_invalid_candidate),
             "artifact_integrity": int(replay.obligations["artifact_integrity"]),
         }
         if record.observed_reward is not None:
             metrics["reward"] = record.observed_reward
-        return {
+        harbor_extension: JsonObject = {
+            "framework_version": HARBOR_VERSION,
+            "framework_commit": HARBOR_COMMIT,
+            "dataset_commit": TERMINAL_BENCH_COMMIT,
+            "task_name": TERMINAL_BENCH_TASK,
+            "run_purpose": record.run_purpose,
+            "record_sha256": replay.record_sha256,
+            "task_invalid_candidate": replay.task_invalid_candidate,
+            "obligations": dict(replay.obligations),
+        }
+        result: JsonObject = {
             "status": replay.status.value,
             "summary": _summary(replay.status, replay.task_invalid_candidate),
             "artifacts": artifacts,
             "metrics": metrics,
-            "extensions": {
-                "gitspace.harbor": {
-                    "framework_version": HARBOR_VERSION,
-                    "framework_commit": HARBOR_COMMIT,
-                    "dataset_commit": TERMINAL_BENCH_COMMIT,
-                    "task_name": TERMINAL_BENCH_TASK,
-                    "run_purpose": record.run_purpose,
-                    "record_sha256": replay.record_sha256,
-                    "task_invalid_candidate": replay.task_invalid_candidate,
-                    "obligations": replay.obligations,
-                }
-            },
+            "extensions": {"gitspace.harbor": harbor_extension},
         }
+        return result
 
     def _publish_capture(
         self, capture: HarborExecutionCapture
@@ -692,7 +700,11 @@ def _capture_projection(
             stage_timings[stage] = clone_object(
                 trial_result[stage], path=f"$/trial_result/{stage}"
             )
-    return {
+    artifact_values: JsonObject = {key: value for key, value in artifacts.items()}
+    artifact_digest_values: JsonObject = {
+        key: value for key, value in artifact_sha256.items()
+    }
+    projection: JsonObject = {
         "version": 1,
         "run_purpose": framework["run_purpose"],
         "framework": framework["framework"],
@@ -706,6 +718,8 @@ def _capture_projection(
         "normalized_task_sha256": framework["normalized_task_sha256"],
         "environment_image_ref": framework["environment_image_ref"],
         "environment_image_id": framework["environment_image_id"],
+        "egress_sidecar_image_ref": framework["egress_sidecar_image_ref"],
+        "egress_sidecar_image_id": framework["egress_sidecar_image_id"],
         "environment_platform": framework["environment_platform"],
         "runtime_network_mode": framework["runtime_network_mode"],
         "verifier_environment_mode": framework["verifier_environment_mode"],
@@ -722,10 +736,11 @@ def _capture_projection(
         "exception_type": exception_type,
         "exception_stage": exception_stage,
         "stage_timings": stage_timings,
-        "artifacts": artifacts,
-        "artifact_sha256": artifact_sha256,
+        "artifacts": artifact_values,
+        "artifact_sha256": artifact_digest_values,
         "cleanup_obligations": cleanup,
     }
+    return projection
 
 
 def _profile(extensions: object) -> JsonObject:
@@ -740,8 +755,16 @@ def _profile(extensions: object) -> JsonObject:
         _digest_string(profile_object[name], name)
     for name in ("environment_image_id", "egress_sidecar_image_id"):
         _digest_string(profile_object[name], name)
-    for name in ("environment_image_ref", "egress_sidecar_image_ref"):
-        _bounded_string(profile_object[name], name)
+    _image_reference(
+        profile_object["environment_image_ref"],
+        "environment_image_ref",
+        profile_object["environment_image_id"],
+    )
+    _image_reference(
+        profile_object["egress_sidecar_image_ref"],
+        "egress_sidecar_image_ref",
+        profile_object["egress_sidecar_image_id"],
+    )
     return profile_object
 
 
@@ -811,8 +834,16 @@ def _validate_framework_request(value: JsonObject) -> None:
     _digest_string(value["normalized_task_sha256"], "normalized_task_sha256")
     _digest_string(value["environment_image_id"], "environment_image_id")
     _digest_string(value["egress_sidecar_image_id"], "egress_sidecar_image_id")
-    _bounded_string(value["environment_image_ref"], "environment_image_ref")
-    _bounded_string(value["egress_sidecar_image_ref"], "egress_sidecar_image_ref")
+    _image_reference(
+        value["environment_image_ref"],
+        "environment_image_ref",
+        value["environment_image_id"],
+    )
+    _image_reference(
+        value["egress_sidecar_image_ref"],
+        "egress_sidecar_image_ref",
+        value["egress_sidecar_image_id"],
+    )
     _validate_job_config(value["job_config"])
 
 
@@ -984,6 +1015,14 @@ def _digest_string(value: object, label: str) -> str:
     except ValueError as error:
         raise AdapterContractError(f"{label} must be a sha256 digest") from error
     return result
+
+
+def _image_reference(value: object, label: str, image_id: object) -> str:
+    reference = _exact_string(value, label)
+    digest = _digest_string(image_id, f"{label}.id")
+    if "@" not in reference or reference.rsplit("@", 1)[1] != digest:
+        raise AdapterContractError(f"{label} must be bound to its image digest")
+    return reference
 
 
 def _json_bytes(value: JsonObject) -> bytes:

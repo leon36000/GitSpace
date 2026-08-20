@@ -59,6 +59,18 @@ MUTATIONS = (
         '            "run",\n',
         '            "job",\n',
     ),
+    Mutation(
+        "allow-unbound-image-reference",
+        "harbor_adapter.py",
+        '    if "@" not in reference or reference.rsplit("@", 1)[1] != digest:\n        raise AdapterContractError(f"{label} must be bound to its image digest")\n',
+        '    if False:\n        raise AdapterContractError(f"{label} must be bound to its image digest")\n',
+    ),
+    Mutation(
+        "allow-unbound-replay-image-reference",
+        "harbor_replay.py",
+        '    if "@" not in reference or reference.rsplit("@", 1)[1] != digest:\n        raise AdapterContractError(f"{label} must be bound to its image digest")\n',
+        '    if False:\n        raise AdapterContractError(f"{label} must be bound to its image digest")\n',
+    ),
 )
 
 

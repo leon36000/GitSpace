@@ -50,6 +50,8 @@ _RECORD_FIELDS = {
     "normalized_task_sha256",
     "environment_image_ref",
     "environment_image_id",
+    "egress_sidecar_image_ref",
+    "egress_sidecar_image_id",
     "environment_platform",
     "runtime_network_mode",
     "verifier_environment_mode",
@@ -87,6 +89,8 @@ class HarborReplayRecord:
     normalized_task_sha256: str
     environment_image_ref: str
     environment_image_id: str
+    egress_sidecar_image_ref: str
+    egress_sidecar_image_id: str
     environment_platform: str
     runtime_network_mode: str
     verifier_environment_mode: str
@@ -146,6 +150,12 @@ class HarborReplayRecord:
             environment_image_id=_bounded_string(
                 data["environment_image_id"], "environment_image_id"
             ),
+            egress_sidecar_image_ref=_bounded_string(
+                data["egress_sidecar_image_ref"], "egress_sidecar_image_ref"
+            ),
+            egress_sidecar_image_id=_bounded_string(
+                data["egress_sidecar_image_id"], "egress_sidecar_image_id"
+            ),
             environment_platform=_bounded_string(
                 data["environment_platform"], "environment_platform"
             ),
@@ -198,6 +208,8 @@ class HarborReplayRecord:
                 "normalized_task_sha256": self.normalized_task_sha256,
                 "environment_image_ref": self.environment_image_ref,
                 "environment_image_id": self.environment_image_id,
+                "egress_sidecar_image_ref": self.egress_sidecar_image_ref,
+                "egress_sidecar_image_id": self.egress_sidecar_image_id,
                 "environment_platform": self.environment_platform,
                 "runtime_network_mode": self.runtime_network_mode,
                 "verifier_environment_mode": self.verifier_environment_mode,
@@ -454,9 +466,20 @@ def _validate_record(record: HarborReplayRecord) -> None:
         "source_task_sha256",
         "normalized_task_sha256",
         "environment_image_id",
+        "egress_sidecar_image_id",
     ):
         if not _DIGEST.fullmatch(getattr(record, name)):
             raise AdapterContractError(f"{name} must be a sha256 digest")
+    _image_reference(
+        record.environment_image_ref,
+        "environment_image_ref",
+        record.environment_image_id,
+    )
+    _image_reference(
+        record.egress_sidecar_image_ref,
+        "egress_sidecar_image_ref",
+        record.egress_sidecar_image_id,
+    )
     if record.environment_platform != "linux/amd64":
         raise AdapterContractError("environment platform must be linux/amd64")
     if record.runtime_network_mode != "no-network":
@@ -547,6 +570,16 @@ def _bounded_string(value: object, label: str) -> str:
     if any(unicodedata.category(char).startswith("C") for char in value):
         raise AdapterContractError(f"{label} contains control characters")
     return value
+
+
+def _image_reference(value: object, label: str, image_id: object) -> str:
+    reference = _bounded_string(value, label)
+    digest = _bounded_string(image_id, f"{label}.id")
+    if not _DIGEST.fullmatch(digest):
+        raise AdapterContractError(f"{label}.id must be a sha256 digest")
+    if "@" not in reference or reference.rsplit("@", 1)[1] != digest:
+        raise AdapterContractError(f"{label} must be bound to its image digest")
+    return reference
 
 
 def _optional_string(value: object, label: str) -> str | None:

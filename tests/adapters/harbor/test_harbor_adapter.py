@@ -285,6 +285,29 @@ class HarborAdapterTests(unittest.TestCase):
         with self.assertRaises(AdapterContractError):
             adapter.invoke(prepared)
 
+    def test_profile_requires_digest_bound_image_references(self) -> None:
+        adapter = HarborAdapter(MemoryCas().publish, executor=FakeHarborExecutor())
+
+        for reference in (
+            "local://gitspace/regex-log:latest",
+            "local://gitspace/regex-log@sha256:" + "0" * 64,
+        ):
+            with self.subTest(reference=reference):
+                request = task12_request()
+                request.extensions["gitspace.harbor"]["environment_image_ref"] = (
+                    reference
+                )
+                with self.assertRaises(AdapterContractError):
+                    adapter.prepare(
+                        {
+                            "version": 1,
+                            "task": deepcopy(request.task),
+                            "agent": deepcopy(request.agent),
+                            "seed": request.seed,
+                            "extensions": deepcopy(request.extensions),
+                        }
+                    )
+
     def test_prepared_job_config_cannot_expand_attempts_or_retries(self) -> None:
         adapter = HarborAdapter(MemoryCas().publish, executor=FakeHarborExecutor())
         request = task12_request()
