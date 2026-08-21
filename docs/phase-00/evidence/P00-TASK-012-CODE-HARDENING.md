@@ -1,13 +1,13 @@
 ---
 task_id: P00-TASK-012
-evidence_type: LOCAL_CODE_HARDENING
+evidence_type: CODE_HARDENING_AND_ROOTLESS_POSITIVE_PATH
 status: PARTIALLY_VERIFIED
-repository_head: 500a7d382133d0a2d948356d9c4eff6f6a393540
+repository_head: 0ea1acefb2454dcf3d5706cb58dc66c77f8a8322
 updated: 2026-08-20
 ---
 # P00-TASK-012 — durcissement local Codex
 
-Cette preuve couvre le commit d’implémentation local `500a7d382133d0a2d948356d9c4eff6f6a393540` et uniquement les comportements exécutables sans Harbor/Docker. Elle ne qualifie pas le worker, l’image runtime, le sidecar egress ni un oracle Harbor réel.
+Cette preuve couvre le commit `0ea1acefb2454dcf3d5706cb58dc66c77f8a8322`, les comportements locaux et un chemin Harbor/Docker réel exécuté sur un worker Linux/amd64 rootless dédié. Elle ne constitue pas encore la qualification formelle complète.
 
 ## Changements vérifiés
 
@@ -26,19 +26,30 @@ Cette preuve couvre le commit d’implémentation local `500a7d382133d0a2d948356
 ## Vérifications fraîches
 
 ```text
-tests/adapters/harbor: 70 tests OK
-tests fixture/verifier normalisés: 12 tests OK
+tests Harbor/exécuteur/replay: 81 méthodes de test OK, 11 sous-tests OK
+tests fixture/verifier normalisés: OK
+mutations SDK: 19/19 tuées
 mutations Harbor: 11/11 tuées
-tests/adapters: 43 tests OK
+tests/adapters: 43 méthodes de test OK
 Rust workspace: tests, clippy et fmt OK
 Harbor CLI `run --help` sans job: OK
-production mypy (adapter/replay/runtime): OK
+mypy 2.3.0 verrouillé (adapter/replay/runtime): OK
 ruff, compileall, lock check et diff check: OK
+
+## Chemin runtime positif
+
+Sur le worker rootless dédié, Harbor `0.21.0` a exécuté la fixture avec
+reward `1`, statut `pass`, une trial et zéro retry. Job
+`58061379-ffb2-40f4-b7d9-fae9beb03b53`, trial
+`fcf1ecbe-6abe-4495-a105-5f5f2952b5c5`, record
+`sha256:cabf877ef98dca901df2eb8a88df6be97eabb23a0bad31f84b003ee7e2690b1e`.
+Le cleanup a laissé zéro ressource GitSpace attribuée et les ressources
+étrangères inchangées. Le détail reproductible est dans
+`P00-TASK-012-RUNTIME-POSITIVE-PATH.md`.
 ```
 
 ## Limites
 
-- Aucun Harbor/Docker n’a été lancé sur PC1; le daemon est partagé/rootful et le projet l’interdit pour cette tâche.
-- Le worker qualifié doit encore fournir les manifests de ressources indépendants, le SBOM/scanner, le sidecar egress, le run réel, la preuve CAS/replay et le cleanup physique.
-- Aucun RED toolchain exact sur worker dédié, qualification runtime base/SBOM/scanner, oracle réel, CAS runtime, replay post-run, cleanup physique ou revue indépendante n’est prouvé ici.
-- Le statut maximal reste `implementation_ready_external_runtime_blocked`; aucune promotion `PROVEN`, merge canonique ou projection RAGLite n’est autorisée par cette preuve.
+- Le chemin positif ne ferme pas le SBOM SPDX 2.3, la provenance OCI, le scanner et sa base fraîche, les dispositions de vulnérabilités, ni la revue indépendante de sécurité/conformité et de non-egress.
+- Le replay post-merge sur `main`, la signature de merge et la promotion d’état restent à produire.
+- Le statut maximal reste `PARTIALLY_VERIFIED`; aucune promotion `PROVEN`, merge canonique ou projection RAGLite n’est autorisée par cette preuve seule.

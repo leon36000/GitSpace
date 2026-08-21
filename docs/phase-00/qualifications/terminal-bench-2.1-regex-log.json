@@ -1,6 +1,6 @@
 {
   "task": "P00-TASK-012",
-  "implementation_commit": "500a7d382133d0a2d948356d9c4eff6f6a393540",
+  "implementation_commit": "0ea1acefb2454dcf3d5706cb58dc66c77f8a8322",
   "dataset": {
     "repository": "harbor-framework/terminal-bench-2-1",
     "commit": "7131e4375048a0e408a8fb404b5f499d726b695b",
@@ -36,14 +36,20 @@
   "runtime_base": {
     "reference": "python:3.13.15-slim-bookworm@sha256:0f16c5d35fe6464ee471792ab3bb9116f911b65b3fbf10120c98d2bdc6332f48",
     "platform": "linux/amd64",
-    "qualification_status": "blocked_not_executed_on_dedicated_worker"
+    "qualification_status": "positive_path_observed_formal_supply_chain_gates_open"
   },
   "local_evidence": {
     "source_provenance": "pass",
     "normalization_manifest": "pass",
     "verifier_pass_fail_infra_protocol": "pass",
-    "runtime_harbor_docker": "not_run"
+    "runtime_harbor_docker": "pass_positive_path",
+    "job_id": "58061379-ffb2-40f4-b7d9-fae9beb03b53",
+    "trial_id": "fcf1ecbe-6abe-4495-a105-5f5f2952b5c5",
+    "record_sha256": "sha256:cabf877ef98dca901df2eb8a88df6be97eabb23a0bad31f84b003ee7e2690b1e",
+    "reward": 1,
+    "cleanup_complete": true,
+    "foreign_resources_unchanged": true
   },
-  "qualification_status": "implementation_ready_external_runtime_blocked",
-  "blocker": "A dedicated disposable or rootless linux/amd64 worker must qualify the runtime base, SBOM, scanner/database freshness, egress sidecar, no-network execution and physical cleanup before Harbor oracle execution."
+  "qualification_status": "PARTIALLY_VERIFIED_RUNTIME_POSITIVE_PATH",
+  "formal_gates_open": "The positive path is observed on the rootless worker, but SPDX 2.3 SBOM, OCI provenance, scanner/database freshness and vulnerability dispositions, independent no-egress/security/conformity review, exact-head formal qualification and post-merge replay remain open."
 }

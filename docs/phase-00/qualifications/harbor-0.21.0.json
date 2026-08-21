@@ -1,6 +1,6 @@
 {
   "task": "P00-TASK-012",
-  "implementation_commit": "500a7d382133d0a2d948356d9c4eff6f6a393540",
+  "implementation_commit": "0ea1acefb2454dcf3d5706cb58dc66c77f8a8322",
   "framework": "harbor",
   "version": "0.21.0",
   "repository": "harbor-framework/harbor",
@@ -42,9 +42,30 @@
     "fixture_inventory_binding": "pass",
     "effective_config_adversarial_mutations": "pass",
     "resource_observer_qualified_path": "unit_verified",
-    "runtime_harbor_docker": "not_run"
+    "runtime_harbor_docker": "pass_positive_path",
+    "official_unittest_harbor": "81_test_methods_pass",
+    "official_unittest_adapters": "43_test_methods_pass",
+    "mutations": "19_of_19_killed",
+    "mypy": "2.3.0_locked_pass"
   },
-  "qualification_status": "implementation_ready_external_runtime_blocked",
-  "runtime_blocker": "The project forbids starting Harbor/Docker on the shared PC1 host; a dedicated qualified worker must provide no-network, egress-sidecar, cleanup, and independent identity evidence.",
+  "runtime_positive_path": {
+    "worker": "dedicated_rootless_linux_amd64",
+    "docker_server": "29.6.1",
+    "docker_driver": "overlayfs",
+    "docker_security": ["rootless", "cgroupns"],
+    "job_id": "58061379-ffb2-40f4-b7d9-fae9beb03b53",
+    "trial_id": "fcf1ecbe-6abe-4495-a105-5f5f2952b5c5",
+    "trial_name": "terminal-bench-2.1-regex-log__diQfZUd",
+    "record_sha256": "sha256:cabf877ef98dca901df2eb8a88df6be97eabb23a0bad31f84b003ee7e2690b1e",
+    "status": "pass",
+    "reward": 1,
+    "before_resources": 9,
+    "after_resources": 7,
+    "after_owned_resources": 0,
+    "foreign_resources_unchanged": true,
+    "cleanup_complete": true
+  },
+  "qualification_status": "PARTIALLY_VERIFIED_RUNTIME_POSITIVE_PATH",
+  "formal_gates_open": "SBOM SPDX 2.3, OCI provenance, scanner/database freshness and dispositions, independent no-egress/security/conformity review, exact-head formal qualification, signed merge and post-merge replay remain open.",
   "checked_at": "2026-08-20"
 }
