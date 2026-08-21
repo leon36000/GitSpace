@@ -49,7 +49,7 @@ jobs:
       - name: Verify exact toolchain and locked graph
         run: |
           python --version | grep -Fx 'Python 3.12.13'
-          uv --version | grep -Fx 'uv 0.12.0'
+          python -c "import importlib.metadata as m; assert m.version('uv') == '0.12.0'"
           uv lock --check --python 3.12.13
       - name: Sync frozen graph without building the project
         run: uv sync --frozen --no-build
