@@ -1168,11 +1168,12 @@ class HarborSdkExecutorTests(unittest.TestCase):
     def test_executor_rejects_worker_environment_outside_qualification_allowlist(
         self,
     ) -> None:
+        observer = FakeResourceObserver()
         with self.assertRaises(AdapterContractError):
             HarborSdkExecutor(
                 qualified_venv="/qualified/venv",
                 worker_environment={"SECRET_TOKEN": "must-not-cross"},
-                resource_observer=FakeResourceObserver(),
+                resource_observer=observer,
             )
 
     def test_sdk_executor_turns_worker_exception_into_infra_capture(self) -> None:

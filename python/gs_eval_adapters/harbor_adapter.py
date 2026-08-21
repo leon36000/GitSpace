@@ -528,7 +528,7 @@ def _validate_trial_capture_binding(
     if Path(unquote(parsed_trial_uri.path)).resolve() != trial_dir:
         raise AdapterContractError("Harbor trial URI differs from trial directory")
     trials_dir = _exact_string(trial_config.get("trials_dir"), "trials_dir")
-    if Path(trials_dir).resolve() != job_dir:
+    if trials_dir != str(job_dir):
         raise AdapterContractError("Harbor trial directory is not bound to job")
 
 

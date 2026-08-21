@@ -9,6 +9,7 @@ import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
+from typing import cast
 from urllib.parse import unquote, urlparse
 
 from .errors import AdapterContractError
@@ -611,77 +612,14 @@ def classify_harbor_record(
     obligations["policy_clear"] = (
         record.exception_discriminant != "policy_violation_exact"
     )
-    obligations["artifact_integrity"] = _required_artifact_fields(record).issubset(
-        record.artifacts
+    artifact_contents, artifact_integrity = _read_record_artifacts(
+        record, read_artifact
     )
-    artifact_contents: dict[str, bytes] = {}
+    obligations["artifact_integrity"] = artifact_integrity
+    if artifact_integrity:
+        _validate_observed_artifacts(record, artifact_contents, obligations)
 
-    if read_artifact is None:
-        obligations["artifact_integrity"] = False
-    else:
-        for name, uri in record.artifacts.items():
-            try:
-                content = read_artifact(uri)
-            except Exception:  # noqa: BLE001 - unreadable CAS is an infra outcome
-                obligations["artifact_integrity"] = False
-                break
-            if type(content) is not bytes:
-                obligations["artifact_integrity"] = False
-                break
-            artifact_contents[name] = content
-            expected_digest = record.artifact_sha256[name].removeprefix(_DIGEST_PREFIX)
-            if hashlib.sha256(content).hexdigest() != expected_digest:
-                obligations["artifact_integrity"] = False
-                break
-        if obligations["artifact_integrity"]:
-            _validate_observed_artifacts(record, artifact_contents, obligations)
-
-    task_invalid_candidate = False
-    status = AdapterStatus.INFRA
-    if (
-        not obligations["artifact_integrity"]
-        or not obligations["qualification_pinned"]
-        or not obligations["run_purpose_valid"]
-        or not obligations["exception_boundary_consistent"]
-        or not obligations["trial_exception_consistent"]
-    ):
-        status = AdapterStatus.INFRA
-    elif not obligations["policy_clear"]:
-        status = AdapterStatus.POLICY
-    elif not obligations["process_exit_zero"]:
-        status = AdapterStatus.INFRA
-    elif not obligations["oracle_exit_consistent"]:
-        task_invalid_candidate = record.run_purpose == "qualification_oracle"
-        status = AdapterStatus.INFRA
-    elif (
-        not obligations["network_closed"]
-        or not obligations["job_cardinality_one"]
-        or not obligations["trial_cardinality_one"]
-        or not obligations["reward_well_typed"]
-        or not obligations["cleanup_complete"]
-        or not obligations["stage_obligations_consistent"]
-    ):
-        status = AdapterStatus.INFRA
-    elif record.exception_discriminant == "agent_timeout_exact":
-        obligations["timeout_attribution_valid"] = _timeout_attribution_valid(record)
-        status = (
-            AdapterStatus.TIMEOUT
-            if obligations["timeout_attribution_valid"]
-            else AdapterStatus.INFRA
-        )
-    elif (
-        record.exception_discriminant is not None
-        or record.harbor_status == "exception"
-        or record.observed_reward is None
-    ):
-        status = AdapterStatus.INFRA
-    elif record.run_purpose == "qualification_oracle" and record.observed_reward == 0:
-        task_invalid_candidate = True
-        status = AdapterStatus.INFRA
-    elif record.observed_reward == 1:
-        status = AdapterStatus.PASS
-    elif record.run_purpose == "status_control" and record.observed_reward == 0:
-        status = AdapterStatus.FAIL
+    status, task_invalid_candidate = _classify_record_status(record, obligations)
 
     obligations["infra_clear"] = status not in {
         AdapterStatus.INFRA,
@@ -692,6 +630,96 @@ def classify_harbor_record(
         obligations=obligations,
         record_sha256=record_digest,
         task_invalid_candidate=task_invalid_candidate,
+    )
+
+
+def _read_record_artifacts(
+    record: HarborReplayRecord,
+    read_artifact: Callable[[str], bytes] | None,
+) -> tuple[dict[str, bytes], bool]:
+    if read_artifact is None:
+        return {}, False
+    if not _required_artifact_fields(record).issubset(record.artifacts):
+        return {}, False
+    artifact_contents: dict[str, bytes] = {}
+    for name, uri in record.artifacts.items():
+        try:
+            content = read_artifact(uri)
+        except Exception:  # noqa: BLE001 - unreadable CAS is an infra outcome
+            return artifact_contents, False
+        if type(content) is not bytes:
+            return artifact_contents, False
+        expected_digest = record.artifact_sha256[name].removeprefix(_DIGEST_PREFIX)
+        if hashlib.sha256(content).hexdigest() != expected_digest:
+            return artifact_contents, False
+        artifact_contents[name] = content
+    return artifact_contents, True
+
+
+def _classify_record_status(
+    record: HarborReplayRecord, obligations: dict[str, bool]
+) -> tuple[AdapterStatus, bool]:
+    if _record_infra_obligation_failed(obligations):
+        return AdapterStatus.INFRA, False
+    if not obligations["policy_clear"]:
+        return AdapterStatus.POLICY, False
+    if not obligations["process_exit_zero"]:
+        return AdapterStatus.INFRA, False
+    if not obligations["oracle_exit_consistent"]:
+        return AdapterStatus.INFRA, record.run_purpose == "qualification_oracle"
+    if _record_execution_obligation_failed(obligations):
+        return AdapterStatus.INFRA, False
+    if record.exception_discriminant == "agent_timeout_exact":
+        obligations["timeout_attribution_valid"] = _timeout_attribution_valid(record)
+        status = (
+            AdapterStatus.TIMEOUT
+            if obligations["timeout_attribution_valid"]
+            else AdapterStatus.INFRA
+        )
+        return status, False
+    if _record_exception_observed(record):
+        return AdapterStatus.INFRA, False
+    if record.run_purpose == "qualification_oracle" and record.observed_reward == 0:
+        return AdapterStatus.INFRA, True
+    if record.observed_reward == 1:
+        return AdapterStatus.PASS, False
+    if record.run_purpose == "status_control" and record.observed_reward == 0:
+        return AdapterStatus.FAIL, False
+    return AdapterStatus.INFRA, False
+
+
+def _record_infra_obligation_failed(obligations: dict[str, bool]) -> bool:
+    return any(
+        not obligations[name]
+        for name in (
+            "artifact_integrity",
+            "qualification_pinned",
+            "run_purpose_valid",
+            "exception_boundary_consistent",
+            "trial_exception_consistent",
+        )
+    )
+
+
+def _record_execution_obligation_failed(obligations: dict[str, bool]) -> bool:
+    return any(
+        not obligations[name]
+        for name in (
+            "network_closed",
+            "job_cardinality_one",
+            "trial_cardinality_one",
+            "reward_well_typed",
+            "cleanup_complete",
+            "stage_obligations_consistent",
+        )
+    )
+
+
+def _record_exception_observed(record: HarborReplayRecord) -> bool:
+    return (
+        record.exception_discriminant is not None
+        or record.harbor_status == "exception"
+        or record.observed_reward is None
     )
 
 
@@ -1393,21 +1421,23 @@ def _absolute_posix_path(value: object) -> str | None:
 
     if type(value) is not str or not value.startswith("/"):
         return None
-    if "\\" in value or "\x00" in value:
+    text = cast(str, value)
+    if "\\" in text or "\x00" in text:
         return None
-    if any(ord(character) < 32 or ord(character) == 127 for character in value):
+    if any(ord(character) < 32 or ord(character) == 127 for character in text):
         return None
-    return posixpath.normpath(value)
+    return posixpath.normpath(text)
 
 
 def _posix_component(value: object) -> str | None:
     if type(value) is not str or not value or value in {".", ".."}:
         return None
-    if "/" in value or "\\" in value or "\x00" in value:
+    text = cast(str, value)
+    if "/" in text or "\\" in text or "\x00" in text:
         return None
-    if any(ord(character) < 32 or ord(character) == 127 for character in value):
+    if any(ord(character) < 32 or ord(character) == 127 for character in text):
         return None
-    return value
+    return text
 
 
 def _validate_trial_result_config(
@@ -1674,7 +1704,7 @@ def _resource_map(value: object) -> dict[tuple[str, str, str], JsonObject] | Non
     if type(value) is not list:
         return None
     resources: dict[tuple[str, str, str], JsonObject] = {}
-    for item in value:
+    for item in cast(list[object], value):
         if type(item) is not dict or set(item) != _RESOURCE_FIELDS:
             return None
         kind = item.get("kind")
@@ -2121,9 +2151,10 @@ def _require_exact_fields(value: JsonObject, expected: set[str], label: str) -> 
 def _bounded_string(value: object, label: str) -> str:
     if type(value) is not str or not value or len(value) > 512:
         raise AdapterContractError(f"{label} must be a bounded non-empty string")
-    if any(unicodedata.category(char).startswith("C") for char in value):
+    text = cast(str, value)
+    if any(unicodedata.category(char).startswith("C") for char in text):
         raise AdapterContractError(f"{label} contains control characters")
-    return value
+    return text
 
 
 def _image_reference(value: object, label: str, image_id: object) -> str:
