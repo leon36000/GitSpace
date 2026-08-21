@@ -3,7 +3,7 @@ task_id: P00-TASK-012
 evidence_type: ROOTLESS_RUNTIME_POSITIVE_PATH
 status: HISTORICAL_POSITIVE_PATH_INVALIDATED_BY_FIXTURE_CHANGE
 implementation_commit: 0ea1acefb2454dcf3d5706cb58dc66c77f8a8322
-superseded_by: 3eb19aa
+superseded_by: 4b06fb2
 updated: 2026-08-20
 ---
 # P00-TASK-012 — chemin Harbor réel positif
@@ -13,7 +13,7 @@ Cette preuve documente un chemin positif réellement exécuté après le commit
 formelle complète ni promotion `PROVEN`.
 
 Elle est conservée comme trace historique uniquement. La fixture normalisée a
-ensuite changé dans `3eb19aa` pour corriger les findings de qualité de la
+ensuite changé dans `4b06fb2` pour corriger les findings de qualité de la
 fixture; ses digests runtime ne correspondent donc plus à ce run et une
 requalification fraîche est obligatoire.
 

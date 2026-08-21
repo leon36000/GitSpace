@@ -3,7 +3,7 @@ task_id: P00-TASK-012
 evidence_type: CODE_HARDENING_AND_ROOTLESS_POSITIVE_PATH
 status: HISTORICAL_POSITIVE_PATH_INVALIDATED_BY_FIXTURE_CHANGE
 repository_head: 0ea1acefb2454dcf3d5706cb58dc66c77f8a8322
-superseded_by: 3eb19aa
+superseded_by: 4b06fb2
 updated: 2026-08-20
 ---
 # P00-TASK-012 — durcissement local Codex
