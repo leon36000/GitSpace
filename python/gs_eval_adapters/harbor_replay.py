@@ -33,7 +33,7 @@ TERMINAL_BENCH_SOURCE_TASK_SHA256 = (
     "sha256:345c3bd09ab6f6fe8c8361a58c0a47bf0a13b3fcb38a5ac7824e44ff855e8f72"
 )
 TERMINAL_BENCH_NORMALIZED_TASK_SHA256 = (
-    "sha256:58bb28ae1ce38ed80f4c07a23f2b905c368448ed87e50fc0c9d542ac421ce027"
+    "sha256:dd86c081c48cc81b0d472122f791786d86bd6d2c9615948e8b32b3fdfafcf194"
 )
 HARBOR_ENVIRONMENT_IMPORT_PATH = (
     "gs_eval_adapters.harbor_runtime:GitSpaceHarborEnvironment"
@@ -48,7 +48,7 @@ TERMINAL_BENCH_RUNTIME_FILE_DIGESTS = {
     _TEST_OUTPUTS_PATH: "sha256:345c3bd09ab6f6fe8c8361a58c0a47bf0a13b3fcb38a5ac7824e44ff855e8f72",
     "tests/run_test.py": "sha256:249dd2c3896af27b943c4eb7df6d3026da388be064c940a05c812d9b2d99dcce",
     "tests/test.sh": "sha256:4bea61a4c4c3787a3b97ef62a98437e854c91172cd8d4b184460d387a6165f71",
-    "environment/Dockerfile": "sha256:98f25a43d0e847aecef06e21754031ce48fdecac9e65affbcbe87497d0d09a37",
+    "environment/Dockerfile": "sha256:d8f1d7d34c169daa44b338e066cfc69c7d6808eb65e093bb91e06f4c6133c3a2",
 }
 TERMINAL_BENCH_FIXTURE_FILE_MODES = {
     _SOURCE_MANIFEST_PATH: "0644",
