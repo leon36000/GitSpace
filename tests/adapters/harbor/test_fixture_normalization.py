@@ -72,11 +72,12 @@ class HarborFixtureNormalizationTests(unittest.TestCase):
         self.assertIn(CANARY, _bytes("solution/solve.sh").decode("utf-8"))
         dockerfile = _bytes("environment/Dockerfile").decode("utf-8")
         self.assertIn(CANARY, dockerfile)
-        self.assertIn("FROM python:3.13.15-slim-bookworm@sha256:", dockerfile)
-        self.assertNotIn("FROM python:3.13.15-slim-bookworm\n", dockerfile)
+        self.assertIn("FROM python@sha256:", dockerfile)
+        self.assertNotIn("FROM python:3.13.15-slim-bookworm@sha256:", dockerfile)
+        self.assertIn("USER gitspace:gitspace", dockerfile)
         manifest = json.loads(_bytes("source-manifest.json"))
         reference = manifest["base_image"]["reference"]
-        self.assertIn(reference, dockerfile)
+        self.assertIn(reference.split("@", 1)[1], dockerfile)
         self.assertEqual(manifest["base_image"]["platform"], "linux/amd64")
         self.assertEqual(
             manifest["base_image"]["qualification_status"],
