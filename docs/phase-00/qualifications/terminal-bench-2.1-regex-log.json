@@ -1,6 +1,6 @@
 {
   "task": "P00-TASK-012",
-  "implementation_commit": "bc524bb",
+  "implementation_commit": "3eb19aa",
   "dataset": {
     "repository": "harbor-framework/terminal-bench-2-1",
     "commit": "7131e4375048a0e408a8fb404b5f499d726b695b",

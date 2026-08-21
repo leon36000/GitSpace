@@ -2,13 +2,13 @@
 task_id: P00-TASK-012
 evidence_type: CODE_QUALITY_AND_EXACT_HEAD
 status: PARTIALLY_VERIFIED
-repository_head: bc524bb
+repository_head: 3eb19aa
 updated: 2026-08-21
 ---
 
 # P00-TASK-012 — preuve de qualité au head de correction
 
-Cette preuve couvre le commit `bc524bb`, qui corrige les cinq annotations
+Cette preuve couvre le commit `3eb19aa`, qui corrige les cinq annotations
 Sonar résiduelles dans la fixture normalisée sans modifier le code de
 production Harbor.
 
@@ -19,7 +19,7 @@ production Harbor.
   `FROM` et exécute la fixture avec l’utilisateur non-root `gitspace`.
 - `source-manifest.json`, `TERMINAL_BENCH_RUNTIME_FILE_DIGESTS` et la
   qualification ont été recalculés; le digest normalisé est
-  `sha256:ae48517f3571e5505f94f780cdd74e208aa31ca2bc1c5f6f8648d3fe163dd147`.
+  `sha256:58bb28ae1ce38ed80f4c07a23f2b905c368448ed87e50fc0c9d542ac421ce027`.
 - L’ancienne qualification runtime est explicitement marquée historique et
   invalidée; aucune preuve Harbor antérieure n’est recyclée.
 
@@ -35,7 +35,7 @@ production Harbor.
 ## Sonar et garde de merge
 
 Le check Sonar antérieur avait cinq annotations dans la fixture. Le head
-`bc524bb` doit encore recevoir un check Sonar exact-head frais; son absence ne
+`3eb19aa` doit encore recevoir un check Sonar exact-head frais; son absence ne
 peut pas être convertie localement en PASS. Les gates formelles Task 012
 restent ouvertes : requalification runtime rootless, SBOM SPDX 2.3,
 provenance OCI, scanner/base fraîche et dispositions, revue indépendante
