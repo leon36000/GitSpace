@@ -49,6 +49,12 @@ _PREPARED_FIELDS = {"canonical_request", "framework_request", "extensions"}
 _RAW_FIELDS = {"capture"}
 _ARTIFACT_FIELDS = HARBOR_ARTIFACT_FIELDS
 _DIGEST = "sha256:"
+_CONFIG_JSON = "config.json"
+_RESULT_JSON = "result.json"
+_SOURCE_MANIFEST = "source-manifest.json"
+_HARBOR_EXTENSION = "gitspace.harbor"
+_JOB_CONFIG_PATH = "$/job_config"
+_ONE_TRIAL_ERROR = "Harbor job result does not contain one trial"
 _STAGE_FIELDS = {
     "environment_started",
     "agent_setup_completed",
@@ -73,7 +79,7 @@ class HarborExecutionRequest:
         _bounded_string(self.run_root, "run_root")
         _bounded_string(self.fixture_root, "fixture_root")
         object.__setattr__(
-            self, "job_config", clone_object(self.job_config, path="$/job_config")
+            self, "job_config", clone_object(self.job_config, path=_JOB_CONFIG_PATH)
         )
         _digest_string(self.environment_image_id, "environment_image_id")
         _image_reference(
@@ -273,7 +279,7 @@ class HarborSdkExecutor:
             )
         root.mkdir(parents=True, exist_ok=True)
 
-        job_config = clone_object(request.job_config, path="$/job_config")
+        job_config = clone_object(request.job_config, path=_JOB_CONFIG_PATH)
         job_name = _exact_string(job_config.get("job_name"), "job_config.job_name")
         if (
             Path(job_name).name != job_name
@@ -370,79 +376,20 @@ class HarborSdkExecutor:
         resource_manifest_before_bytes: bytes,
         resource_manifest_after_bytes: bytes,
     ) -> HarborExecutionCapture:
-        job_dir = (jobs_dir / job_name).resolve()
-        try:
-            job_dir.relative_to(jobs_dir.resolve())
-        except ValueError as error:
-            raise AdapterContractError(
-                "Harbor job directory escaped jobs_dir"
-            ) from error
-        job_result_path = job_dir / "result.json"
+        job_dir = _validated_job_dir(jobs_dir, job_name)
+        job_result_path = job_dir / _RESULT_JSON
         if not job_result_path.is_file():
             raise AdapterContractError("Harbor did not publish job result.json")
         job_result_bytes = job_result_path.read_bytes()
         job_result = _json_object_bytes(job_result_bytes, "job_result")
-        trial_summary_id = _job_result_trial_summary_id(job_result)
-        if trial_summary_id is not None:
-            trial_results = job_result.get("trial_results")
-            if type(trial_results) is not list or len(trial_results) != 1:
-                raise AdapterContractError("Harbor job result does not contain one trial")
-            trial_summary = _exact_object(
-                trial_results[0], "job_result.trial_results[0]"
-            )
-            trial_uri = _exact_string(trial_summary.get("trial_uri"), "trial_uri")
-            parsed_uri = urlparse(trial_uri)
-            if parsed_uri.scheme != "file" or parsed_uri.netloc not in {
-                "",
-                "localhost",
-            }:
-                raise AdapterContractError("Harbor trial URI must be a local file URI")
-            trial_dir = Path(unquote(parsed_uri.path)).resolve()
-        else:
-            trial_dirs = sorted(
-                (
-                    path
-                    for path in job_dir.iterdir()
-                    if path.is_dir()
-                    and (path / "config.json").is_file()
-                    and (path / "result.json").is_file()
-                ),
-                key=lambda path: str(path),
-            )
-            if len(trial_dirs) != 1:
-                raise AdapterContractError(
-                    "Harbor job result does not contain one trial directory"
-                )
-            trial_dir = trial_dirs[0].resolve()
-        try:
-            trial_dir.relative_to(job_dir)
-        except ValueError as error:
-            raise AdapterContractError(
-                "Harbor trial URI escaped the job directory"
-            ) from error
-        trial_config_path = trial_dir / "config.json"
-        trial_result_path = trial_dir / "result.json"
-        if not trial_config_path.is_file() or not trial_result_path.is_file():
-            raise AdapterContractError(
-                "Harbor trial configuration/result is incomplete"
-            )
-        trial_result = _json_object_bytes(
-            trial_result_path.read_bytes(), "trial_result"
-        )
+        trial_dir = _resolve_trial_dir(job_dir, job_result)
+        _validate_trial_dir(job_dir, trial_dir)
+        trial_config_path, trial_result_path = _trial_artifact_paths(trial_dir)
+        trial_result_bytes = trial_result_path.read_bytes()
+        trial_result = _json_object_bytes(trial_result_bytes, "trial_result")
         trial_config_bytes = trial_config_path.read_bytes()
         trial_config = _json_object_bytes(trial_config_bytes, "trial_config")
-        trial_uri = _exact_string(trial_result.get("trial_uri"), "trial_uri")
-        parsed_trial_uri = urlparse(trial_uri)
-        if parsed_trial_uri.scheme != "file" or parsed_trial_uri.netloc not in {
-            "",
-            "localhost",
-        }:
-            raise AdapterContractError("Harbor trial URI must be a local file URI")
-        if Path(unquote(parsed_trial_uri.path)).resolve() != trial_dir:
-            raise AdapterContractError("Harbor trial URI differs from trial directory")
-        trials_dir = _exact_string(trial_config.get("trials_dir"), "trials_dir")
-        if Path(trials_dir).resolve() != job_dir:
-            raise AdapterContractError("Harbor trial directory is not bound to job")
+        _validate_trial_capture_binding(job_dir, trial_dir, trial_config, trial_result)
         exception_boundary_bytes = _read_or_default(
             root / "exception-boundary.json",
             _default_exception_boundary_bytes(trial_result),
@@ -456,11 +403,11 @@ class HarborSdkExecutor:
             harbor_stdout=process_result.stdout or _read_or_empty(job_dir / "job.log"),
             harbor_stderr=process_result.stderr
             or _read_or_empty(job_dir / "harbor-stderr.txt"),
-            job_config_bytes=_read_or_empty(job_dir / "config.json")
+            job_config_bytes=_read_or_empty(job_dir / _CONFIG_JSON)
             or job_config_bytes,
             job_result_bytes=job_result_bytes,
             trial_config_bytes=trial_config_bytes,
-            trial_result_bytes=trial_result_path.read_bytes(),
+            trial_result_bytes=trial_result_bytes,
             agent_stdout=_read_or_empty(agent_dir / "oracle.txt"),
             agent_stderr=_read_or_empty(agent_dir / "stderr.txt"),
             oracle_exit_code_bytes=_read_optional(agent_dir / "exit-code.txt"),
@@ -471,7 +418,7 @@ class HarborSdkExecutor:
                 verifier_dir / "gitspace-result.json"
             ),
             source_manifest_bytes=_read_or_default(
-                fixture_root / "source-manifest.json", b""
+                fixture_root / _SOURCE_MANIFEST, b""
             ),
             task_toml_bytes=_read_or_default(fixture_root / "task.toml", b""),
             instruction_md_bytes=_read_or_default(fixture_root / "instruction.md", b""),
@@ -504,6 +451,85 @@ class HarborSdkExecutor:
             exception_discriminant=exception_discriminant,
             stage_obligations=_stage_obligations_from_trial_result(trial_result),
         )
+
+
+def _validated_job_dir(jobs_dir: Path, job_name: str) -> Path:
+    job_dir = (jobs_dir / job_name).resolve()
+    try:
+        job_dir.relative_to(jobs_dir.resolve())
+    except ValueError as error:
+        raise AdapterContractError(
+            "Harbor job directory escaped jobs_dir"
+        ) from error
+    return job_dir
+
+
+def _resolve_trial_dir(job_dir: Path, job_result: JsonObject) -> Path:
+    summary_id = _job_result_trial_summary_id(job_result)
+    if summary_id is not None:
+        trial_results = job_result.get("trial_results")
+        if type(trial_results) is not list or len(trial_results) != 1:
+            raise AdapterContractError(_ONE_TRIAL_ERROR)
+        trial_summary = _exact_object(
+            trial_results[0], "job_result.trial_results[0]"
+        )
+        trial_uri = _exact_string(trial_summary.get("trial_uri"), "trial_uri")
+        parsed_uri = urlparse(trial_uri)
+        if parsed_uri.scheme != "file" or parsed_uri.netloc not in {"", "localhost"}:
+            raise AdapterContractError("Harbor trial URI must be a local file URI")
+        return Path(unquote(parsed_uri.path)).resolve()
+    trial_dirs = sorted(
+        (
+            path
+            for path in job_dir.iterdir()
+            if path.is_dir()
+            and (path / _CONFIG_JSON).is_file()
+            and (path / _RESULT_JSON).is_file()
+        ),
+        key=lambda path: str(path),
+    )
+    if len(trial_dirs) != 1:
+        raise AdapterContractError(
+            "Harbor job result does not contain one trial directory"
+        )
+    return trial_dirs[0].resolve()
+
+
+def _validate_trial_dir(job_dir: Path, trial_dir: Path) -> None:
+    try:
+        trial_dir.relative_to(job_dir)
+    except ValueError as error:
+        raise AdapterContractError(
+            "Harbor trial URI escaped the job directory"
+        ) from error
+
+
+def _trial_artifact_paths(trial_dir: Path) -> tuple[Path, Path]:
+    trial_config_path = trial_dir / _CONFIG_JSON
+    trial_result_path = trial_dir / _RESULT_JSON
+    if not trial_config_path.is_file() or not trial_result_path.is_file():
+        raise AdapterContractError("Harbor trial configuration/result is incomplete")
+    return trial_config_path, trial_result_path
+
+
+def _validate_trial_capture_binding(
+    job_dir: Path,
+    trial_dir: Path,
+    trial_config: JsonObject,
+    trial_result: JsonObject,
+) -> None:
+    trial_uri = _exact_string(trial_result.get("trial_uri"), "trial_uri")
+    parsed_trial_uri = urlparse(trial_uri)
+    if parsed_trial_uri.scheme != "file" or parsed_trial_uri.netloc not in {
+        "",
+        "localhost",
+    }:
+        raise AdapterContractError("Harbor trial URI must be a local file URI")
+    if Path(unquote(parsed_trial_uri.path)).resolve() != trial_dir:
+        raise AdapterContractError("Harbor trial URI differs from trial directory")
+    trials_dir = _exact_string(trial_config.get("trials_dir"), "trials_dir")
+    if Path(trials_dir).resolve() != job_dir:
+        raise AdapterContractError("Harbor trial directory is not bound to job")
 
 
 def _run_harbor_process(
@@ -585,7 +611,7 @@ def _failure_capture(
             {"discriminant": "other_exception", "stage": "unknown"}
         ),
         exception_discriminant="other_exception",
-        stage_obligations={name: False for name in _STAGE_FIELDS},
+        stage_obligations=dict.fromkeys(_STAGE_FIELDS, False),
     )
 
 
@@ -687,11 +713,11 @@ def _resource_state_map(value: bytes) -> dict[tuple[str, str, str], str] | None:
             or owner not in {"gitspace", "foreign"}
             or type(state_digest) is not str
             or len(state_digest) != 71
-            or not state_digest.startswith("sha256:")
+            or not state_digest.startswith(_DIGEST)
         ):
             return None
         try:
-            int(state_digest.removeprefix("sha256:"), 16)
+            int(state_digest.removeprefix(_DIGEST), 16)
         except ValueError:
             return None
         key = (kind, resource_id, owner)
@@ -743,7 +769,7 @@ def _fixture_inventory_bytes(fixture_root: Path) -> bytes:
             "bytes": len(content),
             "mode": TERMINAL_BENCH_FIXTURE_FILE_MODES[str(relative)],
         }
-    if set(files) != {"source-manifest.json", *TERMINAL_BENCH_RUNTIME_FILE_DIGESTS}:
+    if set(files) != {_SOURCE_MANIFEST, *TERMINAL_BENCH_RUNTIME_FILE_DIGESTS}:
         raise AdapterContractError(
             "Harbor fixture inventory is not the locked file set"
         )
@@ -773,7 +799,7 @@ def _job_result_trial_summary_id(job_result: JsonObject) -> str | None:
     if "trial_results" in job_result:
         trial_results = job_result["trial_results"]
         if type(trial_results) is not list or len(trial_results) != 1:
-            raise AdapterContractError("Harbor job result does not contain one trial")
+            raise AdapterContractError(_ONE_TRIAL_ERROR)
         trial_summary = _exact_object(
             trial_results[0], "job_result.trial_results[0]"
         )
@@ -807,7 +833,7 @@ def _job_result_trial_summary_id(job_result: JsonObject) -> str | None:
         or cancelled > errored
         or retries != 0
     ):
-        raise AdapterContractError("Harbor job result does not contain one trial")
+        raise AdapterContractError(_ONE_TRIAL_ERROR)
     if type(stats.get("evals")) is not dict:
         raise AdapterContractError("job_result.stats.evals is invalid")
     return None
@@ -894,7 +920,7 @@ class HarborAdapter:
             "canonical_request": canonical,
             "framework_request": framework_request,
             "extensions": {
-                "gitspace.harbor": {
+                _HARBOR_EXTENSION: {
                     "qualification": "terminal-bench-2.1-regex-log",
                     "source_task_sha256": profile["source_task_sha256"],
                     "normalized_task_sha256": profile["normalized_task_sha256"],
@@ -913,7 +939,7 @@ class HarborAdapter:
             execution_request = HarborExecutionRequest(
                 run_root=run_root,
                 fixture_root=str(_fixture_root()),
-                job_config=clone_object(framework["job_config"], path="$/job_config"),
+                job_config=clone_object(framework["job_config"], path=_JOB_CONFIG_PATH),
                 environment_image_ref=framework["environment_image_ref"],  # type: ignore[arg-type]
                 environment_image_id=framework["environment_image_id"],  # type: ignore[arg-type]
                 egress_sidecar_image_ref=framework["egress_sidecar_image_ref"],  # type: ignore[arg-type]
@@ -961,7 +987,7 @@ class HarborAdapter:
             "summary": _summary(replay.status, replay.task_invalid_candidate),
             "artifacts": artifacts,
             "metrics": metrics,
-            "extensions": {"gitspace.harbor": harbor_extension},
+            "extensions": {_HARBOR_EXTENSION: harbor_extension},
         }
         return result
 
@@ -1045,59 +1071,20 @@ def _capture_projection(
     boundary_details = _parse_exception_boundary_details(
         capture.exception_boundary_bytes
     )
-    summary_id = _job_result_trial_summary_id(job_result)
-    if _exact_string(job_result.get("id"), "job_result.id") == "":
-        raise AdapterContractError("Harbor job id is empty")
-    job_id = _exact_string(job_result["id"], "job_result.id")
-    trial_id = _exact_string(trial_result.get("id"), "trial_result.id")
-    if summary_id is not None and trial_id != summary_id:
-        raise AdapterContractError("Harbor job/result trial IDs differ")
-    for config_id_name in ("id", "trial_id"):
-        if config_id_name in trial_config and trial_id != _exact_string(
-            trial_config[config_id_name], f"trial_config.{config_id_name}"
-        ):
-            raise AdapterContractError("Harbor trial config/result IDs differ")
-    task_name = _exact_string(trial_result.get("task_name"), "trial_result.task_name")
-    if task_name != TERMINAL_BENCH_TASK:
-        raise AdapterContractError("Harbor trial task name is not pinned")
-    exception_info = trial_result.get("exception_info")
-    if exception_info is None:
-        exception_present = False
-        exception_type_diagnostic = None
-        exception_stage = None
-    else:
-        info = _exact_object(exception_info, "trial_result.exception_info")
-        exception_present = True
-        exception_type_diagnostic = _exact_string(
-            info.get("exception_type"), "exception_type"
-        )
-        raw_stage = trial_result.get("exception_stage")
-        boundary_stage = boundary_details[1] if boundary_details is not None else None
-        exception_stage = (
-            boundary_stage or "unknown"
-            if raw_stage is None
-            else _exact_string(raw_stage, "exception_stage")
-        )
-
-    observed_reward, reward_error = _parse_reward(capture.verifier_reward_json_bytes)
-    if reward_error and not exception_present:
-        exception_present = True
-        exception_type_diagnostic = "VerifierOutputParseError"
-        exception_stage = "verifier"
-    exception_discriminant = capture.exception_discriminant
-    if reward_error and exception_discriminant is None:
-        exception_discriminant = "other_exception"
-    stage_timings: dict[str, JsonValue] = {}
-    for stage in ("environment_setup", "agent_setup", "agent_execution", "verifier"):
-        if stage in trial_result and trial_result[stage] is not None:
-            stage_timings[stage] = clone_object(
-                trial_result[stage], path=f"$/trial_result/{stage}"
-            )
-    artifact_values: JsonObject = {key: value for key, value in artifacts.items()}
-    artifact_digest_values: JsonObject = {
-        key: value for key, value in artifact_sha256.items()
-    }
-    projection: JsonObject = {
+    job_id, trial_id, task_name = _capture_identity(
+        job_result, trial_config, trial_result
+    )
+    (
+        exception_present,
+        observed_reward,
+        exception_discriminant,
+        exception_type_diagnostic,
+        exception_stage,
+    ) = _capture_outcome(capture, trial_result, boundary_details)
+    stage_timings = _capture_stage_timings(trial_result)
+    artifact_values: JsonObject = dict(artifacts)
+    artifact_digest_values: JsonObject = dict(artifact_sha256)
+    return {
         "version": 2,
         "run_purpose": framework["run_purpose"],
         "framework": framework["framework"],
@@ -1135,14 +1122,87 @@ def _capture_projection(
         "artifact_sha256": artifact_digest_values,
         "cleanup_obligations": cleanup,
     }
-    return projection
+
+
+def _capture_identity(
+    job_result: JsonObject,
+    trial_config: JsonObject,
+    trial_result: JsonObject,
+) -> tuple[str, str, str]:
+    summary_id = _job_result_trial_summary_id(job_result)
+    if _exact_string(job_result.get("id"), "job_result.id") == "":
+        raise AdapterContractError("Harbor job id is empty")
+    job_id = _exact_string(job_result["id"], "job_result.id")
+    trial_id = _exact_string(trial_result.get("id"), "trial_result.id")
+    if summary_id is not None and trial_id != summary_id:
+        raise AdapterContractError("Harbor job/result trial IDs differ")
+    for config_id_name in ("id", "trial_id"):
+        if config_id_name in trial_config and trial_id != _exact_string(
+            trial_config[config_id_name], f"trial_config.{config_id_name}"
+        ):
+            raise AdapterContractError("Harbor trial config/result IDs differ")
+    task_name = _exact_string(trial_result.get("task_name"), "trial_result.task_name")
+    if task_name != TERMINAL_BENCH_TASK:
+        raise AdapterContractError("Harbor trial task name is not pinned")
+    return job_id, trial_id, task_name
+
+
+def _capture_outcome(
+    capture: HarborExecutionCapture,
+    trial_result: JsonObject,
+    boundary_details: tuple[str | None, str | None] | None,
+) -> tuple[bool, int | None, str | None, str | None, str | None]:
+    exception_info = trial_result.get("exception_info")
+    if exception_info is None:
+        exception_present = False
+        exception_type_diagnostic = None
+        exception_stage = None
+    else:
+        info = _exact_object(exception_info, "trial_result.exception_info")
+        exception_present = True
+        exception_type_diagnostic = _exact_string(
+            info.get("exception_type"), "exception_type"
+        )
+        raw_stage = trial_result.get("exception_stage")
+        boundary_stage = boundary_details[1] if boundary_details is not None else None
+        exception_stage = (
+            boundary_stage or "unknown"
+            if raw_stage is None
+            else _exact_string(raw_stage, "exception_stage")
+        )
+
+    observed_reward, reward_error = _parse_reward(capture.verifier_reward_json_bytes)
+    if reward_error and not exception_present:
+        exception_present = True
+        exception_type_diagnostic = "VerifierOutputParseError"
+        exception_stage = "verifier"
+    exception_discriminant = capture.exception_discriminant
+    if reward_error and exception_discriminant is None:
+        exception_discriminant = "other_exception"
+    return (
+        exception_present,
+        observed_reward,
+        exception_discriminant,
+        exception_type_diagnostic,
+        exception_stage,
+    )
+
+
+def _capture_stage_timings(trial_result: JsonObject) -> dict[str, JsonValue]:
+    stage_timings: dict[str, JsonValue] = {}
+    for stage in ("environment_setup", "agent_setup", "agent_execution", "verifier"):
+        if stage in trial_result and trial_result[stage] is not None:
+            stage_timings[stage] = clone_object(
+                trial_result[stage], path=f"$/trial_result/{stage}"
+            )
+    return stage_timings
 
 
 def _profile(extensions: object) -> JsonObject:
     value = clone_object(extensions, path="$/canonical_request/extensions")
-    profile = value.get("gitspace.harbor")
-    profile_object = _exact_object(profile, "gitspace.harbor")
-    _require_exact_keys(profile_object, _PROFILE_FIELDS, "gitspace.harbor")
+    profile = value.get(_HARBOR_EXTENSION)
+    profile_object = _exact_object(profile, _HARBOR_EXTENSION)
+    _require_exact_keys(profile_object, _PROFILE_FIELDS, _HARBOR_EXTENSION)
     _bounded_string(profile_object["run_purpose"], "run_purpose")
     if profile_object["run_purpose"] not in {"qualification_oracle", "status_control"}:
         raise AdapterContractError("run_purpose is invalid")
@@ -1288,6 +1348,18 @@ def _validate_job_config(
         },
         "job_config",
     )
+    _validate_job_basics(job)
+    _validate_job_environment(
+        job,
+        environment_image_ref=environment_image_ref,
+        environment_image_id=environment_image_id,
+        egress_sidecar_image_ref=egress_sidecar_image_ref,
+        egress_sidecar_image_id=egress_sidecar_image_id,
+    )
+    _validate_job_agents_and_tasks(job)
+
+
+def _validate_job_basics(job: JsonObject) -> None:
     _exact_string(job["job_name"], "job_config.job_name")
     if type(job["n_attempts"]) is not int or job["n_attempts"] != 1:
         raise AdapterContractError("Harbor job must use exactly one attempt")
@@ -1299,6 +1371,15 @@ def _validate_job_config(
     if type(retry["max_retries"]) is not int or retry["max_retries"] != 0:
         raise AdapterContractError("Harbor job retries must be disabled")
 
+
+def _validate_job_environment(
+    job: JsonObject,
+    *,
+    environment_image_ref: object | None,
+    environment_image_id: object | None,
+    egress_sidecar_image_ref: object | None,
+    egress_sidecar_image_id: object | None,
+) -> None:
     environment = _exact_object(job["environment"], "job_config.environment")
     _require_exact_keys(
         environment,
@@ -1344,6 +1425,28 @@ def _validate_job_config(
         "job_config.environment.kwargs.gitspace_egress_sidecar_image_ref",
         sidecar_image_id,
     )
+    _validate_job_request_image_matches(
+        environment_ref,
+        environment_image_id_value,
+        sidecar_image_ref,
+        sidecar_image_id,
+        environment_image_ref,
+        environment_image_id,
+        egress_sidecar_image_ref,
+        egress_sidecar_image_id,
+    )
+
+
+def _validate_job_request_image_matches(
+    environment_ref: str,
+    environment_image_id_value: str,
+    sidecar_image_ref: str,
+    sidecar_image_id: str,
+    environment_image_ref: object | None,
+    environment_image_id: object | None,
+    egress_sidecar_image_ref: object | None,
+    egress_sidecar_image_id: object | None,
+) -> None:
     if environment_image_ref is not None and environment_ref != environment_image_ref:
         raise AdapterContractError(
             "Harbor job environment image differs from the framework request"
@@ -1370,6 +1473,8 @@ def _validate_job_config(
             "Harbor job sidecar identity differs from the framework request"
         )
 
+
+def _validate_job_agents_and_tasks(job: JsonObject) -> None:
     agents = job["agents"]
     if type(agents) is not list or len(agents) != 1 or type(agents[0]) is not dict:
         raise AdapterContractError("Harbor job must contain exactly one agent")

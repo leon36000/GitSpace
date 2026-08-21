@@ -37,30 +37,33 @@ TERMINAL_BENCH_NORMALIZED_TASK_SHA256 = (
 HARBOR_ENVIRONMENT_IMPORT_PATH = (
     "gs_eval_adapters.harbor_runtime:GitSpaceHarborEnvironment"
 )
+_DIGEST_PREFIX = "sha256:"
+_SOURCE_MANIFEST_PATH = "source-manifest.json"
+_TEST_OUTPUTS_PATH = "tests/test_outputs.py"
 TERMINAL_BENCH_RUNTIME_FILE_DIGESTS = {
     "task.toml": "sha256:eb71853de4f613a6ad4e2650f12c9d5af39908b20082f6206c3378d5f67538d7",
     "instruction.md": "sha256:4f7ac05e70cf9220ea0f1e5a052c5f908cd0fa884e847d80b0bd51bae2e96f9c",
     "solution/solve.sh": "sha256:7e670d4f2b4bccb1e4db38f2a173e085ceda028c38167912b466b0a84fcc0999",
-    "tests/test_outputs.py": "sha256:345c3bd09ab6f6fe8c8361a58c0a47bf0a13b3fcb38a5ac7824e44ff855e8f72",
+    _TEST_OUTPUTS_PATH: "sha256:345c3bd09ab6f6fe8c8361a58c0a47bf0a13b3fcb38a5ac7824e44ff855e8f72",
     "tests/run_test.py": "sha256:249dd2c3896af27b943c4eb7df6d3026da388be064c940a05c812d9b2d99dcce",
     "tests/test.sh": "sha256:32d0433e8eeee0271eb275f6a976f2704530ed3d5de6074535eab9dc01e7f88d",
     "environment/Dockerfile": "sha256:31fa4625b97ec859d0a26b9df931eb0de5b9d313a17413dfadd528e9e9c48cb6",
 }
 TERMINAL_BENCH_FIXTURE_FILE_MODES = {
-    "source-manifest.json": "0644",
-    **{relative_path: "0644" for relative_path in TERMINAL_BENCH_RUNTIME_FILE_DIGESTS},
+    _SOURCE_MANIFEST_PATH: "0644",
+    **dict.fromkeys(TERMINAL_BENCH_RUNTIME_FILE_DIGESTS, "0644"),
 }
 _FIXTURE_ARTIFACT_TO_PATH = {
     "task_toml": "task.toml",
     "instruction_md": "instruction.md",
     "solution_solve_sh": "solution/solve.sh",
-    "test_source": "tests/test_outputs.py",
+    "test_source": _TEST_OUTPUTS_PATH,
     "verifier_script": "tests/run_test.py",
     "verifier_test_script": "tests/test.sh",
     "environment_dockerfile": "environment/Dockerfile",
 }
 _EXPECTED_FIXTURE_FILE_DIGESTS = {
-    "source-manifest.json": TERMINAL_BENCH_NORMALIZED_TASK_SHA256,
+    _SOURCE_MANIFEST_PATH: TERMINAL_BENCH_NORMALIZED_TASK_SHA256,
     **TERMINAL_BENCH_RUNTIME_FILE_DIGESTS,
 }
 
@@ -570,7 +573,7 @@ def build_replay_record(
         content = artifact_bytes[name]
         if type(content) is not bytes:
             raise AdapterContractError(f"artifact bytes must be exact bytes for {name}")
-        digest = "sha256:" + hashlib.sha256(content).hexdigest()
+        digest = _DIGEST_PREFIX + hashlib.sha256(content).hexdigest()
         if digest != record.artifact_sha256[name]:
             raise AdapterContractError(f"artifact bytes digest differs for {name}")
         uri = artifact_uris[name]
@@ -598,9 +601,9 @@ def classify_harbor_record(
         raise AdapterContractError("record must be an exact HarborReplayRecord")
     _validate_record(record)
     record_digest = (
-        "sha256:" + hashlib.sha256(canonical_record_bytes(record)).hexdigest()
+        _DIGEST_PREFIX + hashlib.sha256(canonical_record_bytes(record)).hexdigest()
     )
-    obligations = {name: False for name in _OBLIGATION_FIELDS}
+    obligations = dict.fromkeys(_OBLIGATION_FIELDS, False)
     obligations["qualification_pinned"] = _qualification_pinned(record)
     obligations["run_purpose_valid"] = _run_purpose_valid(record)
     obligations["process_exit_zero"] = record.harbor_process_return_code == 0
@@ -626,7 +629,7 @@ def classify_harbor_record(
                 obligations["artifact_integrity"] = False
                 break
             artifact_contents[name] = content
-            expected_digest = record.artifact_sha256[name].removeprefix("sha256:")
+            expected_digest = record.artifact_sha256[name].removeprefix(_DIGEST_PREFIX)
             if hashlib.sha256(content).hexdigest() != expected_digest:
                 obligations["artifact_integrity"] = False
                 break
@@ -796,6 +799,10 @@ def _parse_timestamp(value: object) -> datetime | None:
     return parsed if parsed.tzinfo is not None else None
 
 
+def _is_exact_one_float(value: object) -> bool:
+    return type(value) is float and value.as_integer_ratio() == (1, 1)
+
+
 def _phase_timings_valid(trial_result: JsonObject) -> bool:
     previous_finished: datetime | None = None
     previous_incomplete = False
@@ -815,7 +822,7 @@ def _phase_timings_valid(trial_result: JsonObject) -> bool:
 
 
 def _expected_exception_stage_obligations(stage: str) -> dict[str, bool]:
-    values = {name: False for name in _STAGE_FIELDS}
+    values = dict.fromkeys(_STAGE_FIELDS, False)
     if stage == "agent_setup":
         values["environment_started"] = True
     elif stage == "agent_execution":
@@ -899,6 +906,34 @@ def _validate_observed_artifacts(
     contents: dict[str, bytes],
     obligations: dict[str, bool],
 ) -> None:
+    decoded = _decode_required_artifacts(contents)
+    if decoded is None:
+        return
+    job_config, job_result, trial_config, trial_result = decoded
+
+    _set_observed_execution_obligations(
+        record, job_config, job_result, trial_config, trial_result, obligations
+    )
+    _set_observed_cleanup_obligations(record, contents, job_config, obligations)
+    obligations["oracle_exit_consistent"] = _oracle_exit_status_consistent(
+        record, contents.get("oracle_exit_status")
+    )
+
+    obligations["reward_well_typed"] = _validate_verifier_artifacts(
+        record,
+        contents.get("verifier_reward_json"),
+        contents.get("verifier_result_json"),
+    )
+    obligations["exception_boundary_consistent"] = (
+        _exception_boundary_consistent(
+            record, contents.get("exception_boundary")
+        )
+    )
+
+
+def _decode_required_artifacts(
+    contents: dict[str, bytes],
+) -> tuple[JsonObject, JsonObject, JsonObject, JsonObject] | None:
     job_config = _decode_object(contents.get("job_config"))
     job_result = _decode_object(contents.get("job_result"))
     trial_config = _decode_object(contents.get("trial_config"))
@@ -909,8 +944,18 @@ def _validate_observed_artifacts(
         or trial_config is None
         or trial_result is None
     ):
-        return
+        return None
+    return job_config, job_result, trial_config, trial_result
 
+
+def _set_observed_execution_obligations(
+    record: HarborReplayRecord,
+    job_config: JsonObject,
+    job_result: JsonObject,
+    trial_config: JsonObject,
+    trial_result: JsonObject,
+    obligations: dict[str, bool],
+) -> None:
     job_cardinality_one, network_closed = _validate_effective_job_config(
         record, job_config
     )
@@ -921,7 +966,6 @@ def _validate_observed_artifacts(
     obligations["trial_cardinality_one"] = trial_cardinality_one
     obligations["trial_exception_consistent"] = trial_exception_consistent
     obligations["network_closed"] = network_closed
-
     observed_stage_obligations = _stage_obligations_from_trial_result(trial_result)
     obligations["stage_obligations_consistent"] = (
         _phase_timings_valid(trial_result)
@@ -930,6 +974,13 @@ def _validate_observed_artifacts(
     )
     obligations["timeout_attribution_valid"] = _timeout_attribution_valid(record)
 
+
+def _set_observed_cleanup_obligations(
+    record: HarborReplayRecord,
+    contents: dict[str, bytes],
+    job_config: JsonObject,
+    obligations: dict[str, bool],
+) -> None:
     before_manifest = _decode_object(contents.get("resource_manifest_before"))
     after_manifest = _decode_object(contents.get("resource_manifest_after"))
     identity_observed, manifests_valid, derived_cleanup = _validate_runtime_manifests(
@@ -950,71 +1001,48 @@ def _validate_observed_artifacts(
         and _validate_fixture_artifacts(record, contents, job_config)
     )
 
-    oracle_content = contents.get("oracle_exit_status")
-    oracle_valid = False
-    if oracle_content is not None:
-        try:
-            value = json.loads(oracle_content)
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            pass
-        else:
-            if type(value) is not dict or set(value) != {"present", "value"}:
-                pass
-            else:
-                present = value["present"]
-                exit_value = value["value"]
-                if type(present) is not bool:
-                    pass
-                elif not present:
-                    oracle_valid = (
-                        exit_value is None and record.oracle_exit_code is None
-                    )
-                elif (
-                    type(exit_value) is not int or record.oracle_exit_code != exit_value
-                ):
-                    pass
-                else:
-                    oracle_valid = record.oracle_exit_code in {None, 0}
-    obligations["oracle_exit_consistent"] = oracle_valid
 
-    obligations["reward_well_typed"] = _validate_verifier_artifacts(
-        record,
-        contents.get("verifier_reward_json"),
-        contents.get("verifier_result_json"),
+def _oracle_exit_status_consistent(
+    record: HarborReplayRecord, content: bytes | None
+) -> bool:
+    if content is None:
+        return False
+    try:
+        value = json.loads(content)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    if type(value) is not dict or set(value) != {"present", "value"}:
+        return False
+    present = value["present"]
+    exit_value = value["value"]
+    if type(present) is not bool:
+        return False
+    if not present:
+        return exit_value is None and record.oracle_exit_code is None
+    if type(exit_value) is not int or record.oracle_exit_code != exit_value:
+        return False
+    return record.oracle_exit_code in {None, 0}
+
+
+def _exception_boundary_consistent(
+    record: HarborReplayRecord, content: bytes | None
+) -> bool:
+    if content is None or content == b"":
+        return False
+    try:
+        boundary = json.loads(content)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    if type(boundary) is not dict or set(boundary) != {"discriminant", "stage"}:
+        return False
+    discriminant = boundary["discriminant"]
+    stage = boundary["stage"]
+    if discriminant != record.exception_discriminant or stage != record.exception_stage:
+        return False
+    return (
+        (discriminant is None or type(discriminant) is str)
+        and (stage is None or type(stage) is str)
     )
-
-    boundary_content = contents.get("exception_boundary")
-    if boundary_content is None or boundary_content == b"":
-        obligations["exception_boundary_consistent"] = False
-    else:
-        try:
-            boundary = json.loads(boundary_content)
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            obligations["exception_boundary_consistent"] = False
-        else:
-            if (
-                type(boundary) is not dict
-                or set(boundary)
-                != {
-                    "discriminant",
-                    "stage",
-                }
-                or (
-                    boundary["discriminant"] != record.exception_discriminant
-                    or boundary["stage"] != record.exception_stage
-                    or (
-                        boundary["discriminant"] is not None
-                        and type(boundary["discriminant"]) is not str
-                    )
-                    or (
-                        boundary["stage"] is not None
-                        and type(boundary["stage"]) is not str
-                    )
-                )
-            ):
-                obligations["exception_boundary_consistent"] = False
-            else:
-                obligations["exception_boundary_consistent"] = True
 
 
 def _decode_object(content: bytes | None) -> JsonObject | None:
@@ -1032,78 +1060,128 @@ def _validate_effective_job_config(
 ) -> tuple[bool, bool]:
     if not set(job).issubset(_HARBOR_JOB_CONFIG_FIELDS):
         return False, False
-    n_attempts = job.get("n_attempts", 1)
+    return _job_cardinality_valid(job), _job_network_closed(record, job)
+
+
+def _job_cardinality_valid(job: JsonObject) -> bool:
+    return (
+        _job_attempts_and_retry_valid(job)
+        and _job_agent_cardinality_valid(job)
+        and _job_task_cardinality_valid(job)
+        and _job_runtime_defaults_valid(job)
+    )
+
+
+def _job_attempts_and_retry_valid(job: JsonObject) -> bool:
+    attempts = job.get("n_attempts", 1)
+    concurrent = job.get("n_concurrent_trials")
     retry = job.get("retry", {"max_retries": 0})
-    environment = job.get("environment")
-    agents = job.get("agents")
-    datasets = job.get("datasets", [])
-    tasks = job.get("tasks")
-    task = tasks[0] if type(tasks) is list and len(tasks) == 1 else None
-    job_cardinality = (
-        type(n_attempts) is int
-        and n_attempts == 1
-        and type(job.get("n_concurrent_trials")) is int
-        and job["n_concurrent_trials"] == 1
+    return (
+        type(attempts) is int
+        and attempts == 1
+        and type(concurrent) is int
+        and concurrent == 1
         and type(retry) is dict
         and set(retry) == {"max_retries"}
         and type(retry.get("max_retries")) is int
         and retry["max_retries"] == 0
-        and type(agents) is list
-        and len(agents) == 1
-        and type(agents[0]) is dict
-        and set(agents[0]) == {"name", "n_concurrent"}
-        and agents[0].get("name") == "oracle"
-        and type(agents[0].get("n_concurrent")) is int
-        and agents[0]["n_concurrent"] == 1
-        and datasets == []
-        and type(tasks) is list
-        and len(tasks) == 1
-        and type(task) is dict
-        and set(task) == {"path"}
+    )
+
+
+def _job_agent_cardinality_valid(job: JsonObject) -> bool:
+    agents = job.get("agents")
+    if type(agents) is not list or len(agents) != 1 or type(agents[0]) is not dict:
+        return False
+    agent = agents[0]
+    return (
+        set(agent) == {"name", "n_concurrent"}
+        and agent.get("name") == "oracle"
+        and type(agent.get("n_concurrent")) is int
+        and agent["n_concurrent"] == 1
+    )
+
+
+def _job_task_cardinality_valid(job: JsonObject) -> bool:
+    if job.get("datasets", []) != []:
+        return False
+    tasks = job.get("tasks")
+    if type(tasks) is not list or len(tasks) != 1 or type(tasks[0]) is not dict:
+        return False
+    task = tasks[0]
+    return (
+        set(task) == {"path"}
         and type(task["path"]) is str
         and bool(task["path"])
-        and job.get("job_name") == "gitspace-p00-task-012-oracle"
-        and (
-            "jobs_dir" not in job
-            or (type(job["jobs_dir"]) is str and bool(job["jobs_dir"]))
-        )
-        and job.get("install_only", False) is False
+    )
+
+
+def _job_runtime_defaults_valid(job: JsonObject) -> bool:
+    return (
+        job.get("job_name") == "gitspace-p00-task-012-oracle"
+        and _job_directory_default_valid(job)
+        and _job_boolean_defaults_valid(job)
+        and _job_timeout_defaults_valid(job)
+        and _job_collection_defaults_valid(job)
+    )
+
+
+def _job_directory_default_valid(job: JsonObject) -> bool:
+    return "jobs_dir" not in job or (
+        type(job["jobs_dir"]) is str and bool(job["jobs_dir"])
+    )
+
+
+def _job_boolean_defaults_valid(job: JsonObject) -> bool:
+    return (
+        job.get("install_only", False) is False
         and job.get("debug", False) is False
         and job.get("quiet", False) is False
-        and type(job.get("timeout_multiplier", 1.0)) is float
-        and job.get("timeout_multiplier", 1.0) == 1.0
+        and job.get("verifier") is None
+        and job.get("source_jobs") is None
+    )
+
+
+def _job_timeout_defaults_valid(job: JsonObject) -> bool:
+    return (
+        _is_exact_one_float(job.get("timeout_multiplier", 1.0))
         and job.get("agent_timeout_multiplier") is None
         and job.get("verifier_timeout_multiplier") is None
         and job.get("agent_setup_timeout_multiplier") is None
         and job.get("environment_build_timeout_multiplier") is None
-        and job.get("verifier") is None
-        and job.get("metrics", []) == []
-        and job.get("artifacts", []) == []
-        and job.get("source_jobs") is None
-        and job.get("extra_instruction_paths", []) == []
     )
-    environment_kwargs = (
-        environment.get("kwargs") if type(environment) is dict else None
-    )
-    network_closed = (
-        type(environment) is dict
-        and set(environment) == {"import_path", "kwargs"}
-        and environment.get("import_path") == HARBOR_ENVIRONMENT_IMPORT_PATH
-        and type(environment_kwargs) is dict
-        and set(environment_kwargs)
-        == {
-            "gitspace_environment_image_ref",
-            "gitspace_environment_image_id",
-            "gitspace_egress_sidecar_image_ref",
-            "gitspace_egress_sidecar_image_id",
-        }
-        and environment_kwargs.get("gitspace_environment_image_ref")
-        == record.environment_image_ref
-        and environment_kwargs.get("gitspace_environment_image_id")
-        == record.environment_image_id
-        and environment_kwargs.get("gitspace_egress_sidecar_image_ref")
+
+
+def _job_collection_defaults_valid(job: JsonObject) -> bool:
+    return job.get("metrics", []) == [] and job.get("artifacts", []) == [] and job.get(
+        "extra_instruction_paths", []
+    ) == []
+
+
+def _job_network_closed(record: HarborReplayRecord, job: JsonObject) -> bool:
+    environment = job.get("environment")
+    if type(environment) is not dict or set(environment) != {"import_path", "kwargs"}:
+        return False
+    if environment.get("import_path") != HARBOR_ENVIRONMENT_IMPORT_PATH:
+        return False
+    return _job_image_kwargs_match(record, environment.get("kwargs"))
+
+
+def _job_image_kwargs_match(record: HarborReplayRecord, value: object) -> bool:
+    if type(value) is not dict:
+        return False
+    if set(value) != {
+        "gitspace_environment_image_ref",
+        "gitspace_environment_image_id",
+        "gitspace_egress_sidecar_image_ref",
+        "gitspace_egress_sidecar_image_id",
+    }:
+        return False
+    return (
+        value.get("gitspace_environment_image_ref") == record.environment_image_ref
+        and value.get("gitspace_environment_image_id") == record.environment_image_id
+        and value.get("gitspace_egress_sidecar_image_ref")
         == record.egress_sidecar_image_ref
-        and environment_kwargs.get("gitspace_egress_sidecar_image_id")
+        and value.get("gitspace_egress_sidecar_image_id")
         == record.egress_sidecar_image_id
         and _image_reference_matches(
             record.environment_image_ref, record.environment_image_id
@@ -1112,7 +1190,6 @@ def _validate_effective_job_config(
             record.egress_sidecar_image_ref, record.egress_sidecar_image_id
         )
     )
-    return job_cardinality, network_closed
 
 
 def _validate_trial_artifacts(
@@ -1201,9 +1278,24 @@ def _validate_effective_trial_config(
 ) -> bool:
     if set(trial_config) != _TRIAL_EFFECTIVE_FIELDS:
         return False
+    return (
+        _trial_task_identity_valid(job_config, trial_config)
+        and _trial_config_identity_valid(record, job_config, trial_config, trial_result)
+        and _trial_uri_valid(trial_config, trial_result)
+        and _trial_agent_valid(trial_config)
+        and _validate_environment_extension(trial_config.get("environment"), record)
+        and _validate_trial_result_config(
+            trial_result.get("config"), trial_config, record
+        )
+    )
+
+
+def _trial_task_identity_valid(
+    job_config: JsonObject, trial_config: JsonObject
+) -> bool:
     job_tasks = job_config.get("tasks")
     task = trial_config.get("task")
-    if (
+    return not (
         type(job_tasks) is not list
         or len(job_tasks) != 1
         or type(job_tasks[0]) is not dict
@@ -1212,8 +1304,15 @@ def _validate_effective_trial_config(
         or type(task) is not dict
         or set(task) != {"path"}
         or task.get("path") != job_tasks[0]["path"]
-    ):
-        return False
+    )
+
+
+def _trial_config_identity_valid(
+    record: HarborReplayRecord,
+    job_config: JsonObject,
+    trial_config: JsonObject,
+    trial_result: JsonObject,
+) -> bool:
     trial_name = trial_config.get("trial_name")
     validated_trial_name = _posix_component(trial_name)
     if (
@@ -1239,6 +1338,16 @@ def _validate_effective_trial_config(
             return False
     if trial_config.get("job_id") != record.job_id:
         return False
+    return True
+
+
+def _trial_uri_valid(
+    trial_config: JsonObject, trial_result: JsonObject
+) -> bool:
+    trial_name = _posix_component(trial_config.get("trial_name"))
+    trials_path = _absolute_posix_path(trial_config.get("trials_dir"))
+    if trial_name is None or trials_path is None:
+        return False
     trial_uri = trial_result.get("trial_uri")
     if type(trial_uri) is not str or any(
         ord(character) <= 32
@@ -1262,24 +1371,20 @@ def _validate_effective_trial_config(
     trial_dir = _absolute_posix_path(unquote(parsed_uri.path))
     if (
         trial_dir is None
-        or validated_trial_name is None
-        or trial_dir != posixpath.join(trials_path, validated_trial_name)
+        or trial_dir != posixpath.join(trials_path, trial_name)
     ):
         return False
+    return True
+
+
+def _trial_agent_valid(trial_config: JsonObject) -> bool:
     agent = trial_config.get("agent")
-    if (
+    return not (
         type(agent) is not dict
         or set(agent) != {"name", "n_concurrent"}
         or agent.get("name") != "oracle"
         or type(agent.get("n_concurrent")) is not int
         or agent["n_concurrent"] != 1
-    ):
-        return False
-    return (
-        _validate_environment_extension(trial_config.get("environment"), record)
-        and _validate_trial_result_config(
-            trial_result.get("config"), trial_config, record
-        )
     )
 
 
@@ -1315,8 +1420,7 @@ def _validate_trial_result_config(
         or value.get("trials_dir") != trial_config.get("trials_dir")
         or value.get("job_id") != record.job_id
         or value.get("install_only") is not False
-        or type(value.get("timeout_multiplier")) is not float
-        or value.get("timeout_multiplier") != 1.0
+        or not _is_exact_one_float(value.get("timeout_multiplier"))
         or value.get("agent_timeout_multiplier") is not None
         or value.get("verifier_timeout_multiplier") is not None
         or value.get("agent_setup_timeout_multiplier") is not None
@@ -1434,28 +1538,36 @@ def _trial_exception_consistent(
     exception_info = trial_result.get("exception_info")
     raw_stage = trial_result.get("exception_stage")
     if record.harbor_status == "completed":
-        return (
-            exception_info is None
-            and raw_stage is None
-            and record.exception_discriminant is None
-            and record.exception_type_diagnostic is None
-            and record.exception_stage is None
-        )
+        return _completed_trial_exception_consistent(record, exception_info, raw_stage)
     if record.harbor_status != "exception" or type(exception_info) is not dict:
         return False
+    return _exception_details_consistent(record, exception_info, raw_stage)
+
+
+def _completed_trial_exception_consistent(
+    record: HarborReplayRecord,
+    exception_info: object,
+    raw_stage: object,
+) -> bool:
+    return (
+        exception_info is None
+        and raw_stage is None
+        and record.exception_discriminant is None
+        and record.exception_type_diagnostic is None
+        and record.exception_stage is None
+    )
+
+
+def _exception_details_consistent(
+    record: HarborReplayRecord,
+    exception_info: dict[str, JsonValue],
+    raw_stage: object,
+) -> bool:
     observed_type = exception_info.get("exception_type")
     if type(observed_type) is not str or not observed_type:
         return False
-    if raw_stage is None:
-        observed_stage = (
-            record.exception_stage
-            if record.exception_discriminant is not None
-            and record.exception_stage in _EXCEPTION_STAGES
-            else "unknown"
-        )
-    elif type(raw_stage) is str and raw_stage in _EXCEPTION_STAGES:
-        observed_stage = raw_stage
-    else:
+    observed_stage = _observed_exception_stage(record, raw_stage)
+    if observed_stage is None:
         return False
     observed_message = exception_info.get("exception_message")
     if observed_message is not None and type(observed_message) is not str:
@@ -1470,12 +1582,27 @@ def _trial_exception_consistent(
     )
 
 
+def _observed_exception_stage(
+    record: HarborReplayRecord, raw_stage: object
+) -> str | None:
+    if raw_stage is None:
+        return (
+            record.exception_stage
+            if record.exception_discriminant is not None
+            and record.exception_stage in _EXCEPTION_STAGES
+            else "unknown"
+        )
+    if type(raw_stage) is str and raw_stage in _EXCEPTION_STAGES:
+        return raw_stage
+    return None
+
+
 def _validate_runtime_manifests(
     record: HarborReplayRecord,
     before: JsonObject | None,
     after: JsonObject | None,
 ) -> tuple[bool, bool, dict[str, bool]]:
-    empty_cleanup = {name: False for name in _CLEANUP_FIELDS}
+    empty_cleanup = dict.fromkeys(_CLEANUP_FIELDS, False)
     if before is None or after is None:
         return False, False, empty_cleanup
     if (
@@ -1540,7 +1667,7 @@ def _resource_inventory_digest(resources: object) -> str | None:
         ).encode("utf-8")
     except (TypeError, ValueError):
         return None
-    return "sha256:" + hashlib.sha256(encoded).hexdigest()
+    return _DIGEST_PREFIX + hashlib.sha256(encoded).hexdigest()
 
 
 def _resource_map(value: object) -> dict[tuple[str, str, str], JsonObject] | None:
@@ -1613,7 +1740,7 @@ def _validate_source_manifest(
     record: HarborReplayRecord, content: bytes | None
 ) -> bool:
     if content is None or hashlib.sha256(content).hexdigest() != (
-        TERMINAL_BENCH_NORMALIZED_TASK_SHA256.removeprefix("sha256:")
+        TERMINAL_BENCH_NORMALIZED_TASK_SHA256.removeprefix(_DIGEST_PREFIX)
     ):
         return False
     manifest = _decode_object(content)
@@ -1623,7 +1750,7 @@ def _validate_source_manifest(
     if type(source_files) is not dict:
         return False
     runtime_files = manifest.get("runtime_files")
-    test_source = source_files.get("tests/test_outputs.py")
+    test_source = source_files.get(_TEST_OUTPUTS_PATH)
     return (
         manifest.get("source_repository") == TERMINAL_BENCH_REPOSITORY
         and manifest.get("source_commit") == TERMINAL_BENCH_COMMIT
@@ -1640,41 +1767,66 @@ def _validate_fixture_artifacts(
     contents: dict[str, bytes],
     job_config: JsonObject,
 ) -> bool:
-    if record.normalized_task_sha256 != TERMINAL_BENCH_NORMALIZED_TASK_SHA256:
-        return False
+    return (
+        record.normalized_task_sha256 == TERMINAL_BENCH_NORMALIZED_TASK_SHA256
+        and _fixture_runtime_artifacts_valid(contents)
+        and _fixture_inventory_valid(contents, job_config)
+        and _fixture_task_config_valid(contents.get("task_toml"))
+    )
+
+
+def _fixture_runtime_artifacts_valid(contents: dict[str, bytes]) -> bool:
     for artifact_name, relative_path in _FIXTURE_ARTIFACT_TO_PATH.items():
         content = contents.get(artifact_name)
         expected = TERMINAL_BENCH_RUNTIME_FILE_DIGESTS.get(relative_path)
         if content is None or expected is None:
             return False
-        if "sha256:" + hashlib.sha256(content).hexdigest() != expected:
+        if _DIGEST_PREFIX + hashlib.sha256(content).hexdigest() != expected:
             return False
+    return True
+
+
+def _fixture_inventory_valid(
+    contents: dict[str, bytes], job_config: JsonObject
+) -> bool:
     inventory = _decode_object(contents.get("fixture_inventory"))
-    if inventory is None or set(inventory) != _FIXTURE_INVENTORY_FIELDS:
+    if inventory is None or not _fixture_inventory_header_valid(inventory):
         return False
-    if inventory.get("schema") != _FIXTURE_INVENTORY_SCHEMA:
+    if not _fixture_inventory_task_valid(inventory, job_config):
         return False
+    return _fixture_inventory_files_valid(inventory, contents)
+
+
+def _fixture_inventory_header_valid(inventory: JsonObject | None) -> bool:
+    return (
+        inventory is not None
+        and set(inventory) == _FIXTURE_INVENTORY_FIELDS
+        and inventory.get("schema") == _FIXTURE_INVENTORY_SCHEMA
+    )
+
+
+def _fixture_inventory_task_valid(
+    inventory: JsonObject, job_config: JsonObject
+) -> bool:
     tasks = job_config.get("tasks")
-    if (
-        type(tasks) is not list
-        or len(tasks) != 1
-        or type(tasks[0]) is not dict
-        or set(tasks[0]) != {"path"}
-        or type(tasks[0]["path"]) is not str
-        or not tasks[0]["path"]
-        or inventory.get("task_path") != tasks[0]["path"]
-    ):
+    if type(tasks) is not list or len(tasks) != 1 or type(tasks[0]) is not dict:
         return False
+    task = tasks[0]
+    return (
+        set(task) == {"path"}
+        and type(task["path"]) is str
+        and bool(task["path"])
+        and inventory.get("task_path") == task["path"]
+    )
+
+
+def _fixture_inventory_files_valid(
+    inventory: JsonObject, contents: dict[str, bytes]
+) -> bool:
     files = inventory.get("files")
     if type(files) is not dict or set(files) != set(_EXPECTED_FIXTURE_FILE_DIGESTS):
         return False
-    artifact_for_path = {
-        "source-manifest.json": "source_manifest",
-        **{
-            relative_path: artifact_name
-            for artifact_name, relative_path in _FIXTURE_ARTIFACT_TO_PATH.items()
-        },
-    }
+    artifact_for_path = _fixture_artifact_map()
     for relative_path, expected_digest in _EXPECTED_FIXTURE_FILE_DIGESTS.items():
         entry = files.get(relative_path)
         if type(entry) is not dict or set(entry) != _FIXTURE_FILE_FIELDS:
@@ -1689,11 +1841,21 @@ def _validate_fixture_artifacts(
             or mode != TERMINAL_BENCH_FIXTURE_FILE_MODES[relative_path]
         ):
             return False
-    task_toml = contents.get("task_toml")
-    if task_toml is None:
+    return True
+
+
+def _fixture_artifact_map() -> dict[str, str]:
+    artifact_for_path = {_SOURCE_MANIFEST_PATH: "source_manifest"}
+    for artifact_name, relative_path in _FIXTURE_ARTIFACT_TO_PATH.items():
+        artifact_for_path[relative_path] = artifact_name
+    return artifact_for_path
+
+
+def _fixture_task_config_valid(content: bytes | None) -> bool:
+    if content is None:
         return False
     try:
-        task = tomllib.loads(task_toml.decode("utf-8"))
+        task = tomllib.loads(content.decode("utf-8"))
     except (UnicodeDecodeError, tomllib.TOMLDecodeError):
         return False
     environment = task.get("environment")
@@ -1715,45 +1877,67 @@ def _validate_verifier_artifacts(
     reward_content: bytes | None,
     result_content: bytes | None,
 ) -> bool:
-    if reward_content in {None, b""} and result_content in {None, b""}:
-        return (
-            record.exception_discriminant == "agent_timeout_exact"
-            and record.harbor_status == "exception"
-            and record.observed_reward is None
-        )
+    if _verifier_artifacts_absent(reward_content, result_content):
+        return _verifier_artifacts_absent_for_timeout(record)
     result = _decode_object(result_content)
+    if result is None or not _verifier_result_valid(result):
+        return False
+    reward_valid, reward = _verifier_reward_value(reward_content)
+    if not reward_valid or reward != record.observed_reward:
+        return False
+    return _verifier_outcome_valid(result, reward)
+
+
+def _verifier_artifacts_absent(
+    reward_content: bytes | None, result_content: bytes | None
+) -> bool:
+    return reward_content in {None, b""} and result_content in {None, b""}
+
+
+def _verifier_artifacts_absent_for_timeout(record: HarborReplayRecord) -> bool:
+    return (
+        record.exception_discriminant == "agent_timeout_exact"
+        and record.harbor_status == "exception"
+        and record.observed_reward is None
+    )
+
+
+def _verifier_result_valid(result: JsonObject | None) -> bool:
     if result is None or set(result) != _VERIFIER_RESULT_FIELDS:
         return False
-    if (
-        result.get("schema") != _VERIFIER_RESULT_SCHEMA
-        or result.get("test_source_sha256") != TERMINAL_BENCH_SOURCE_TASK_SHA256
-        or (
-            result.get("exception_type_or_null") is not None
-            and type(result.get("exception_type_or_null")) is not str
-        )
-        or (
-            result.get("exception_message_or_null") is not None
-            and type(result.get("exception_message_or_null")) is not str
-        )
-    ):
+    if result.get("schema") != _VERIFIER_RESULT_SCHEMA:
         return False
-    kind = result.get("kind")
-    if kind not in {"functional_pass", "functional_assertion", "harness_infra"}:
+    if result.get("test_source_sha256") != TERMINAL_BENCH_SOURCE_TASK_SHA256:
         return False
-    if reward_content in {None, b""}:
-        reward = None
-    else:
-        reward_value = _decode_object(reward_content)
-        if (
-            reward_value is None
-            or set(reward_value) != {"reward"}
-            or type(reward_value.get("reward")) is not int
-            or reward_value["reward"] not in {0, 1}
-        ):
-            return False
-        reward = reward_value["reward"]
-    if reward != record.observed_reward:
+    if not _optional_string_value_valid(result.get("exception_type_or_null")):
         return False
+    if not _optional_string_value_valid(result.get("exception_message_or_null")):
+        return False
+    return result.get("kind") in {
+        "functional_pass",
+        "functional_assertion",
+        "harness_infra",
+    }
+
+
+def _optional_string_value_valid(value: object) -> bool:
+    return value is None or type(value) is str
+
+
+def _verifier_reward_value(value: bytes | None) -> tuple[bool, int | None]:
+    if value in {None, b""}:
+        return True, None
+    reward_value = _decode_object(value)
+    if reward_value is None or set(reward_value) != {"reward"}:
+        return False, None
+    reward = reward_value.get("reward")
+    if type(reward) is not int or reward not in {0, 1}:
+        return False, None
+    return True, reward
+
+
+def _verifier_outcome_valid(result: JsonObject, reward: int | None) -> bool:
+    kind = result["kind"]
     if reward == 1:
         return (
             kind == "functional_pass"
@@ -1768,6 +1952,15 @@ def _validate_verifier_artifacts(
 
 
 def _validate_record(record: HarborReplayRecord) -> None:
+    _validate_record_shape(record)
+    _validate_record_pins(record)
+    _validate_record_runtime(record)
+    _validate_record_exception_fields(record)
+    _validate_record_artifacts(record)
+    _validate_record_obligations(record)
+
+
+def _validate_record_shape(record: HarborReplayRecord) -> None:
     if type(record.stage_timings) is not dict:
         raise AdapterContractError("stage_timings must be an exact dict")
     if type(record.stage_obligations) is not dict:
@@ -1776,6 +1969,9 @@ def _validate_record(record: HarborReplayRecord) -> None:
         raise AdapterContractError("artifacts must be exact dicts")
     if type(record.cleanup_obligations) is not dict:
         raise AdapterContractError("cleanup_obligations must be an exact dict")
+
+
+def _validate_record_pins(record: HarborReplayRecord) -> None:
     if record.version != HARBOR_RECORD_VERSION:
         raise AdapterContractError(f"version must be exactly {HARBOR_RECORD_VERSION}")
     if record.run_purpose not in _RUN_PURPOSES:
@@ -1810,6 +2006,9 @@ def _validate_record(record: HarborReplayRecord) -> None:
         "egress_sidecar_image_ref",
         record.egress_sidecar_image_id,
     )
+
+
+def _validate_record_runtime(record: HarborReplayRecord) -> None:
     if record.environment_platform != "linux/amd64":
         raise AdapterContractError("environment platform must be linux/amd64")
     if record.runtime_network_mode != "no-network":
@@ -1820,6 +2019,9 @@ def _validate_record(record: HarborReplayRecord) -> None:
         raise AdapterContractError("verifier Python must be 3.13.15")
     if record.run_purpose == "qualification_oracle" and record.agent != "oracle":
         raise AdapterContractError("qualification_oracle must use the oracle agent")
+
+
+def _validate_record_exception_fields(record: HarborReplayRecord) -> None:
     if record.harbor_status not in _HARBOR_STATUSES:
         raise AdapterContractError("Harbor status is invalid")
     if record.exception_discriminant is not None and not isinstance(
@@ -1836,6 +2038,9 @@ def _validate_record(record: HarborReplayRecord) -> None:
         and record.exception_stage not in _EXCEPTION_STAGES
     ):
         raise AdapterContractError("exception stage is invalid")
+
+
+def _validate_record_artifacts(record: HarborReplayRecord) -> None:
     if set(record.artifacts) != set(record.artifact_sha256):
         raise AdapterContractError("artifact and digest keys differ")
     if not set(record.artifacts).issubset(HARBOR_ARTIFACT_FIELDS):
@@ -1848,8 +2053,11 @@ def _validate_record(record: HarborReplayRecord) -> None:
         digest = record.artifact_sha256[name]
         if not _DIGEST.fullmatch(digest):
             raise AdapterContractError(f"artifact digest is invalid for {name}")
-        if uri != _CAS_URI_PREFIX + digest.removeprefix("sha256:"):
+        if uri != _CAS_URI_PREFIX + digest.removeprefix(_DIGEST_PREFIX):
             raise AdapterContractError(f"artifact URI and digest differ for {name}")
+
+
+def _validate_record_obligations(record: HarborReplayRecord) -> None:
     if set(record.stage_obligations) != _STAGE_FIELDS:
         raise AdapterContractError("stage obligation fields differ")
     if any(type(value) is not bool for value in record.stage_obligations.values()):

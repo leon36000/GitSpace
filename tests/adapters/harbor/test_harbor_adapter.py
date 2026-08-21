@@ -629,8 +629,8 @@ class HarborAdapterTests(unittest.TestCase):
         )
 
         self.assertIs(result.status, AdapterStatus.INFRA)
-        self.assertEqual(
-            result.extensions["gitspace.harbor"]["task_invalid_candidate"], True
+        self.assertTrue(
+            result.extensions["gitspace.harbor"]["task_invalid_candidate"]
         )
 
     def test_missing_cas_reader_is_infra_not_pass(self) -> None:
@@ -873,7 +873,7 @@ class HarborSdkExecutorTests(unittest.TestCase):
             ).run_oracle(request)
 
             self.assertEqual(capture.process_return_code, 0)
-            self.assertEqual(capture.oracle_exit_code_bytes, None)
+            self.assertIsNone(capture.oracle_exit_code_bytes)
             self.assertEqual(capture.verifier_reward_json_bytes, b'{"reward":1}')
             self.assertIn(b"terminal-bench/regex-log", capture.trial_result_bytes)
 
