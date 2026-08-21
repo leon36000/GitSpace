@@ -689,29 +689,23 @@ def _classify_record_status(
 
 
 def _record_infra_obligation_failed(obligations: dict[str, bool]) -> bool:
-    return any(
-        not obligations[name]
-        for name in (
-            "artifact_integrity",
-            "qualification_pinned",
-            "run_purpose_valid",
-            "exception_boundary_consistent",
-            "trial_exception_consistent",
-        )
+    return (
+        not obligations["artifact_integrity"]
+        or not obligations["qualification_pinned"]
+        or not obligations["run_purpose_valid"]
+        or not obligations["exception_boundary_consistent"]
+        or not obligations["trial_exception_consistent"]
     )
 
 
 def _record_execution_obligation_failed(obligations: dict[str, bool]) -> bool:
-    return any(
-        not obligations[name]
-        for name in (
-            "network_closed",
-            "job_cardinality_one",
-            "trial_cardinality_one",
-            "reward_well_typed",
-            "cleanup_complete",
-            "stage_obligations_consistent",
-        )
+    return (
+        not obligations["network_closed"]
+        or not obligations["job_cardinality_one"]
+        or not obligations["trial_cardinality_one"]
+        or not obligations["reward_well_typed"]
+        or not obligations["cleanup_complete"]
+        or not obligations["stage_obligations_consistent"]
     )
 
 
