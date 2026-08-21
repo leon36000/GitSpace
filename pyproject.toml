@@ -8,8 +8,20 @@ dependencies = [
   "jsonschema==4.26.0",
 ]
 
+[dependency-groups]
+dev = [
+  "mypy==2.3.0",
+]
+
 [tool.uv]
 package = false
+
+[tool.mypy]
+python_version = "3.12"
+
+[[tool.mypy.overrides]]
+module = ["harbor.*"]
+ignore_missing_imports = true
 
 [tool.gitspace]
 uv-version = "0.12.0"

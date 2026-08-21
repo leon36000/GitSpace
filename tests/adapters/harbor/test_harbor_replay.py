@@ -12,6 +12,7 @@ from gs_eval_adapters.harbor_replay import (
     TERMINAL_BENCH_SOURCE_TASK_SHA256,
     HarborReplayRecord,
     HarborReplayResult,
+    _job_result_trial_summary_id,
     build_replay_record,
     canonical_record_bytes,
     classify_harbor_record,
@@ -119,6 +120,7 @@ def record_with_content(
     run_purpose: str = "status_control",
     reward: int | None = 1,
     stage_obligations: dict[str, bool] | None = None,
+    actual_harbor_job_result: bool = False,
 ) -> tuple[HarborReplayRecord, dict[str, bytes]]:
     content = b'{"present":false,"value":null}\n'
     boundary_content = b'{"discriminant":null,"stage":null}'
@@ -180,11 +182,26 @@ def record_with_content(
         "datasets": [],
         "tasks": [{"path": "/fixture"}],
     }
-    job_result = {
-        "id": value["job_id"],
-        "n_total_trials": 1,
-        "trial_results": [{"id": value["trial_id"]}],
-    }
+    if actual_harbor_job_result:
+        job_result = {
+            "id": value["job_id"],
+            "n_total_trials": 1,
+            "stats": {
+                "n_completed_trials": 1,
+                "n_errored_trials": 0,
+                "n_running_trials": 0,
+                "n_pending_trials": 0,
+                "n_cancelled_trials": 0,
+                "n_retries": 0,
+                "evals": {"oracle__adhoc": {"n_trials": 1}},
+            },
+        }
+    else:
+        job_result = {
+            "id": value["job_id"],
+            "n_total_trials": 1,
+            "trial_results": [{"id": value["trial_id"]}],
+        }
     trial_config = {
         "task": {"path": "/fixture"},
         "trial_name": "regex-log__trial-1",
@@ -205,6 +222,74 @@ def record_with_content(
         "id": value["trial_id"],
         "task_name": value["task_name"],
         "trial_name": "regex-log__trial-1",
+        "trial_uri": "file:///fixture/jobs/regex-log__trial-1",
+        "config": {
+            "task": {
+                "path": "/fixture",
+                "git_url": None,
+                "git_commit_id": None,
+                "name": None,
+                "ref": None,
+                "overwrite": False,
+                "download_dir": None,
+                "source": None,
+            },
+            "trial_name": "regex-log__trial-1",
+            "trials_dir": "/fixture/jobs",
+            "install_only": False,
+            "timeout_multiplier": 1.0,
+            "agent_timeout_multiplier": None,
+            "verifier_timeout_multiplier": None,
+            "agent_setup_timeout_multiplier": None,
+            "environment_build_timeout_multiplier": None,
+            "agent": {
+                "name": "oracle",
+                "import_path": None,
+                "model_name": None,
+                "n_concurrent": 1,
+                "concurrency_group": None,
+                "skills": [],
+                "override_timeout_sec": None,
+                "override_setup_timeout_sec": None,
+                "max_timeout_sec": None,
+                "resume_trajectory": False,
+                "load_trajectory": None,
+                "extra_allowed_hosts": [],
+                "kwargs": {},
+                "mcp_servers": [],
+            },
+            "environment": {
+                "type": None,
+                "import_path": HARBOR_ENVIRONMENT_IMPORT_PATH,
+                "force_build": False,
+                "delete": True,
+                "cpu_enforcement_policy": "auto",
+                "memory_enforcement_policy": "auto",
+                "override_cpus": None,
+                "override_memory_mb": None,
+                "override_storage_mb": None,
+                "override_gpus": None,
+                "override_tpu": None,
+                "mounts": None,
+                "extra_docker_compose": [],
+                "kwargs": {
+                    "gitspace_environment_image_ref": value["environment_image_ref"],
+                    "gitspace_environment_image_id": value["environment_image_id"],
+                    "gitspace_egress_sidecar_image_ref": value["egress_sidecar_image_ref"],
+                    "gitspace_egress_sidecar_image_id": value["egress_sidecar_image_id"],
+                },
+                "extra_allowed_hosts": [],
+            },
+            "verifier": {
+                "override_timeout_sec": None,
+                "max_timeout_sec": None,
+                "disable": False,
+            },
+            "artifacts": [],
+            "extra_instruction_paths": [],
+            "job_id": value["job_id"],
+            "source_trial": None,
+        },
         "exception_info": None,
         **stage_timings,
     }
@@ -496,6 +581,32 @@ class HarborReplayRedTests(unittest.TestCase):
         self.assertIs(result.status, AdapterStatus.INFRA)
         self.assertFalse(result.obligations["artifact_integrity"])
 
+    def test_actual_harbor_021_aggregate_job_result_replays(self) -> None:
+        record, store = record_with_content(actual_harbor_job_result=True)
+
+        result = classify_harbor_record(record, read_artifact=store.get)
+
+        self.assertIs(result.status, AdapterStatus.PASS)
+        self.assertTrue(result.obligations["job_cardinality_one"])
+        self.assertTrue(result.obligations["trial_cardinality_one"])
+
+    def test_actual_harbor_021_errored_aggregate_counts_one_trial(self) -> None:
+        job_result = {
+            "id": "job-1",
+            "n_total_trials": 1,
+            "stats": {
+                "n_completed_trials": 1,
+                "n_errored_trials": 1,
+                "n_running_trials": 0,
+                "n_pending_trials": 0,
+                "n_cancelled_trials": 0,
+                "n_retries": 0,
+                "evals": {},
+            },
+        }
+
+        self.assertIsNone(_job_result_trial_summary_id(job_result))
+
     def test_replay_missing_runtime_evidence_is_infra(self) -> None:
         record, store = record_with_content()
         value = record.to_json()
@@ -701,6 +812,30 @@ class HarborReplayRedTests(unittest.TestCase):
             "job_config",
             json.dumps(job, sort_keys=True, separators=(",", ":")).encode(),
         )
+        trial_dir = "/qualified-worker/jobs/gitspace-p00-task-012-oracle"
+        trial_config_uri = value["artifacts"]["trial_config"]
+        trial_result_uri = value["artifacts"]["trial_result"]
+        assert isinstance(trial_config_uri, str)
+        assert isinstance(trial_result_uri, str)
+        trial_config = json.loads(store[trial_config_uri])
+        trial_result = json.loads(store[trial_result_uri])
+        trial_config["trials_dir"] = trial_dir
+        trial_result["trial_uri"] = (
+            f"file://{trial_dir}/{trial_result['trial_name']}"
+        )
+        trial_result["config"]["trials_dir"] = trial_dir
+        replace_artifact(
+            value,
+            store,
+            "trial_config",
+            json.dumps(trial_config, sort_keys=True, separators=(",", ":")).encode(),
+        )
+        replace_artifact(
+            value,
+            store,
+            "trial_result",
+            json.dumps(trial_result, sort_keys=True, separators=(",", ":")).encode(),
+        )
         record = HarborReplayRecord.from_json(value)
 
         result = classify_harbor_record(record, read_artifact=store.__getitem__)
@@ -708,6 +843,154 @@ class HarborReplayRedTests(unittest.TestCase):
         self.assertIs(result.status, AdapterStatus.PASS)
         self.assertTrue(result.obligations["job_cardinality_one"])
         self.assertTrue(result.obligations["network_closed"])
+
+    def test_trial_uri_must_bind_to_effective_job_directory(self) -> None:
+        record, store = record_with_content()
+        value = record.to_json()
+        replace_json_artifact(value, store, "job_config", {"jobs_dir": "/qualified-worker/jobs"})
+        trial_config_uri = value["artifacts"]["trial_config"]
+        trial_result_uri = value["artifacts"]["trial_result"]
+        assert isinstance(trial_config_uri, str)
+        assert isinstance(trial_result_uri, str)
+        trial_config = json.loads(store[trial_config_uri])
+        trial_result = json.loads(store[trial_result_uri])
+        trial_config["trials_dir"] = "/outside"
+        trial_result["trial_uri"] = f"file:///outside/{trial_result['trial_name']}"
+        trial_result["config"]["trials_dir"] = "/outside"
+        replace_artifact(
+            value,
+            store,
+            "trial_config",
+            json.dumps(trial_config, sort_keys=True, separators=(",", ":")).encode(),
+        )
+        replace_artifact(
+            value,
+            store,
+            "trial_result",
+            json.dumps(trial_result, sort_keys=True, separators=(",", ":")).encode(),
+        )
+        record = HarborReplayRecord.from_json(value)
+
+        result = classify_harbor_record(record, read_artifact=store.__getitem__)
+
+        self.assertIs(result.status, AdapterStatus.INFRA)
+        self.assertFalse(result.obligations["trial_cardinality_one"])
+
+    def test_replay_rejects_nul_trial_uri_without_host_path_access(self) -> None:
+        record, store = record_with_content()
+        value = record.to_json()
+        replace_json_artifact(
+            value,
+            store,
+            "trial_result",
+            {"trial_uri": "file:///fixture/jobs/%00trial"},
+        )
+        record = HarborReplayRecord.from_json(value)
+
+        result = classify_harbor_record(record, read_artifact=store.__getitem__)
+
+        self.assertIs(result.status, AdapterStatus.INFRA)
+        self.assertFalse(result.obligations["trial_cardinality_one"])
+
+    def test_replay_rejects_malformed_file_uri_without_raising(self) -> None:
+        record, store = record_with_content()
+        value = record.to_json()
+        replace_json_artifact(
+            value,
+            store,
+            "trial_result",
+            {"trial_uri": "file://["},
+        )
+        record = HarborReplayRecord.from_json(value)
+
+        result = classify_harbor_record(record, read_artifact=store.__getitem__)
+
+        self.assertIs(result.status, AdapterStatus.INFRA)
+        self.assertFalse(result.obligations["trial_cardinality_one"])
+
+    def test_replay_rejects_uri_parser_normalization_characters(self) -> None:
+        for character in ("\n", "\r", "\t", " ", "\x1f"):
+            with self.subTest(character=repr(character)):
+                record, store = record_with_content()
+                value = record.to_json()
+                replace_json_artifact(
+                    value,
+                    store,
+                    "trial_result",
+                    {"trial_uri": character + "file:///fixture/jobs/regex-log__trial-1"},
+                )
+                record = HarborReplayRecord.from_json(value)
+
+                result = classify_harbor_record(
+                    record, read_artifact=store.__getitem__
+                )
+
+                self.assertIs(result.status, AdapterStatus.INFRA)
+                self.assertFalse(result.obligations["trial_cardinality_one"])
+
+    def test_replay_does_not_resolve_host_symlinks_for_trial_containment(self) -> None:
+        record, store = record_with_content()
+        value = record.to_json()
+        trial_dir = "/usr/bin/gitspace-p00-task-012-oracle"
+        replace_json_artifact(
+            value, store, "job_config", {"jobs_dir": "/bin"}
+        )
+        trial_config_uri = value["artifacts"]["trial_config"]
+        trial_result_uri = value["artifacts"]["trial_result"]
+        assert isinstance(trial_config_uri, str)
+        assert isinstance(trial_result_uri, str)
+        trial_config = json.loads(store[trial_config_uri])
+        trial_result = json.loads(store[trial_result_uri])
+        trial_config["trials_dir"] = trial_dir
+        trial_result["trial_uri"] = f"file://{trial_dir}/{trial_result['trial_name']}"
+        trial_result["config"]["trials_dir"] = trial_dir
+        replace_artifact(
+            value,
+            store,
+            "trial_config",
+            json.dumps(trial_config, sort_keys=True, separators=(",", ":")).encode(),
+        )
+        replace_artifact(
+            value,
+            store,
+            "trial_result",
+            json.dumps(trial_result, sort_keys=True, separators=(",", ":")).encode(),
+        )
+        record = HarborReplayRecord.from_json(value)
+
+        result = classify_harbor_record(record, read_artifact=store.__getitem__)
+
+        self.assertIs(result.status, AdapterStatus.INFRA)
+        self.assertFalse(result.obligations["trial_cardinality_one"])
+
+    def test_trial_result_rejects_boolean_numeric_defaults(self) -> None:
+        for path in ("timeout_multiplier", "agent.n_concurrent"):
+            with self.subTest(path=path):
+                record, store = record_with_content()
+                value = record.to_json()
+                trial_uri = value["artifacts"]["trial_result"]
+                assert isinstance(trial_uri, str)
+                trial_result = json.loads(store[trial_uri])
+                if path == "timeout_multiplier":
+                    trial_result["config"]["timeout_multiplier"] = True
+                else:
+                    trial_result["config"]["agent"]["n_concurrent"] = True
+                replace_artifact(
+                    value,
+                    store,
+                    "trial_result",
+                    json.dumps(
+                        trial_result, sort_keys=True, separators=(",", ":")
+                    ).encode(),
+                )
+                record = HarborReplayRecord.from_json(value)
+
+                result = classify_harbor_record(
+                    record, read_artifact=store.__getitem__
+                )
+
+                self.assertIs(result.status, AdapterStatus.INFRA)
+                self.assertFalse(result.obligations["trial_cardinality_one"])
 
     def test_effective_job_config_rejects_runtime_modifiers_and_task_drift(
         self,

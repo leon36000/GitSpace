@@ -10,15 +10,13 @@ from harbor.environments.docker.docker import (
 from harbor.models.task.config import EnvironmentConfig, NetworkMode
 from harbor.models.trial.paths import TrialPaths
 
+from .harbor_replay import is_digest_bound_docker_reference
+
 # Harbor 0.21.0 does not publish a py.typed marker; validate the adapter seam
 # while treating its third-party implementation as an untyped runtime boundary.
 # mypy: disable-error-code=import-untyped
 
 _DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
-_DOCKER_IMAGE_REFERENCE = re.compile(
-    r"^(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]+)?/)?"
-    r"[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?@sha256:[0-9a-f]{64}$"
-)
 
 
 class GitSpaceHarborEnvironment(DockerEnvironment):
@@ -92,7 +90,7 @@ class GitSpaceHarborEnvironment(DockerEnvironment):
 
 
 def _validate_image_reference(value: str, label: str) -> None:
-    if type(value) is not str or _DOCKER_IMAGE_REFERENCE.fullmatch(value) is None:
+    if not is_digest_bound_docker_reference(value):
         raise ValueError(f"{label} must be digest-bound")
     digest = value.rsplit("@", 1)[1]
     if _DIGEST.fullmatch(digest) is None:

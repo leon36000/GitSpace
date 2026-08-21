@@ -199,6 +199,74 @@ def _capture(
         "id": "trial-1",
         "task_name": "terminal-bench/regex-log",
         "trial_name": "regex-log__trial-1",
+        "trial_uri": "file:///fixture/jobs/regex-log__trial-1",
+        "config": {
+            "task": {
+                "path": "/fixture",
+                "git_url": None,
+                "git_commit_id": None,
+                "name": None,
+                "ref": None,
+                "overwrite": False,
+                "download_dir": None,
+                "source": None,
+            },
+            "trial_name": "regex-log__trial-1",
+            "trials_dir": "/fixture/jobs",
+            "install_only": False,
+            "timeout_multiplier": 1.0,
+            "agent_timeout_multiplier": None,
+            "verifier_timeout_multiplier": None,
+            "agent_setup_timeout_multiplier": None,
+            "environment_build_timeout_multiplier": None,
+            "agent": {
+                "name": "oracle",
+                "import_path": None,
+                "model_name": None,
+                "n_concurrent": 1,
+                "concurrency_group": None,
+                "skills": [],
+                "override_timeout_sec": None,
+                "override_setup_timeout_sec": None,
+                "max_timeout_sec": None,
+                "resume_trajectory": False,
+                "load_trajectory": None,
+                "extra_allowed_hosts": [],
+                "kwargs": {},
+                "mcp_servers": [],
+            },
+            "environment": {
+                "type": None,
+                "import_path": HARBOR_ENVIRONMENT_IMPORT_PATH,
+                "force_build": False,
+                "delete": True,
+                "cpu_enforcement_policy": "auto",
+                "memory_enforcement_policy": "auto",
+                "override_cpus": None,
+                "override_memory_mb": None,
+                "override_storage_mb": None,
+                "override_gpus": None,
+                "override_tpu": None,
+                "mounts": None,
+                "extra_docker_compose": [],
+                "kwargs": {
+                    "gitspace_environment_image_ref": environment_image_ref,
+                    "gitspace_environment_image_id": environment_image_id,
+                    "gitspace_egress_sidecar_image_ref": sidecar_image_ref,
+                    "gitspace_egress_sidecar_image_id": sidecar_image_id,
+                },
+                "extra_allowed_hosts": [],
+            },
+            "verifier": {
+                "override_timeout_sec": None,
+                "max_timeout_sec": None,
+                "disable": False,
+            },
+            "artifacts": [],
+            "extra_instruction_paths": [],
+            "job_id": "job-1",
+            "source_trial": None,
+        },
         "exception_info": exception_info,
         "exception_stage": "agent_execution" if exception_info else None,
         "environment_setup": {
@@ -765,6 +833,8 @@ class HarborSdkExecutorTests(unittest.TestCase):
                 trial_result = {
                     "id": "trial-1",
                     "task_name": "terminal-bench/regex-log",
+                    "trial_name": "trial-1",
+                    "trial_uri": trial_uri,
                     "exception_info": None,
                     "agent_execution": {"started_at": "a", "finished_at": "b"},
                     "verifier": {"started_at": "b", "finished_at": "c"},
@@ -772,6 +842,8 @@ class HarborSdkExecutorTests(unittest.TestCase):
                 trial_config = {
                     "id": "trial-1",
                     "task_name": "terminal-bench/regex-log",
+                    "trial_name": "trial-1",
+                    "trials_dir": str(job_dir),
                 }
                 job_dir.mkdir(parents=True, exist_ok=True)
                 (job_dir / "config.json").write_bytes(_json_bytes(config))
@@ -804,6 +876,165 @@ class HarborSdkExecutorTests(unittest.TestCase):
             self.assertEqual(capture.oracle_exit_code_bytes, None)
             self.assertEqual(capture.verifier_reward_json_bytes, b'{"reward":1}')
             self.assertIn(b"terminal-bench/regex-log", capture.trial_result_bytes)
+
+    def test_sdk_executor_projects_actual_harbor_021_job_result_shape(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = FIXTURE_ROOT
+
+            def runner(config: dict[str, object]) -> None:
+                job_dir = Path(str(config["jobs_dir"])) / str(config["job_name"])
+                trial_dir = job_dir / "terminal-bench-2.1-regex-log__TQN27aZ"
+                (trial_dir / "agent").mkdir(parents=True)
+                (trial_dir / "verifier").mkdir(parents=True)
+                job_dir.mkdir(parents=True, exist_ok=True)
+                (job_dir / "config.json").write_bytes(_json_bytes(config))
+                (job_dir / "result.json").write_bytes(
+                    _json_bytes(
+                        {
+                            "id": "job-1",
+                            "n_total_trials": 1,
+                            "stats": {
+                                "n_completed_trials": 1,
+                                "n_errored_trials": 0,
+                                "n_running_trials": 0,
+                                "n_pending_trials": 0,
+                                "n_cancelled_trials": 0,
+                                "n_retries": 0,
+                                "evals": {"oracle__adhoc": {"n_trials": 1}},
+                            },
+                        }
+                    )
+                )
+                (trial_dir / "config.json").write_bytes(
+                    _json_bytes(
+                        {
+                            "task": {"path": str(fixture)},
+                            "trial_name": "terminal-bench-2.1-regex-log__TQN27aZ",
+                            "trials_dir": str(job_dir),
+                        }
+                    )
+                )
+                (trial_dir / "result.json").write_bytes(
+                    _json_bytes(
+                        {
+                            "id": "trial-1",
+                            "task_name": "terminal-bench/regex-log",
+                            "trial_name": "terminal-bench-2.1-regex-log__TQN27aZ",
+                            "trial_uri": trial_dir.resolve().as_uri(),
+                            "exception_info": None,
+                        }
+                    )
+                )
+
+            request = HarborExecutionRequest(
+                run_root=str(root / "run"),
+                fixture_root=str(fixture),
+                job_config=self._job_config(),
+                environment_image_ref="registry.invalid/gitspace/regex-log@sha256:"
+                + "e" * 64,
+                environment_image_id="sha256:" + "e" * 64,
+                egress_sidecar_image_ref="registry.invalid/gitspace/harbor-egress@sha256:"
+                + "f" * 64,
+                egress_sidecar_image_id="sha256:" + "f" * 64,
+            )
+            capture = HarborSdkExecutor(
+                job_runner=runner,
+                resource_observer=FakeResourceObserver(),
+            ).run_oracle(request)
+
+            self.assertEqual(capture.process_return_code, 0)
+            self.assertIn(b'"n_completed_trials":1', capture.job_result_bytes)
+            self.assertIn(b'"task_name":"terminal-bench/regex-log"', capture.trial_result_bytes)
+            self.assertEqual(
+                json.loads(capture.cleanup_report_bytes),
+                {
+                    "process_group_absent": True,
+                    "temp_root_absent": True,
+                    "containers_absent": True,
+                    "networks_absent": True,
+                    "derived_images_absent": True,
+                    "foreign_resources_untouched": True,
+                },
+            )
+            self.assertEqual(
+                json.loads(capture.exception_boundary_bytes),
+                {"discriminant": None, "stage": None},
+            )
+
+    def test_sdk_executor_does_not_synthesize_exception_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = FIXTURE_ROOT
+
+            def runner(config: dict[str, object]) -> None:
+                job_dir = Path(str(config["jobs_dir"])) / str(config["job_name"])
+                trial_dir = job_dir / "terminal-bench-2.1-regex-log__error"
+                job_dir.mkdir(parents=True, exist_ok=True)
+                (trial_dir / "agent").mkdir(parents=True)
+                (trial_dir / "verifier").mkdir(parents=True)
+                (job_dir / "config.json").write_bytes(_json_bytes(config))
+                (job_dir / "result.json").write_bytes(
+                    _json_bytes(
+                        {
+                            "id": "job-1",
+                            "n_total_trials": 1,
+                            "stats": {
+                                "n_completed_trials": 1,
+                                "n_errored_trials": 1,
+                                "n_running_trials": 0,
+                                "n_pending_trials": 0,
+                                "n_cancelled_trials": 0,
+                                "n_retries": 0,
+                                "evals": {},
+                            },
+                        }
+                    )
+                )
+                (trial_dir / "config.json").write_bytes(
+                    _json_bytes(
+                        {
+                            "trial_name": "terminal-bench-2.1-regex-log__error",
+                            "trials_dir": str(job_dir),
+                        }
+                    )
+                )
+                (trial_dir / "result.json").write_bytes(
+                    _json_bytes(
+                        {
+                            "id": "trial-1",
+                            "task_name": "terminal-bench/regex-log",
+                            "trial_name": "terminal-bench-2.1-regex-log__error",
+                            "trial_uri": trial_dir.resolve().as_uri(),
+                            "exception_info": {
+                                "exception_type": "AdapterPolicyViolation",
+                                "exception_message": "untrusted trial text",
+                            },
+                        }
+                    )
+                )
+
+            request = HarborExecutionRequest(
+                run_root=str(root / "run"),
+                fixture_root=str(fixture),
+                job_config=self._job_config(),
+                environment_image_ref="registry.invalid/gitspace/regex-log@sha256:"
+                + "e" * 64,
+                environment_image_id="sha256:" + "e" * 64,
+                egress_sidecar_image_ref="registry.invalid/gitspace/harbor-egress@sha256:"
+                + "f" * 64,
+                egress_sidecar_image_id="sha256:" + "f" * 64,
+            )
+            capture = HarborSdkExecutor(
+                job_runner=runner,
+                resource_observer=FakeResourceObserver(),
+            ).run_oracle(request)
+
+            self.assertIsNone(capture.exception_discriminant)
+            self.assertEqual(
+                json.loads(capture.exception_boundary_bytes),
+                {"discriminant": None, "stage": "unknown"},
+            )
 
     def test_default_executor_uses_exact_cli_and_minimal_worker_environment(
         self,
@@ -841,12 +1072,22 @@ class HarborSdkExecutorTests(unittest.TestCase):
                         }
                     )
                 )
-                (trial_dir / "config.json").write_bytes(_json_bytes({"id": "trial-1"}))
+                (trial_dir / "config.json").write_bytes(
+                    _json_bytes(
+                        {
+                            "id": "trial-1",
+                            "trial_name": "trial-1",
+                            "trials_dir": str(job_dir),
+                        }
+                    )
+                )
                 (trial_dir / "result.json").write_bytes(
                     _json_bytes(
                         {
                             "id": "trial-1",
                             "task_name": "terminal-bench/regex-log",
+                            "trial_name": "trial-1",
+                            "trial_uri": trial_dir.resolve().as_uri(),
                             "exception_info": None,
                         }
                     )

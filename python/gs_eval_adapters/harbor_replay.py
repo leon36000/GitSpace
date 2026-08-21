@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import posixpath
 import re
 import tomllib
 import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
+from urllib.parse import unquote, urlparse
 
 from .errors import AdapterContractError
 from .json_boundary import (
@@ -44,6 +46,10 @@ TERMINAL_BENCH_RUNTIME_FILE_DIGESTS = {
     "tests/test.sh": "sha256:32d0433e8eeee0271eb275f6a976f2704530ed3d5de6074535eab9dc01e7f88d",
     "environment/Dockerfile": "sha256:31fa4625b97ec859d0a26b9df931eb0de5b9d313a17413dfadd528e9e9c48cb6",
 }
+TERMINAL_BENCH_FIXTURE_FILE_MODES = {
+    "source-manifest.json": "0644",
+    **{relative_path: "0644" for relative_path in TERMINAL_BENCH_RUNTIME_FILE_DIGESTS},
+}
 _FIXTURE_ARTIFACT_TO_PATH = {
     "task_toml": "task.toml",
     "instruction_md": "instruction.md",
@@ -59,9 +65,16 @@ _EXPECTED_FIXTURE_FILE_DIGESTS = {
 }
 
 _DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
+_DOCKER_NAME_COMPONENT = r"[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*"
+_DOCKER_DOMAIN_COMPONENT = r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"
+_DOCKER_DOMAIN = (
+    rf"{_DOCKER_DOMAIN_COMPONENT}(?:\.{_DOCKER_DOMAIN_COMPONENT})*(?::[0-9]+)?"
+)
+_DOCKER_TAG = r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}"
 _DOCKER_IMAGE_REFERENCE = re.compile(
-    r"^(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]+)?/)?"
-    r"[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?@sha256:[0-9a-f]{64}$"
+    rf"^(?:(?:{_DOCKER_DOMAIN})/)?"
+    rf"{_DOCKER_NAME_COMPONENT}(?:/{_DOCKER_NAME_COMPONENT})*"
+    rf"(?::{_DOCKER_TAG})?@sha256:[0-9a-f]{{64}}$"
 )
 _CAS_URI_PREFIX = "cas://sha256/"
 _RUN_PURPOSES = {"qualification_oracle", "status_control"}
@@ -177,6 +190,68 @@ _TRIAL_EFFECTIVE_FIELDS = {
     "environment",
     "job_id",
 }
+_TRIAL_RESULT_CONFIG_FIELDS = {
+    "task",
+    "trial_name",
+    "trials_dir",
+    "install_only",
+    "timeout_multiplier",
+    "agent_timeout_multiplier",
+    "verifier_timeout_multiplier",
+    "agent_setup_timeout_multiplier",
+    "environment_build_timeout_multiplier",
+    "agent",
+    "environment",
+    "verifier",
+    "artifacts",
+    "extra_instruction_paths",
+    "job_id",
+    "source_trial",
+}
+_TRIAL_RESULT_TASK_FIELDS = {
+    "path",
+    "git_url",
+    "git_commit_id",
+    "name",
+    "ref",
+    "overwrite",
+    "download_dir",
+    "source",
+}
+_TRIAL_RESULT_AGENT_FIELDS = {
+    "name",
+    "import_path",
+    "model_name",
+    "n_concurrent",
+    "concurrency_group",
+    "skills",
+    "override_timeout_sec",
+    "override_setup_timeout_sec",
+    "max_timeout_sec",
+    "resume_trajectory",
+    "load_trajectory",
+    "extra_allowed_hosts",
+    "kwargs",
+    "mcp_servers",
+}
+_TRIAL_RESULT_ENVIRONMENT_FIELDS = {
+    "type",
+    "import_path",
+    "force_build",
+    "delete",
+    "cpu_enforcement_policy",
+    "memory_enforcement_policy",
+    "override_cpus",
+    "override_memory_mb",
+    "override_storage_mb",
+    "override_gpus",
+    "override_tpu",
+    "mounts",
+    "extra_docker_compose",
+    "kwargs",
+    "extra_allowed_hosts",
+}
+_TRIAL_RESULT_VERIFIER_FIELDS = {"override_timeout_sec", "max_timeout_sec", "disable"}
 _HARBOR_JOB_CONFIG_FIELDS = {
     "job_name",
     "jobs_dir",
@@ -657,7 +732,7 @@ def _run_purpose_valid(record: HarborReplayRecord) -> bool:
 def _image_reference_matches(reference: str, image_id: str) -> bool:
     return (
         _DIGEST.fullmatch(image_id) is not None
-        and _DOCKER_IMAGE_REFERENCE.fullmatch(reference) is not None
+        and is_digest_bound_docker_reference(reference)
         and reference.rsplit("@", 1)[1] == image_id
     )
 
@@ -970,11 +1045,13 @@ def _validate_effective_job_config(
         and type(job.get("n_concurrent_trials")) is int
         and job["n_concurrent_trials"] == 1
         and type(retry) is dict
+        and set(retry) == {"max_retries"}
         and type(retry.get("max_retries")) is int
         and retry["max_retries"] == 0
         and type(agents) is list
         and len(agents) == 1
         and type(agents[0]) is dict
+        and set(agents[0]) == {"name", "n_concurrent"}
         and agents[0].get("name") == "oracle"
         and type(agents[0].get("n_concurrent")) is int
         and agents[0]["n_concurrent"] == 1
@@ -1045,27 +1122,75 @@ def _validate_trial_artifacts(
     trial_result: JsonObject,
     job_config: JsonObject,
 ) -> tuple[bool, bool]:
-    trial_results = job_result.get("trial_results")
-    if (
-        type(job_result.get("n_total_trials")) is not int
-        or job_result["n_total_trials"] != 1
-        or type(trial_results) is not list
-        or len(trial_results) != 1
-        or type(trial_results[0]) is not dict
-    ):
+    summary_id = _job_result_trial_summary_id(job_result)
+    if summary_id is False:
         return False, False
-    summary = trial_results[0]
     config_identity_valid = _validate_effective_trial_config(
         record, job_config, trial_config, trial_result
     )
     cardinality_valid = (
-        summary.get("id") == record.trial_id
+        (summary_id is None or summary_id == record.trial_id)
         and job_result.get("id") == record.job_id
         and trial_result.get("id") == record.trial_id
         and trial_result.get("task_name") == record.task_name
         and config_identity_valid
     )
     return cardinality_valid, _trial_exception_consistent(record, trial_result)
+
+
+def _job_result_trial_summary_id(job_result: JsonObject) -> str | bool | None:
+    """Return a legacy trial id, ``None`` for Harbor 0.21 aggregate results."""
+
+    if (
+        type(job_result.get("n_total_trials")) is not int
+        or job_result["n_total_trials"] != 1
+    ):
+        return False
+    if "trial_results" in job_result:
+        trial_results = job_result["trial_results"]
+        if (
+            type(trial_results) is not list
+            or len(trial_results) != 1
+            or type(trial_results[0]) is not dict
+        ):
+            return False
+        summary = trial_results[0]
+        summary_id = summary.get("id")
+        return summary_id if type(summary_id) is str and summary_id else False
+
+    stats = job_result.get("stats")
+    if type(stats) is not dict:
+        return False
+    completed = stats.get("n_completed_trials")
+    errored = stats.get("n_errored_trials")
+    running = stats.get("n_running_trials")
+    pending = stats.get("n_pending_trials")
+    cancelled = stats.get("n_cancelled_trials")
+    counts = {
+        "n_completed_trials": completed,
+        "n_errored_trials": errored,
+        "n_running_trials": running,
+        "n_pending_trials": pending,
+        "n_cancelled_trials": cancelled,
+    }
+    if any(type(value) is not int or value < 0 for value in counts.values()):
+        return False
+    retries = stats.get("n_retries")
+    if (
+        type(retries) is not int
+        or retries < 0
+        or completed != 1
+        or running != 0
+        or pending != 0
+        or type(errored) is not int
+        or type(cancelled) is not int
+        or errored > completed
+        or cancelled > errored
+        or retries != 0
+        or type(stats.get("evals")) is not dict
+    ):
+        return False
+    return None
 
 
 def _validate_effective_trial_config(
@@ -1090,18 +1215,56 @@ def _validate_effective_trial_config(
     ):
         return False
     trial_name = trial_config.get("trial_name")
+    validated_trial_name = _posix_component(trial_name)
     if (
-        type(trial_name) is not str
-        or not trial_name
+        validated_trial_name is None
+        or trial_name == record.trial_id
         or trial_result.get("trial_name") != trial_name
     ):
         return False
-    if (
-        type(trial_config.get("trials_dir")) is not str
-        or not trial_config["trials_dir"]
+    trials_dir = trial_config.get("trials_dir")
+    trials_path = _absolute_posix_path(trials_dir)
+    if trials_path is None:
+        return False
+    jobs_dir = job_config.get("jobs_dir")
+    job_name = job_config.get("job_name")
+    if jobs_dir is not None:
+        jobs_path = _absolute_posix_path(jobs_dir)
+        validated_job_name = _posix_component(job_name)
+        if (
+            jobs_path is None
+            or validated_job_name is None
+            or trials_path != posixpath.join(jobs_path, validated_job_name)
+        ):
+            return False
+    if trial_config.get("job_id") != record.job_id:
+        return False
+    trial_uri = trial_result.get("trial_uri")
+    if type(trial_uri) is not str or any(
+        ord(character) <= 32
+        or ord(character) == 127
+        or character.isspace()
+        for character in trial_uri
     ):
         return False
-    if trial_config.get("job_id") != record.job_id:
+    try:
+        parsed_uri = urlparse(trial_uri)
+    except ValueError:
+        return False
+    if (
+        parsed_uri.scheme != "file"
+        or parsed_uri.netloc not in {"", "localhost"}
+        or parsed_uri.params
+        or parsed_uri.query
+        or parsed_uri.fragment
+    ):
+        return False
+    trial_dir = _absolute_posix_path(unquote(parsed_uri.path))
+    if (
+        trial_dir is None
+        or validated_trial_name is None
+        or trial_dir != posixpath.join(trials_path, validated_trial_name)
+    ):
         return False
     agent = trial_config.get("agent")
     if (
@@ -1112,28 +1275,155 @@ def _validate_effective_trial_config(
         or agent["n_concurrent"] != 1
     ):
         return False
-    return _validate_environment_extension(trial_config.get("environment"), record)
+    return (
+        _validate_environment_extension(trial_config.get("environment"), record)
+        and _validate_trial_result_config(
+            trial_result.get("config"), trial_config, record
+        )
+    )
+
+
+def _absolute_posix_path(value: object) -> str | None:
+    """Normalize a fixture path without consulting the host filesystem."""
+
+    if type(value) is not str or not value.startswith("/"):
+        return None
+    if "\\" in value or "\x00" in value:
+        return None
+    if any(ord(character) < 32 or ord(character) == 127 for character in value):
+        return None
+    return posixpath.normpath(value)
+
+
+def _posix_component(value: object) -> str | None:
+    if type(value) is not str or not value or value in {".", ".."}:
+        return None
+    if "/" in value or "\\" in value or "\x00" in value:
+        return None
+    if any(ord(character) < 32 or ord(character) == 127 for character in value):
+        return None
+    return value
+
+
+def _validate_trial_result_config(
+    value: object, trial_config: JsonObject, record: HarborReplayRecord
+) -> bool:
+    if type(value) is not dict or set(value) != _TRIAL_RESULT_CONFIG_FIELDS:
+        return False
+    if (
+        value.get("trial_name") != trial_config.get("trial_name")
+        or value.get("trials_dir") != trial_config.get("trials_dir")
+        or value.get("job_id") != record.job_id
+        or value.get("install_only") is not False
+        or type(value.get("timeout_multiplier")) is not float
+        or value.get("timeout_multiplier") != 1.0
+        or value.get("agent_timeout_multiplier") is not None
+        or value.get("verifier_timeout_multiplier") is not None
+        or value.get("agent_setup_timeout_multiplier") is not None
+        or value.get("environment_build_timeout_multiplier") is not None
+        or value.get("artifacts") != []
+        or value.get("extra_instruction_paths") != []
+        or value.get("source_trial") is not None
+    ):
+        return False
+    trial_task = trial_config.get("task")
+    trial_task_path = (
+        trial_task.get("path") if type(trial_task) is dict else None
+    )
+    if type(trial_task_path) is not str:
+        return False
+    task = value.get("task")
+    if (
+        type(task) is not dict
+        or set(task) != _TRIAL_RESULT_TASK_FIELDS
+        or task.get("path") != trial_task_path
+        or task.get("git_url") is not None
+        or task.get("git_commit_id") is not None
+        or task.get("name") is not None
+        or task.get("ref") is not None
+        or task.get("overwrite") is not False
+        or task.get("download_dir") is not None
+        or task.get("source") is not None
+    ):
+        return False
+    agent = value.get("agent")
+    if (
+        type(agent) is not dict
+        or set(agent) != _TRIAL_RESULT_AGENT_FIELDS
+        or agent.get("name") != "oracle"
+        or agent.get("import_path") is not None
+        or agent.get("model_name") is not None
+        or type(agent.get("n_concurrent")) is not int
+        or agent.get("n_concurrent") != 1
+        or agent.get("concurrency_group") is not None
+        or agent.get("skills") != []
+        or agent.get("override_timeout_sec") is not None
+        or agent.get("override_setup_timeout_sec") is not None
+        or agent.get("max_timeout_sec") is not None
+        or agent.get("resume_trajectory") is not False
+        or agent.get("load_trajectory") is not None
+        or agent.get("extra_allowed_hosts") != []
+        or agent.get("kwargs") != {}
+        or agent.get("mcp_servers") != []
+    ):
+        return False
+    environment = value.get("environment")
+    if (
+        type(environment) is not dict
+        or set(environment) != _TRIAL_RESULT_ENVIRONMENT_FIELDS
+        or environment.get("type") is not None
+        or environment.get("import_path") != HARBOR_ENVIRONMENT_IMPORT_PATH
+        or environment.get("force_build") is not False
+        or environment.get("delete") is not True
+        or environment.get("cpu_enforcement_policy") != "auto"
+        or environment.get("memory_enforcement_policy") != "auto"
+        or environment.get("override_cpus") is not None
+        or environment.get("override_memory_mb") is not None
+        or environment.get("override_storage_mb") is not None
+        or environment.get("override_gpus") is not None
+        or environment.get("override_tpu") is not None
+        or environment.get("mounts") is not None
+        or environment.get("extra_docker_compose") != []
+        or environment.get("extra_allowed_hosts") != []
+        or not _validate_environment_kwargs(environment.get("kwargs"), record)
+    ):
+        return False
+    verifier = value.get("verifier")
+    return (
+        type(verifier) is dict
+        and set(verifier) == _TRIAL_RESULT_VERIFIER_FIELDS
+        and verifier.get("override_timeout_sec") is None
+        and verifier.get("max_timeout_sec") is None
+        and verifier.get("disable") is False
+    )
 
 
 def _validate_environment_extension(value: object, record: HarborReplayRecord) -> bool:
     if type(value) is not dict or set(value) != {"import_path", "kwargs"}:
         return False
-    kwargs = value.get("kwargs")
     return (
         value.get("import_path") == HARBOR_ENVIRONMENT_IMPORT_PATH
-        and type(kwargs) is dict
-        and set(kwargs)
+        and _validate_environment_kwargs(value.get("kwargs"), record)
+    )
+
+
+def _validate_environment_kwargs(value: object, record: HarborReplayRecord) -> bool:
+    if type(value) is not dict:
+        return False
+    return (
+        set(value)
         == {
             "gitspace_environment_image_ref",
             "gitspace_environment_image_id",
             "gitspace_egress_sidecar_image_ref",
             "gitspace_egress_sidecar_image_id",
         }
-        and kwargs.get("gitspace_environment_image_ref") == record.environment_image_ref
-        and kwargs.get("gitspace_environment_image_id") == record.environment_image_id
-        and kwargs.get("gitspace_egress_sidecar_image_ref")
+        and value.get("gitspace_environment_image_ref")
+        == record.environment_image_ref
+        and value.get("gitspace_environment_image_id") == record.environment_image_id
+        and value.get("gitspace_egress_sidecar_image_ref")
         == record.egress_sidecar_image_ref
-        and kwargs.get("gitspace_egress_sidecar_image_id")
+        and value.get("gitspace_egress_sidecar_image_id")
         == record.egress_sidecar_image_id
     )
 
@@ -1157,7 +1447,12 @@ def _trial_exception_consistent(
     if type(observed_type) is not str or not observed_type:
         return False
     if raw_stage is None:
-        observed_stage = "unknown"
+        observed_stage = (
+            record.exception_stage
+            if record.exception_discriminant is not None
+            and record.exception_stage in _EXCEPTION_STAGES
+            else "unknown"
+        )
     elif type(raw_stage) is str and raw_stage in _EXCEPTION_STAGES:
         observed_stage = raw_stage
     else:
@@ -1391,8 +1686,7 @@ def _validate_fixture_artifacts(
             content is None
             or entry.get("sha256") != expected_digest
             or entry.get("bytes") != len(content)
-            or type(mode) is not str
-            or re.fullmatch(r"[0-7]{4}", mode) is None
+            or mode != TERMINAL_BENCH_FIXTURE_FILE_MODES[relative_path]
         ):
             return False
     task_toml = contents.get("task_toml")
@@ -1631,9 +1925,13 @@ def _image_reference(value: object, label: str, image_id: object) -> str:
         raise AdapterContractError(f"{label}.id must be a sha256 digest")
     if "@" not in reference or reference.rsplit("@", 1)[1] != digest:
         raise AdapterContractError(f"{label} must be bound to its image digest")
-    if _DOCKER_IMAGE_REFERENCE.fullmatch(reference) is None:
+    if not is_digest_bound_docker_reference(reference):
         raise AdapterContractError(f"{label} must be a valid Docker reference")
     return reference
+
+
+def is_digest_bound_docker_reference(value: object) -> bool:
+    return type(value) is str and _DOCKER_IMAGE_REFERENCE.fullmatch(value) is not None
 
 
 def _optional_string(value: object, label: str) -> str | None:
