@@ -34,11 +34,15 @@ production Harbor.
 
 ## Sonar et garde de merge
 
-Le check Sonar antérieur avait cinq annotations dans la fixture. Le head
-`4b06fb2` doit encore recevoir un check Sonar exact-head frais; son absence ne
-peut pas être convertie localement en PASS. Les gates formelles Task 012
-restent ouvertes : requalification runtime rootless, SBOM SPDX 2.3,
-provenance OCI, scanner/base fraîche et dispositions, revue indépendante
-sécurité/conformité/non-egress, merge signé et replay post-merge.
+Le check Sonar antérieur avait cinq annotations dans la fixture. Le check
+exact-head `96918650020` sur `5a15ea6` en rapporte maintenant `0`; sa conclusion
+reste `cancelled` et l’objet quality-gate externe est absent. Le workflow Task
+011 a classé cette situation `NOT_COMPUTED_EXTERNAL` avec sa dérogation
+explicite, et a terminé avec succès. Cela ne constitue pas un `SONAR_PASS`.
+
+Les gates formelles Task 012 restent ouvertes : requalification runtime
+rootless, SBOM SPDX 2.3, provenance OCI, scanner/base fraîche et dispositions,
+revue indépendante sécurité/conformité/non-egress, merge signé et replay
+post-merge.
 
 Le PR reste donc non fusionné et `PROVEN` est interdit à ce stade.
