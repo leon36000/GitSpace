@@ -2,45 +2,43 @@
 task_id: P00-TASK-012
 evidence_type: CODE_QUALITY_AND_EXACT_HEAD
 status: PARTIALLY_VERIFIED
-repository_head: b3a3dc09c664d092d0360a4083433b78eb822023
+repository_head: bc524bb
 updated: 2026-08-21
 ---
 
-# P00-TASK-012 — preuve de qualité au head exact
+# P00-TASK-012 — preuve de qualité au head de correction
 
-Cette preuve couvre les refactorings `1651ef6`, `b8773cf` et `b3a3dc0` sur le
-head exact `b3a3dc09c664d092d0360a4083433b78eb822023`. Les validations Harbor,
-replay et adapter restent sémantiquement couvertes par les tests et les
-mutations; aucune promotion `PROVEN` n'est déduite de cette preuve.
+Cette preuve couvre le commit `bc524bb`, qui corrige les cinq annotations
+Sonar résiduelles dans la fixture normalisée sans modifier le code de
+production Harbor.
 
-## Vérifications reproductibles
+## Corrections liées à la provenance
 
-- Archive Git propre : `43` tests adaptateurs OK.
+- `tests/test.sh` utilise désormais les tests Bash `[[ ... ]]` équivalents.
+- Le Dockerfile conserve le même digest OCI mais retire le tag redondant de
+  `FROM` et exécute la fixture avec l’utilisateur non-root `gitspace`.
+- `source-manifest.json`, `TERMINAL_BENCH_RUNTIME_FILE_DIGESTS` et la
+  qualification ont été recalculés; le digest normalisé est
+  `sha256:ae48517f3571e5505f94f780cdd74e208aa31ca2bc1c5f6f8648d3fe163dd147`.
+- L’ancienne qualification runtime est explicitement marquée historique et
+  invalidée; aucune preuve Harbor antérieure n’est recyclée.
+
+## Vérifications locales
+
+- Tests adaptateurs : `43` OK.
+- Tests Harbor/exécuteur/replay : `81` OK.
+- Tests fixture/verifier normalisés : `12` OK.
 - Mutations Harbor : `11/11` tuées.
-- `uv lock --check`, mypy des trois modules adapter/replay/runtime, Ruff,
-  compileall et `git diff --check` : OK.
-- Rust workspace : tests, clippy et fmt : OK.
-- CI exact-head : Task 001, Task 010, Task 012 et GitGuardian : succès.
+- `uv lock --check`, mypy, Ruff, compileall, shell syntax, JSON et
+  `git diff --check` : OK.
 
-## Sonar exact-head
+## Sonar et garde de merge
 
-Le check Sonar `96735219177` a terminé `cancelled` avec cinq annotations, toutes
-dans la fixture benchmark et aucune dans le code de production :
+Le check Sonar antérieur avait cinq annotations dans la fixture. Le head
+`bc524bb` doit encore recevoir un check Sonar exact-head frais; son absence ne
+peut pas être convertie localement en PASS. Les gates formelles Task 012
+restent ouvertes : requalification runtime rootless, SBOM SPDX 2.3,
+provenance OCI, scanner/base fraîche et dispositions, revue indépendante
+sécurité/conformité/non-egress, merge signé et replay post-merge.
 
-- `tests/adapters/harbor/fixtures/terminal-bench-2.1-regex-log/tests/test.sh`
-  — trois recommandations sur les tests shell;
-- `tests/adapters/harbor/fixtures/terminal-bench-2.1-regex-log/environment/Dockerfile`
-  — deux recommandations sur la référence d'image et l'utilisateur par défaut.
-
-Ces fichiers sont byte-liés par `source-manifest.json` et par le digest de la
-fixture; ils n'ont pas été modifiés pour fabriquer un feu vert Sonar. La gate
-Task 011 échoue donc honnêtement sur ces cinq annotations résiduelles.
-
-## Garde de merge
-
-Le PR #57 reste draft et `UNSTABLE`. Les gates formelles Task 012 restent
-ouvertes : SBOM SPDX 2.3, provenance OCI, scanner/base fraîche et dispositions
-de vulnérabilités, revue indépendante sécurité/conformité/non-egress,
-qualification runtime sur exact-head, merge signé et replay post-merge sur
-`main`. Aucun merge de `main`, promotion canonique ou projection RAGLite n'est
-autorisé à ce stade.
+Le PR reste donc non fusionné et `PROVEN` est interdit à ce stade.

@@ -1,13 +1,19 @@
 ---
 task_id: P00-TASK-012
 evidence_type: CODE_HARDENING_AND_ROOTLESS_POSITIVE_PATH
-status: PARTIALLY_VERIFIED
+status: HISTORICAL_POSITIVE_PATH_INVALIDATED_BY_FIXTURE_CHANGE
 repository_head: 0ea1acefb2454dcf3d5706cb58dc66c77f8a8322
+superseded_by: bc524bb
 updated: 2026-08-20
 ---
 # P00-TASK-012 — durcissement local Codex
 
 Cette preuve couvre le commit `0ea1acefb2454dcf3d5706cb58dc66c77f8a8322`, les comportements locaux et un chemin Harbor/Docker réel exécuté sur un worker Linux/amd64 rootless dédié. Elle ne constitue pas encore la qualification formelle complète.
+
+Cette preuve reste historique : la fixture normalisée a changé dans `bc524bb`
+pour corriger les findings de qualité de `tests/test.sh` et du Dockerfile.
+Les digests runtime ont donc changé et le chemin positif décrit ici ne peut
+pas être réutilisé comme qualification du head courant.
 
 ## Changements vérifiés
 
