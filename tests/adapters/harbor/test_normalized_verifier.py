@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import stat
 import tempfile
 import unittest
 from pathlib import Path
@@ -108,6 +109,35 @@ class NormalizedVerifierTests(unittest.TestCase):
             self.assertEqual(reward_path.read_bytes(), b"sentinel")
             self.assertEqual(
                 json.loads(result_path.read_bytes())["kind"], "harness_infra"
+            )
+
+    def test_outputs_are_host_readable_on_rootless_workers(self) -> None:
+        module = _load_verifier()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source_path = root / "test_outputs.py"
+            reward_path = root / "logs" / "reward.json"
+            result_path = root / "logs" / "gitspace-result.json"
+            source_path.write_text(
+                "def test_regex_matches_dates():\n    return None\n",
+                encoding="utf-8",
+            )
+
+            code = module.run_verifier(
+                workspace_root=Path.cwd(),
+                test_source=source_path,
+                reward_path=reward_path,
+                result_path=result_path,
+            )
+
+            self.assertEqual(code, 0)
+            self.assertEqual(
+                stat.S_IMODE(reward_path.stat().st_mode),
+                0o644,
+            )
+            self.assertEqual(
+                stat.S_IMODE(result_path.stat().st_mode),
+                0o644,
             )
 
 

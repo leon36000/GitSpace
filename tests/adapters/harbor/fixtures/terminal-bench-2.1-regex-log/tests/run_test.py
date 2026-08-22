@@ -162,6 +162,10 @@ def _atomic_write(path: Path, content: bytes) -> None:
     )
     temporary_path = Path(temporary_name)
     try:
+        # Rootless Docker maps a non-root container UID to a host sub-UID.
+        # These non-secret protocol artifacts must remain readable by the
+        # host-side Harbor collector after the atomic rename.
+        os.fchmod(descriptor, 0o644)
         with os.fdopen(descriptor, "wb") as temporary:
             temporary.write(content)
             temporary.flush()
