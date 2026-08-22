@@ -1,0 +1,549 @@
+{
+  "buildDefinition": {
+    "buildType": "https://github.com/moby/buildkit/blob/master/docs/attestations/slsa-definitions.md",
+    "resolvedDependencies": [
+      {
+        "uri": "pkg:docker/gogost/gost?digest=sha256:6ed277d799bb6adae168155cacf986145a0ab490444a6cf1bad1825a016a3241\u0026platform=linux%2Famd64",
+        "digest": {
+          "sha256": "6ed277d799bb6adae168155cacf986145a0ab490444a6cf1bad1825a016a3241"
+        }
+      }
+    ],
+    "externalParameters": {
+      "configSource": {
+        "path": "Dockerfile"
+      },
+      "request": {
+        "frontend": "dockerfile.v0",
+        "args": {
+          "force-network-mode": "none"
+        },
+        "locals": [
+          {
+            "name": "context"
+          },
+          {
+            "name": "dockerfile"
+          }
+        ],
+        "root": {
+          "configSource": {
+            "path": "Dockerfile"
+          },
+          "request": {
+            "args": {
+              "force-network-mode": "none"
+            }
+          }
+        },
+        "compatibilityVersion": 30
+      }
+    },
+    "internalParameters": {
+      "buildConfig": {
+        "digestMapping": {
+          "sha256:123bd0de71b6f8cc2a34330b3b8c0e20e96477f9a687a8a87a265b21303d747e": "step3",
+          "sha256:16d5f78002768371835abae574e389504196770cdee1dffccee8a84e74c0521b": "step2",
+          "sha256:3881c4e4bcb1fcd5b030ff14b2d8bb33224a7cedc21ade0712b16e4ee88e77fc": "step4",
+          "sha256:41ec5c1fa7a4f51906c716c8f0fa225305fcdcae155db7e8fa31af1e33b5729a": "step0",
+          "sha256:dcc2d2892c6715465873b7f0f49bc59966443e870ff0bd14a808e79bd81b28e7": "step5",
+          "sha256:f5d6028b808ac25f4c27d98218f204b7eea60425262bdb347045bfdddf0a703d": "step1"
+        },
+        "llbDefinition": [
+          {
+            "id": "step0",
+            "op": {
+              "Op": {
+                "source": {
+                  "attrs": {
+                    "image.resolvemode": "local"
+                  },
+                  "identifier": "docker-image://docker.io/gogost/gost@sha256:6ed277d799bb6adae168155cacf986145a0ab490444a6cf1bad1825a016a3241"
+                }
+              },
+              "constraints": {},
+              "platform": {
+                "Architecture": "amd64",
+                "OS": "linux"
+              }
+            }
+          },
+          {
+            "id": "step1",
+            "op": {
+              "Op": {
+                "source": {
+                  "attrs": {
+                    "local.followpaths": "[\"allowlist.txt\",\"bin/network-policy\",\"entrypoint.sh\",\"gost.yaml\"]",
+                    "local.sharedkeyhint": "context"
+                  },
+                  "identifier": "local://context"
+                }
+              },
+              "constraints": {}
+            }
+          },
+          {
+            "id": "step2",
+            "inputs": [
+              "step0:0",
+              "step1:0"
+            ],
+            "op": {
+              "Op": {
+                "file": {
+                  "actions": [
+                    {
+                      "Action": {
+                        "copy": {
+                          "allowEmptyWildcard": true,
+                          "allowWildcard": true,
+                          "createDestPath": true,
+                          "dest": "/opt/egress-sidecar/",
+                          "dirCopyContents": true,
+                          "followSymlink": true,
+                          "mode": -1,
+                          "src": "/gost.yaml",
+                          "timestamp": -1
+                        }
+                      },
+                      "input": 0,
+                      "output": -1,
+                      "secondaryInput": 1
+                    },
+                    {
+                      "Action": {
+                        "copy": {
+                          "allowEmptyWildcard": true,
+                          "allowWildcard": true,
+                          "createDestPath": true,
+                          "dest": "/opt/egress-sidecar/",
+                          "dirCopyContents": true,
+                          "followSymlink": true,
+                          "mode": -1,
+                          "src": "/allowlist.txt",
+                          "timestamp": -1
+                        }
+                      },
+                      "input": 2,
+                      "output": 0,
+                      "secondaryInput": 1
+                    }
+                  ]
+                }
+              },
+              "constraints": {}
+            }
+          },
+          {
+            "id": "step3",
+            "inputs": [
+              "step2:0",
+              "step1:0"
+            ],
+            "op": {
+              "Op": {
+                "file": {
+                  "actions": [
+                    {
+                      "Action": {
+                        "copy": {
+                          "allowEmptyWildcard": true,
+                          "allowWildcard": true,
+                          "createDestPath": true,
+                          "dest": "/opt/egress-sidecar/entrypoint.sh",
+                          "dirCopyContents": true,
+                          "followSymlink": true,
+                          "mode": 493,
+                          "src": "/entrypoint.sh",
+                          "timestamp": -1
+                        }
+                      },
+                      "input": 0,
+                      "output": 0,
+                      "secondaryInput": 1
+                    }
+                  ]
+                }
+              },
+              "constraints": {}
+            }
+          },
+          {
+            "id": "step4",
+            "inputs": [
+              "step3:0",
+              "step1:0"
+            ],
+            "op": {
+              "Op": {
+                "file": {
+                  "actions": [
+                    {
+                      "Action": {
+                        "copy": {
+                          "allowEmptyWildcard": true,
+                          "allowWildcard": true,
+                          "createDestPath": true,
+                          "dest": "/usr/local/bin/network-policy",
+                          "dirCopyContents": true,
+                          "followSymlink": true,
+                          "mode": 493,
+                          "src": "/bin/network-policy",
+                          "timestamp": -1
+                        }
+                      },
+                      "input": 0,
+                      "output": 0,
+                      "secondaryInput": 1
+                    }
+                  ]
+                }
+              },
+              "constraints": {}
+            }
+          },
+          {
+            "id": "step5",
+            "inputs": [
+              "step4:0"
+            ],
+            "op": {
+              "Op": {}
+            }
+          }
+        ]
+      },
+      "builderPlatform": "linux/amd64",
+      "dockerfileVersion": "1.25.0"
+    }
+  },
+  "runDetails": {
+    "builder": {
+      "id": ""
+    },
+    "metadata": {
+      "invocationId": "i83op46pwtumbz4ify4ghby4w",
+      "startedOn": "2026-08-22T04:30:59.176069096-04:00",
+      "finishedOn": "2026-08-22T04:30:59.204018809-04:00",
+      "buildkit_metadata": {
+        "source": {
+          "locations": {
+            "step0": {
+              "locations": [
+                {
+                  "ranges": [
+                    {
+                      "start": {
+                        "line": 1
+                      },
+                      "end": {
+                        "line": 1
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "step1": {},
+            "step2": {
+              "locations": [
+                {
+                  "ranges": [
+                    {
+                      "start": {
+                        "line": 3
+                      },
+                      "end": {
+                        "line": 3
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "step3": {
+              "locations": [
+                {
+                  "ranges": [
+                    {
+                      "start": {
+                        "line": 4
+                      },
+                      "end": {
+                        "line": 4
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "step4": {
+              "locations": [
+                {
+                  "ranges": [
+                    {
+                      "start": {
+                        "line": 5
+                      },
+                      "end": {
+                        "line": 5
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "infos": [
+            {
+              "filename": "Dockerfile",
+              "language": "Dockerfile",
+              "data": "RlJPTSBnb2dvc3QvZ29zdEBzaGEyNTY6NmVkMjc3ZDc5OWJiNmFkYWUxNjgxNTVjYWNmOTg2MTQ1YTBhYjQ5MDQ0NGE2Y2YxYmFkMTgyNWEwMTZhMzI0MQoKQ09QWSBnb3N0LnlhbWwgYWxsb3dsaXN0LnR4dCAvb3B0L2VncmVzcy1zaWRlY2FyLwpDT1BZIC0tY2htb2Q9NzU1IGVudHJ5cG9pbnQuc2ggL29wdC9lZ3Jlc3Mtc2lkZWNhci9lbnRyeXBvaW50LnNoCkNPUFkgLS1jaG1vZD03NTUgYmluL25ldHdvcmstcG9saWN5IC91c3IvbG9jYWwvYmluL25ldHdvcmstcG9saWN5Cg==",
+              "llbDefinition": [
+                {
+                  "id": "step0",
+                  "op": {
+                    "Op": {
+                      "source": {
+                        "identifier": "local://dockerfile",
+                        "attrs": {
+                          "local.differ": "none",
+                          "local.followpaths": "[\"Dockerfile\",\"Dockerfile.dockerignore\",\"dockerfile\"]",
+                          "local.sharedkeyhint": "dockerfile"
+                        }
+                      }
+                    },
+                    "constraints": {}
+                  }
+                },
+                {
+                  "id": "step1",
+                  "op": {
+                    "Op": {}
+                  },
+                  "inputs": [
+                    "step0:0"
+                  ]
+                }
+              ],
+              "digestMapping": {
+                "sha256:74effc2c95673fb7df373c1337da36a99b4463280bec3cd03b48ad8865efebfd": "step0",
+                "sha256:7d1f5fb72265611dff86b091f2528cc00a7feab5b62684821c778a4252a98a8a": "step1"
+              }
+            }
+          ]
+        },
+        "layers": {
+          "step0:0": [
+            [
+              {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:e6f31ffc071e5560b82a8685fba8214954e5721e3e49269d00958316edbe89fe",
+                "size": 3844421
+              },
+              {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:9038959c02c30cf72bf01c7ddf5d7ecd803d7d340e22a9ca945bfeff42bb50c3",
+                "size": 1363183
+              },
+              {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1",
+                "size": 32
+              },
+              {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:b0d43f56104bfa9ca8e065ad7a7fafe4a526f3977f6bf96b2a30a51c232dc7d6",
+                "size": 17833008
+              }
+            ]
+          ],
+          "step2:0": [
+            [
+              {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:e6f31ffc071e5560b82a8685fba8214954e5721e3e49269d00958316edbe89fe",
+                "size": 3844421
+              },
+              {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:9038959c02c30cf72bf01c7ddf5d7ecd803d7d340e22a9ca945bfeff42bb50c3",
+                "size": 1363183
+              },
+              {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1",
+                "size": 32
+              },
+              {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:b0d43f56104bfa9ca8e065ad7a7fafe4a526f3977f6bf96b2a30a51c232dc7d6",
+                "size": 17833008
+              },
+              {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:0a5c9d2cfd33f2d6f95dfc94b72294210975f74ff1f4689590b041b3e4eb969e",
+                "size": 498
+              }
+            ]
+          ],
+          "step3:0": [
+            [
+              {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:e6f31ffc071e5560b82a8685fba8214954e5721e3e49269d00958316edbe89fe",
+                "size": 3844421
+              },
+              {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:9038959c02c30cf72bf01c7ddf5d7ecd803d7d340e22a9ca945bfeff42bb50c3",
+                "size": 1363183
+              },
+              {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1",
+                "size": 32
+              },
+              {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:b0d43f56104bfa9ca8e065ad7a7fafe4a526f3977f6bf96b2a30a51c232dc7d6",
+                "size": 17833008
+              },
+              {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:0a5c9d2cfd33f2d6f95dfc94b72294210975f74ff1f4689590b041b3e4eb969e",
+                "size": 498
+              },
+              {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:456665104128d77ae64e2f08858f1cfd3f431bca31cfb053b43ac33a0843495b",
+                "size": 742
+              }
+            ]
+          ],
+          "step4:0": [
+            [
+              {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:e6f31ffc071e5560b82a8685fba8214954e5721e3e49269d00958316edbe89fe",
+                "size": 3844421
+              },
+              {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:9038959c02c30cf72bf01c7ddf5d7ecd803d7d340e22a9ca945bfeff42bb50c3",
+                "size": 1363183
+              },
+              {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1",
+                "size": 32
+              },
+              {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:b0d43f56104bfa9ca8e065ad7a7fafe4a526f3977f6bf96b2a30a51c232dc7d6",
+                "size": 17833008
+              },
+              {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:0a5c9d2cfd33f2d6f95dfc94b72294210975f74ff1f4689590b041b3e4eb969e",
+                "size": 498
+              },
+              {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:456665104128d77ae64e2f08858f1cfd3f431bca31cfb053b43ac33a0843495b",
+                "size": 742
+              },
+              {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:f05bba8b5b2edee67a65cc6cec3e43b94030020ed01eb314f12c0a7076b3c45d",
+                "size": 1270
+              }
+            ]
+          ]
+        },
+        "sysUsage": [
+          {
+            "timestamp": "2026-08-22T04:30:59.22090434-04:00",
+            "cpuStat": {
+              "user": 64014.28,
+              "nice": 9.88,
+              "system": 11267.88,
+              "idle": 3535827.83,
+              "iowait": 6836.57,
+              "irq": 0,
+              "softirq": 748.24,
+              "steal": 0,
+              "guest": 0,
+              "guestNice": 0
+            },
+            "procStat": {
+              "contextSwitches": 3190247804,
+              "processCreated": 5232833,
+              "processesRunning": 2
+            },
+            "memoryStat": {
+              "total": 47319492,
+              "free": 627784,
+              "available": 16923436,
+              "buffers": 1472012,
+              "cached": 14772888,
+              "active": 13091736,
+              "inactive": 27223492,
+              "swap": 134217724,
+              "dirty": 365584,
+              "writeback": 0,
+              "slab": 3179816
+            },
+            "cpuPressure": {
+              "some": {
+                "avg10": 0,
+                "avg60": 0,
+                "avg300": 0,
+                "total": 121227239
+              },
+              "full": {
+                "avg10": 0,
+                "avg60": 0,
+                "avg300": 0,
+                "total": 0
+              }
+            },
+            "memoryPressure": {
+              "some": {
+                "avg10": 0,
+                "avg60": 0.01,
+                "avg300": 0,
+                "total": 7259945
+              },
+              "full": {
+                "avg10": 0,
+                "avg60": 0.01,
+                "avg300": 0,
+                "total": 7212019
+              }
+            },
+            "ioPressure": {
+              "some": {
+                "avg10": 0,
+                "avg60": 0.03,
+                "avg300": 0.48,
+                "total": 851050085
+              },
+              "full": {
+                "avg10": 0,
+                "avg60": 0.03,
+                "avg300": 0.47,
+                "total": 838477001
+              }
+            }
+          }
+        ]
+      },
+      "buildkit_completeness": {
+        "request": true,
+        "resolvedDependencies": false
+      }
+    }
+  }
+}

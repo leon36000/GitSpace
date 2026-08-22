@@ -1,6 +1,6 @@
 {
   "task": "P00-TASK-012",
-  "implementation_commit": "4b06fb2",
+  "implementation_commit": "51064f8397b5480b6f81bf0924a18ed2b6f9cc94",
   "dataset": {
     "repository": "harbor-framework/terminal-bench-2-1",
     "commit": "7131e4375048a0e408a8fb404b5f499d726b695b",
@@ -36,13 +36,30 @@
   "runtime_base": {
     "reference": "python:3.13.15-slim-bookworm@sha256:0f16c5d35fe6464ee471792ab3bb9116f911b65b3fbf10120c98d2bdc6332f48",
     "platform": "linux/amd64",
-    "qualification_status": "requalification_required_after_fixture_change"
+    "qualification_status": "pass_exact_head_rootless_positive_path",
+    "image_id": "sha256:2cc553dba23e6c42d58b264ac2409a9bd76ad509c0117db61c4ec0312795ec85",
+    "oci_manifest": "sha256:afc78c3d4e2292cdde4853798b7a79ddcdba16d16710c42c0e897588604f18e3",
+    "provenance": "sha256:abee476ed589269b035bcbb97ce20c22ecdf4b8c14c7ae4f7749e64110a0f444",
+    "build_network": "none",
+    "vcs_revision": "51064f8397b5480b6f81bf0924a18ed2b6f9cc94"
   },
   "local_evidence": {
     "source_provenance": "pass",
     "normalization_manifest": "pass",
     "verifier_pass_fail_infra_protocol": "pass",
-    "runtime_harbor_docker": "historical_positive_path_invalidated_by_fixture_change",
+    "runtime_harbor_docker": "pass_exact_head_rootless_positive_path",
+    "current_job_id": "8dc78258-261f-47f0-aac7-a513ad3e3831",
+    "current_trial_id": "4c04c48a-0e35-496e-9d10-8d7c45b29337",
+    "current_trial_name": "terminal-bench-2.1-regex-log__U4n2ZqE",
+    "current_trial_checksum": "sha256:7d144b17234c7386e0f10d311fbb2139ee69f1f06be76b11bf53753afca74f22",
+    "current_record_sha256": "sha256:23a4922599fb49aaffd0315713a949cb99eb380557ea5ecae4fce62fc06c9c05",
+    "current_reward": 1,
+    "current_cleanup_complete": true,
+    "current_foreign_resources_unchanged": true,
+    "current_environment_image_id": "sha256:2cc553dba23e6c42d58b264ac2409a9bd76ad509c0117db61c4ec0312795ec85",
+    "current_sidecar_image_id": "sha256:2a1c1b598be3512db201bb03f50ac66d8a794c3fd834752aae99138f3fda37a0",
+    "current_supply_chain_evidence": "docs/phase-00/evidence/P00-TASK-012-SUPPLY-CHAIN-2026-08-22.md",
+    "current_qualification_evidence": "docs/phase-00/evidence/P00-TASK-012-QUALIFICATION-2026-08-22.md",
     "historical_job_id": "58061379-ffb2-40f4-b7d9-fae9beb03b53",
     "historical_trial_id": "fcf1ecbe-6abe-4495-a105-5f5f2952b5c5",
     "historical_record_sha256": "sha256:cabf877ef98dca901df2eb8a88df6be97eabb23a0bad31f84b003ee7e2690b1e",
@@ -50,6 +67,6 @@
     "historical_cleanup_complete": true,
     "historical_foreign_resources_unchanged": true
   },
-  "qualification_status": "PARTIALLY_VERIFIED_REQUALIFICATION_REQUIRED",
-  "formal_gates_open": "The prior positive path is historical and invalidated by the fixture hash change. A fresh exact-head rootless qualification is required, followed by SPDX 2.3 SBOM, OCI provenance, scanner/database freshness and vulnerability dispositions, independent no-egress/security/conformity review, signed merge and post-merge replay."
+  "qualification_status": "PARTIALLY_VERIFIED_RUNTIME_POSITIVE_PATH",
+  "formal_gates_open": "A fresh exact-head rootless qualification, SPDX 2.3 SBOMs, OCI provenance, and fresh scanner/database reports are now recorded. Owner-approved vulnerability dispositions, independent no-egress/security/conformity review, signed merge authorization, and post-merge replay remain open."
 }

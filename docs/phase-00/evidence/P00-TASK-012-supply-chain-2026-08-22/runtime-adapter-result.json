@@ -1,0 +1,68 @@
+{
+  "adapter_identity": "harbor@0.21.0/protocol-1/sha256:c77d779a03f1a9e8ecb3c449e17f39a9728b82238832f1fd28632eb9426c0a21",
+  "artifacts": {
+    "agent_stderr": "cas://sha256/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "agent_stdout": "cas://sha256/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cleanup_report": "cas://sha256/b149b55ffb463d29691efbe0c52eac6f45420c5a46d52a47dfb48dfda152039f",
+    "environment_dockerfile": "cas://sha256/d8f1d7d34c169daa44b338e066cfc69c7d6808eb65e093bb91e06f4c6133c3a2",
+    "exception_boundary": "cas://sha256/be1e1b5c6e29211c19afd8ebaf325f3095848b2069d54685900558602ee8e48f",
+    "fixture_inventory": "cas://sha256/e618c014e11e65658dbd91b0875d1fd2c5603a78c10b75a4436c7870aeaab988",
+    "harbor_record": "cas://sha256/23a4922599fb49aaffd0315713a949cb99eb380557ea5ecae4fce62fc06c9c05",
+    "harbor_stderr": "cas://sha256/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "harbor_stdout": "cas://sha256/51b1c5d44491884eda8f75d0f80d34a5de18ff30fe189415f00e0767fa6823e3",
+    "instruction_md": "cas://sha256/4f7ac05e70cf9220ea0f1e5a052c5f908cd0fa884e847d80b0bd51bae2e96f9c",
+    "job_config": "cas://sha256/b84dc251c51df5a2727e8ae0fc3faf19664567b4757ce1416e761d9d8dc56698",
+    "job_result": "cas://sha256/1664c10cec9f1e8e74050ae59531ad0380d3b40e3e757250e9e5a07e5dd30f6b",
+    "oracle_exit_status": "cas://sha256/f35a0cf0ef896a2236d8419cac8a2d85bfb33d12859af555f9cf7825dc785109",
+    "resource_manifest_after": "cas://sha256/285ac6fca7b31f8464216832d3a6188a7239a41b117f5481a7def0fa37b3e33d",
+    "resource_manifest_before": "cas://sha256/bb0c22ae6e6bcbe2879c124f9de775455f65f8f71dc2394b6dd89edb55b4144e",
+    "solution_solve_sh": "cas://sha256/7e670d4f2b4bccb1e4db38f2a173e085ceda028c38167912b466b0a84fcc0999",
+    "source_manifest": "cas://sha256/afd4eeceb4d93fa384e4767d921e956b77a41802793a708204e677f951e1899e",
+    "task_toml": "cas://sha256/eb71853de4f613a6ad4e2650f12c9d5af39908b20082f6206c3378d5f67538d7",
+    "test_source": "cas://sha256/345c3bd09ab6f6fe8c8361a58c0a47bf0a13b3fcb38a5ac7824e44ff855e8f72",
+    "trial_config": "cas://sha256/28327dcbfb060d895cc6873beab585ca1466ca2bfc6aa6ea4c3f4ecc5cd7e044",
+    "trial_result": "cas://sha256/26884679fb944cd27becef5eabe76ee0ce69edd1cdc1d8a961b91e8877f2c12a",
+    "verifier_result_json": "cas://sha256/4809f460bea161b0515adf8e380c0fa1a574af42153118425964a67d3c203fa1",
+    "verifier_reward_json": "cas://sha256/b13160d0762a5612ee98d66ba60e7b86d7eebdfa7416738577057e2b03c66e35",
+    "verifier_script": "cas://sha256/7b36ee16f297fb0187a5eed5829bc1855ed3bfc03414e17f5dc204342cdbf7af",
+    "verifier_stderr": "cas://sha256/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "verifier_stdout": "cas://sha256/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "verifier_test_script": "cas://sha256/4bea61a4c4c3787a3b97ef62a98437e854c91172cd8d4b184460d387a6165f71"
+  },
+  "extensions": {
+    "gitspace.harbor": {
+      "dataset_commit": "7131e4375048a0e408a8fb404b5f499d726b695b",
+      "framework_commit": "64afbbcb62165950301e1a6407c729aa26d844ff",
+      "framework_version": "0.21.0",
+      "obligations": {
+        "artifact_integrity": true,
+        "cleanup_complete": true,
+        "exception_boundary_consistent": true,
+        "infra_clear": true,
+        "job_cardinality_one": true,
+        "network_closed": true,
+        "oracle_exit_consistent": true,
+        "policy_clear": true,
+        "process_exit_zero": true,
+        "qualification_pinned": true,
+        "reward_well_typed": true,
+        "run_purpose_valid": true,
+        "stage_obligations_consistent": true,
+        "timeout_attribution_valid": false,
+        "trial_cardinality_one": true,
+        "trial_exception_consistent": true
+      },
+      "record_sha256": "sha256:23a4922599fb49aaffd0315713a949cb99eb380557ea5ecae4fce62fc06c9c05",
+      "run_purpose": "qualification_oracle",
+      "task_invalid_candidate": false,
+      "task_name": "terminal-bench/regex-log"
+    }
+  },
+  "metrics": {
+    "artifact_integrity": 1,
+    "reward": 1,
+    "task_invalid_candidate": 0
+  },
+  "status": "pass",
+  "summary": "Harbor oracle completed and CAS-bound replay passed"
+}

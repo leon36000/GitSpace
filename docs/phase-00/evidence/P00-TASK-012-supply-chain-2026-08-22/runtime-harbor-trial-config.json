@@ -1,0 +1,21 @@
+{
+    "task": {
+        "path": "/home/pc1/.codex/worktrees/gitspace-p00-task-012-replay/tests/adapters/harbor/fixtures/terminal-bench-2.1-regex-log"
+    },
+    "trial_name": "terminal-bench-2.1-regex-log__U4n2ZqE",
+    "trials_dir": "/tmp/gitspace-harbor-3tu_9jr9/jobs/gitspace-p00-task-012-oracle",
+    "agent": {
+        "name": "oracle",
+        "n_concurrent": 1
+    },
+    "environment": {
+        "import_path": "gs_eval_adapters.harbor_runtime:GitSpaceHarborEnvironment",
+        "kwargs": {
+            "gitspace_egress_sidecar_image_id": "sha256:2a1c1b598be3512db201bb03f50ac66d8a794c3fd834752aae99138f3fda37a0",
+            "gitspace_egress_sidecar_image_ref": "gitspace-p00/harbor-egress-latest@sha256:2a1c1b598be3512db201bb03f50ac66d8a794c3fd834752aae99138f3fda37a0",
+            "gitspace_environment_image_id": "sha256:2cc553dba23e6c42d58b264ac2409a9bd76ad509c0117db61c4ec0312795ec85",
+            "gitspace_environment_image_ref": "gitspace-p00/regex-log@sha256:2cc553dba23e6c42d58b264ac2409a9bd76ad509c0117db61c4ec0312795ec85"
+        }
+    },
+    "job_id": "8dc78258-261f-47f0-aac7-a513ad3e3831"
+}
