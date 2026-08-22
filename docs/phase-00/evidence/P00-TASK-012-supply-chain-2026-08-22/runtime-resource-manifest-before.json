@@ -1,0 +1,137 @@
+{
+  "collector": "gitspace.harbor.resource-observer.v1",
+  "identity": null,
+  "inventory_complete": true,
+  "inventory_digest": "sha256:ecc0904290a6949d7882cddb9c6a021fbe7edf2f847c0480043b3cd4e880c96a",
+  "inventory_scope": [
+    "process_group",
+    "temp_root",
+    "container",
+    "network",
+    "derived_image"
+  ],
+  "phase": "before",
+  "resources": [
+    {
+      "id": "sha256:00faa2debb87529f9f0764e9491d8ba400a3678976616c3bd7cb193745ac20d1",
+      "kind": "derived_image",
+      "owner": "foreign",
+      "state_digest": "sha256:68a3c6865f6aeebadf1e471c88a92864bfab2cd61cf178d2e7327d4f5637714b"
+    },
+    {
+      "id": "sha256:0f16c5d35fe6464ee471792ab3bb9116f911b65b3fbf10120c98d2bdc6332f48",
+      "kind": "derived_image",
+      "owner": "foreign",
+      "state_digest": "sha256:7ab57f8bcba5842eead831c01ab6649e53c6b41cced0162533de172e931e4cb9"
+    },
+    {
+      "id": "sha256:2a1c1b598be3512db201bb03f50ac66d8a794c3fd834752aae99138f3fda37a0",
+      "kind": "derived_image",
+      "owner": "foreign",
+      "state_digest": "sha256:dc754df2d5bc8e4a50e0cf029f3bec0d8d9773589bc8dc3cf1c7c625a5d7dc70"
+    },
+    {
+      "id": "sha256:2cc553dba23e6c42d58b264ac2409a9bd76ad509c0117db61c4ec0312795ec85",
+      "kind": "derived_image",
+      "owner": "foreign",
+      "state_digest": "sha256:e8105a6a135fbf22b5f566b85dd50589509726e492606de292bf0a37998e5853"
+    },
+    {
+      "id": "sha256:3146c7055845b105d921f1eceb07efcc8c5cc16ff45f98663f0fa93aa9182f35",
+      "kind": "derived_image",
+      "owner": "foreign",
+      "state_digest": "sha256:8210be01e91e8a30b4832fb031ccf8d19a1cf1746820e1ce8bee6e142c19c960"
+    },
+    {
+      "id": "sha256:32d6038738baf145824452d6f4ad2dca36ad9d894eac9684dbd39ea6d901bd14",
+      "kind": "derived_image",
+      "owner": "foreign",
+      "state_digest": "sha256:04aead890c58a138c173ab14486e04c8a3c887bbf786f4c01b42ff01e1a5c206"
+    },
+    {
+      "id": "sha256:4e923686cfbcbc6a9a7c3b885dba32bcd6e6550fa3d40dd4cc16a7f6aadcde90",
+      "kind": "derived_image",
+      "owner": "foreign",
+      "state_digest": "sha256:6acd4f8852ce11171f3a8a9b523d26333be7ba0240e3a12940e3ee8c6e0db01a"
+    },
+    {
+      "id": "sha256:540c7d91f98ff6880174c40e99067bf5941eb54d818a7a5e094d188b196a934d",
+      "kind": "derived_image",
+      "owner": "foreign",
+      "state_digest": "sha256:99d94b274f4cfb02f93297cffa0994a2b6ed1f92f0de30aef067ea08f8501338"
+    },
+    {
+      "id": "sha256:6ed277d799bb6adae168155cacf986145a0ab490444a6cf1bad1825a016a3241",
+      "kind": "derived_image",
+      "owner": "foreign",
+      "state_digest": "sha256:5b0b4f048ec6db224cee5fcb4f4b401ae7dc4afbb247545b16eb42dbfc6ca07e"
+    },
+    {
+      "id": "sha256:7eba91ea96e91209329684e9b34e4d7c0918f9c7cf3217994797004bbdec4d31",
+      "kind": "derived_image",
+      "owner": "foreign",
+      "state_digest": "sha256:d1f8e52b59a866120b7bcaa29ebbf9499fd961b30f4bae54bc026b68287d487d"
+    },
+    {
+      "id": "sha256:934af880bb803d3aa9b11f0126870789b16e8bf08bc08f7a6c43c9432d256033",
+      "kind": "derived_image",
+      "owner": "foreign",
+      "state_digest": "sha256:15f4df58212d05e23b7c00a434c8b8e97a5ac3115d2f0867c79770f42c36f219"
+    },
+    {
+      "id": "sha256:afc0137758ab4ce399d47a299f9abbacbf522b52a17e59cbb4b4e7a1a66e9196",
+      "kind": "derived_image",
+      "owner": "foreign",
+      "state_digest": "sha256:baf41fcfdfce13fdefa5f21cdb8757aa392fc22280d9fa72830a131ec986c5d5"
+    },
+    {
+      "id": "sha256:bad7857f4dd239a9f218740afda8b6d3ef15a910e9941d9d78edb9468f5ab685",
+      "kind": "derived_image",
+      "owner": "foreign",
+      "state_digest": "sha256:3dd93bc2189a886b6dcbbd346fd9c3e587ba0e94aea66918837d6288dee4aa0f"
+    },
+    {
+      "id": "sha256:effbe65ae23c4b4740492f5dafb28052a84311aee3c77595bc9a1f6374d0467e",
+      "kind": "derived_image",
+      "owner": "foreign",
+      "state_digest": "sha256:d2a324995e40c0d251ee91b7e676a5c392fa78c81d158c147cb6e707b28270f3"
+    },
+    {
+      "id": "sha256:ffb752e139c0a19692a43af8d8523b274222dd68eebad5d583b45c2201c6e30a",
+      "kind": "derived_image",
+      "owner": "foreign",
+      "state_digest": "sha256:3fe15aae1351ebc016ce4f2be44c235d4d8ab7f5ff7ff6e588563d0adfd4ce6d"
+    },
+    {
+      "id": "310aace0473078016ac8f055c0638764c91b9ffd4af36060770cb55f306de5b7",
+      "kind": "network",
+      "owner": "foreign",
+      "state_digest": "sha256:0acaf74662f4516616cfe6da1c6fa52b52ff03987bf6688bddcd3bab12499c45"
+    },
+    {
+      "id": "b4ba3785ba0230ab816a1e980005a0fc15fb45403e11678b50eab1466dca8ff1",
+      "kind": "network",
+      "owner": "foreign",
+      "state_digest": "sha256:ccaf41a82c835585f312aa2a604bdcfdbdcacada48207166c37456db9742d3d9"
+    },
+    {
+      "id": "d0dd24eb28b37b911c07b09cd258098b85c04d30f12d5bd0dc32079fc83e0d1f",
+      "kind": "network",
+      "owner": "foreign",
+      "state_digest": "sha256:1c8cc14003e4c2f2753008e8c0060fc9d363684fc808202d93a0c7b37186cffb"
+    },
+    {
+      "id": "gitspace-harbor-cli",
+      "kind": "process_group",
+      "owner": "gitspace",
+      "state_digest": "sha256:7b5c311d9604a9bcb7b3cb430d7a029dccbaac49e73a4ef5763afbbb221c1f2f"
+    },
+    {
+      "id": "gitspace-harbor-sandbox",
+      "kind": "temp_root",
+      "owner": "gitspace",
+      "state_digest": "sha256:f3fafa58150ececf0bf694a73fc5f5a5d959eb89903e8f464f22d93ae59e80e0"
+    }
+  ],
+  "schema": "gitspace.harbor.resource-manifest.v1"
+}

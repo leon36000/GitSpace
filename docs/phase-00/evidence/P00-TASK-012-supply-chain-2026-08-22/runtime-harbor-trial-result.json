@@ -1,0 +1,117 @@
+{
+    "id": "4c04c48a-0e35-496e-9d10-8d7c45b29337",
+    "task_name": "terminal-bench/regex-log",
+    "trial_name": "terminal-bench-2.1-regex-log__U4n2ZqE",
+    "trial_uri": "file:///tmp/gitspace-harbor-3tu_9jr9/jobs/gitspace-p00-task-012-oracle/terminal-bench-2.1-regex-log__U4n2ZqE",
+    "task_id": {
+        "path": "/home/pc1/.codex/worktrees/gitspace-p00-task-012-replay/tests/adapters/harbor/fixtures/terminal-bench-2.1-regex-log"
+    },
+    "source": null,
+    "task_checksum": "7d144b17234c7386e0f10d311fbb2139ee69f1f06be76b11bf53753afca74f22",
+    "config": {
+        "task": {
+            "path": "/home/pc1/.codex/worktrees/gitspace-p00-task-012-replay/tests/adapters/harbor/fixtures/terminal-bench-2.1-regex-log",
+            "git_url": null,
+            "git_commit_id": null,
+            "name": null,
+            "ref": null,
+            "overwrite": false,
+            "download_dir": null,
+            "source": null
+        },
+        "trial_name": "terminal-bench-2.1-regex-log__U4n2ZqE",
+        "trials_dir": "/tmp/gitspace-harbor-3tu_9jr9/jobs/gitspace-p00-task-012-oracle",
+        "install_only": false,
+        "timeout_multiplier": 1.0,
+        "agent_timeout_multiplier": null,
+        "verifier_timeout_multiplier": null,
+        "agent_setup_timeout_multiplier": null,
+        "environment_build_timeout_multiplier": null,
+        "agent": {
+            "name": "oracle",
+            "import_path": null,
+            "model_name": null,
+            "n_concurrent": 1,
+            "concurrency_group": null,
+            "skills": [],
+            "override_timeout_sec": null,
+            "override_setup_timeout_sec": null,
+            "max_timeout_sec": null,
+            "resume_trajectory": false,
+            "load_trajectory": null,
+            "extra_allowed_hosts": [],
+            "kwargs": {},
+            "mcp_servers": []
+        },
+        "environment": {
+            "type": null,
+            "import_path": "gs_eval_adapters.harbor_runtime:GitSpaceHarborEnvironment",
+            "force_build": false,
+            "delete": true,
+            "cpu_enforcement_policy": "auto",
+            "memory_enforcement_policy": "auto",
+            "override_cpus": null,
+            "override_memory_mb": null,
+            "override_storage_mb": null,
+            "override_gpus": null,
+            "override_tpu": null,
+            "mounts": null,
+            "extra_docker_compose": [],
+            "kwargs": {
+                "gitspace_egress_sidecar_image_id": "sha256:2a1c1b598be3512db201bb03f50ac66d8a794c3fd834752aae99138f3fda37a0",
+                "gitspace_egress_sidecar_image_ref": "gitspace-p00/harbor-egress-latest@sha256:2a1c1b598be3512db201bb03f50ac66d8a794c3fd834752aae99138f3fda37a0",
+                "gitspace_environment_image_id": "sha256:2cc553dba23e6c42d58b264ac2409a9bd76ad509c0117db61c4ec0312795ec85",
+                "gitspace_environment_image_ref": "gitspace-p00/regex-log@sha256:2cc553dba23e6c42d58b264ac2409a9bd76ad509c0117db61c4ec0312795ec85"
+            },
+            "extra_allowed_hosts": []
+        },
+        "verifier": {
+            "override_timeout_sec": null,
+            "max_timeout_sec": null,
+            "disable": false
+        },
+        "artifacts": [],
+        "extra_instruction_paths": [],
+        "job_id": "8dc78258-261f-47f0-aac7-a513ad3e3831",
+        "source_trial": null
+    },
+    "agent_info": {
+        "name": "oracle",
+        "version": "1.0.0",
+        "model_info": null
+    },
+    "agent_result": {
+        "n_input_tokens": null,
+        "n_cache_tokens": null,
+        "n_output_tokens": null,
+        "cost_usd": null,
+        "rollout_details": null,
+        "metadata": null
+    },
+    "verifier_result": {
+        "rewards": {
+            "reward": 1
+        }
+    },
+    "verifier_environment_mode": "shared",
+    "exception_info": null,
+    "started_at": "2026-08-22T08:47:33.606357Z",
+    "finished_at": "2026-08-22T08:47:47.875728Z",
+    "environment_setup": {
+        "started_at": "2026-08-22T08:47:33.615865Z",
+        "finished_at": "2026-08-22T08:47:36.918790Z"
+    },
+    "agent_setup": {
+        "started_at": "2026-08-22T08:47:36.918826Z",
+        "finished_at": "2026-08-22T08:47:36.918866Z"
+    },
+    "agent_execution": {
+        "started_at": "2026-08-22T08:47:36.918967Z",
+        "finished_at": "2026-08-22T08:47:37.066539Z"
+    },
+    "verifier": {
+        "started_at": "2026-08-22T08:47:37.267832Z",
+        "finished_at": "2026-08-22T08:47:37.438942Z"
+    },
+    "step_results": null
+}

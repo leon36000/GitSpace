@@ -1,0 +1,65 @@
+{
+  "source_repository": "harbor-framework/terminal-bench-2-1",
+  "source_commit": "7131e4375048a0e408a8fb404b5f499d726b695b",
+  "task_name": "regex-log",
+  "source_task_name": "terminal-bench/regex-log",
+  "source_files": {
+    "task.toml": {
+      "git_blob": "1687e8f7a3fff35acc7b7ffea6aecd6bdfb7051e",
+      "sha256": "sha256:6bc98525852755caf1fe34c174c2f10f4328adb4ce6c1968dcafe1c877e4e160"
+    },
+    "instruction.md": {
+      "git_blob": "ab7f39b6e55776d9597657a435f902705c69450e",
+      "sha256": "sha256:4f7ac05e70cf9220ea0f1e5a052c5f908cd0fa884e847d80b0bd51bae2e96f9c"
+    },
+    "solution/solve.sh": {
+      "git_blob": "036acdf6b2ea66b34149a9a0336e7b9aed970a0d",
+      "sha256": "sha256:7e670d4f2b4bccb1e4db38f2a173e085ceda028c38167912b466b0a84fcc0999"
+    },
+    "tests/test_outputs.py": {
+      "git_blob": "38c51719f480d2e852262ed2453842d5ea1ca79f",
+      "sha256": "sha256:345c3bd09ab6f6fe8c8361a58c0a47bf0a13b3fcb38a5ac7824e44ff855e8f72"
+    },
+    "environment/Dockerfile": {
+      "git_blob": "4c9e232ed0c1fe5bc88a37e9ea1a7de48f222ef0",
+      "sha256": "sha256:5f264ff0bf62a49aee3c6398447de5108df141e7a2ad35c6de8ef39fa62049c6"
+    }
+  },
+  "normalized_files": {
+    "tests/run_test.py": {
+      "sha256": "sha256:7b36ee16f297fb0187a5eed5829bc1855ed3bfc03414e17f5dc204342cdbf7af",
+      "bytes": 5242,
+      "mode": "0644"
+    },
+    "tests/test.sh": {
+      "sha256": "sha256:4bea61a4c4c3787a3b97ef62a98437e854c91172cd8d4b184460d387a6165f71",
+      "bytes": 356,
+      "mode": "0644"
+    }
+  },
+  "runtime_files": {
+    "task.toml": "sha256:eb71853de4f613a6ad4e2650f12c9d5af39908b20082f6206c3378d5f67538d7",
+    "instruction.md": "sha256:4f7ac05e70cf9220ea0f1e5a052c5f908cd0fa884e847d80b0bd51bae2e96f9c",
+    "solution/solve.sh": "sha256:7e670d4f2b4bccb1e4db38f2a173e085ceda028c38167912b466b0a84fcc0999",
+    "tests/test_outputs.py": "sha256:345c3bd09ab6f6fe8c8361a58c0a47bf0a13b3fcb38a5ac7824e44ff855e8f72",
+    "tests/run_test.py": "sha256:7b36ee16f297fb0187a5eed5829bc1855ed3bfc03414e17f5dc204342cdbf7af",
+    "tests/test.sh": "sha256:4bea61a4c4c3787a3b97ef62a98437e854c91172cd8d4b184460d387a6165f71",
+    "environment/Dockerfile": "sha256:d8f1d7d34c169daa44b338e066cfc69c7d6808eb65e093bb91e06f4c6133c3a2"
+  },
+  "normalization": {
+    "schema_version": "1.4",
+    "network_mode": "no-network",
+    "verifier_environment_mode": "shared",
+    "reward_artifact": "reward.json",
+    "forbidden_artifacts": ["reward.txt"],
+    "network_install_commands_removed": true,
+    "canary_preserved": true
+  },
+  "base_image": {
+    "reference": "python:3.13.15-slim-bookworm@sha256:0f16c5d35fe6464ee471792ab3bb9116f911b65b3fbf10120c98d2bdc6332f48",
+    "source_reference": "ubuntu:24.04",
+    "platform": "linux/amd64",
+    "observed_at": "2026-08-20",
+    "qualification_status": "not_executed_on_dedicated_worker"
+  }
+}

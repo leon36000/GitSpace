@@ -1,0 +1,72 @@
+{
+  "task": "P00-TASK-012",
+  "implementation_commit": "51064f8397b5480b6f81bf0924a18ed2b6f9cc94",
+  "dataset": {
+    "repository": "harbor-framework/terminal-bench-2-1",
+    "commit": "7131e4375048a0e408a8fb404b5f499d726b695b",
+    "task": "terminal-bench/regex-log",
+    "upstream_test_outputs_sha256": "sha256:345c3bd09ab6f6fe8c8361a58c0a47bf0a13b3fcb38a5ac7824e44ff855e8f72",
+    "upstream_test_outputs_bytes": 3730,
+    "upstream_test_outputs_git_blob": "38c51719f480d2e852262ed2453842d5ea1ca79f"
+  },
+  "fixture": {
+    "path": "tests/adapters/harbor/fixtures/terminal-bench-2.1-regex-log",
+    "kind": "gitspace-normalized",
+    "normalized_network": "no-network",
+    "verifier_environment_mode": "shared",
+    "reward_artifact": "reward.json",
+    "result_artifact": "gitspace-result.json",
+    "source_manifest": "source-manifest.json",
+    "fixture_inventory_schema": "gitspace.harbor.fixture-inventory.v1",
+    "runtime_file_digests": {
+      "task.toml": "sha256:eb71853de4f613a6ad4e2650f12c9d5af39908b20082f6206c3378d5f67538d7",
+      "instruction.md": "sha256:4f7ac05e70cf9220ea0f1e5a052c5f908cd0fa884e847d80b0bd51bae2e96f9c",
+      "solution/solve.sh": "sha256:7e670d4f2b4bccb1e4db38f2a173e085ceda028c38167912b466b0a84fcc0999",
+      "tests/test_outputs.py": "sha256:345c3bd09ab6f6fe8c8361a58c0a47bf0a13b3fcb38a5ac7824e44ff855e8f72",
+      "tests/run_test.py": "sha256:7b36ee16f297fb0187a5eed5829bc1855ed3bfc03414e17f5dc204342cdbf7af",
+      "tests/test.sh": "sha256:4bea61a4c4c3787a3b97ef62a98437e854c91172cd8d4b184460d387a6165f71",
+      "environment/Dockerfile": "sha256:d8f1d7d34c169daa44b338e066cfc69c7d6808eb65e093bb91e06f4c6133c3a2"
+    },
+    "normalized_task_sha256": "sha256:afd4eeceb4d93fa384e4767d921e956b77a41802793a708204e677f951e1899e",
+    "normalized_protocol_files": {
+      "tests/run_test.py": "sha256:7b36ee16f297fb0187a5eed5829bc1855ed3bfc03414e17f5dc204342cdbf7af",
+      "tests/test.sh": "sha256:4bea61a4c4c3787a3b97ef62a98437e854c91172cd8d4b184460d387a6165f71"
+    }
+  },
+  "runtime_base": {
+    "reference": "python:3.13.15-slim-bookworm@sha256:0f16c5d35fe6464ee471792ab3bb9116f911b65b3fbf10120c98d2bdc6332f48",
+    "platform": "linux/amd64",
+    "qualification_status": "pass_exact_head_rootless_positive_path",
+    "image_id": "sha256:2cc553dba23e6c42d58b264ac2409a9bd76ad509c0117db61c4ec0312795ec85",
+    "oci_manifest": "sha256:afc78c3d4e2292cdde4853798b7a79ddcdba16d16710c42c0e897588604f18e3",
+    "provenance": "sha256:abee476ed589269b035bcbb97ce20c22ecdf4b8c14c7ae4f7749e64110a0f444",
+    "build_network": "none",
+    "vcs_revision": "51064f8397b5480b6f81bf0924a18ed2b6f9cc94"
+  },
+  "local_evidence": {
+    "source_provenance": "pass",
+    "normalization_manifest": "pass",
+    "verifier_pass_fail_infra_protocol": "pass",
+    "runtime_harbor_docker": "pass_exact_head_rootless_positive_path",
+    "current_job_id": "8dc78258-261f-47f0-aac7-a513ad3e3831",
+    "current_trial_id": "4c04c48a-0e35-496e-9d10-8d7c45b29337",
+    "current_trial_name": "terminal-bench-2.1-regex-log__U4n2ZqE",
+    "current_trial_checksum": "sha256:7d144b17234c7386e0f10d311fbb2139ee69f1f06be76b11bf53753afca74f22",
+    "current_record_sha256": "sha256:23a4922599fb49aaffd0315713a949cb99eb380557ea5ecae4fce62fc06c9c05",
+    "current_reward": 1,
+    "current_cleanup_complete": true,
+    "current_foreign_resources_unchanged": true,
+    "current_environment_image_id": "sha256:2cc553dba23e6c42d58b264ac2409a9bd76ad509c0117db61c4ec0312795ec85",
+    "current_sidecar_image_id": "sha256:2a1c1b598be3512db201bb03f50ac66d8a794c3fd834752aae99138f3fda37a0",
+    "current_supply_chain_evidence": "docs/phase-00/evidence/P00-TASK-012-SUPPLY-CHAIN-2026-08-22.md",
+    "current_qualification_evidence": "docs/phase-00/evidence/P00-TASK-012-QUALIFICATION-2026-08-22.md",
+    "historical_job_id": "58061379-ffb2-40f4-b7d9-fae9beb03b53",
+    "historical_trial_id": "fcf1ecbe-6abe-4495-a105-5f5f2952b5c5",
+    "historical_record_sha256": "sha256:cabf877ef98dca901df2eb8a88df6be97eabb23a0bad31f84b003ee7e2690b1e",
+    "historical_reward": 1,
+    "historical_cleanup_complete": true,
+    "historical_foreign_resources_unchanged": true
+  },
+  "qualification_status": "PARTIALLY_VERIFIED_RUNTIME_POSITIVE_PATH",
+  "formal_gates_open": "A fresh exact-head rootless qualification, SPDX 2.3 SBOMs, OCI provenance, and fresh scanner/database reports are now recorded. Owner-approved vulnerability dispositions, independent no-egress/security/conformity review, signed merge authorization, and post-merge replay remain open."
+}
