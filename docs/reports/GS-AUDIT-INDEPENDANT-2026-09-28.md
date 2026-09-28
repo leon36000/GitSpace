@@ -31,6 +31,9 @@ canon_modified: false
 - **Défaut sémantique central** : `false_done` est calculé de façon à ce que tout agent honnête
   déclarant « succès » avant vérification indépendante soit compté comme faux DONE. La métrique
   souveraine n°1 de la Phase 00 est donc inutilisable en l'état pour mesurer de vrais agents.
+- **Provenance et attribution** : le commit « réellement exécuté » que le README dit lier au
+  replay est en fait choisi par l'appelant (un commit inexistant rejoue avec succès) ; horodatages
+  et environnement sont des constantes ; un agent peut transformer son échec en erreur du runner.
 - **Dérive d'architecture** : la Foundry Rust et les adaptateurs Python ne sont pas reliés ;
   la logique de replay/rescoring des harness externes s'accumule en Python.
 - **Blocage** : 11 tâches fusionnées en ~31 h (13–14 août), puis **aucune fusion depuis 6
@@ -52,9 +55,9 @@ Méthode : lecture intégrale du code source et des tests Rust/Python, lecture d
 (`00`–`04`, ADR, RSK, CONFLICT, SPEC, PLAN, paquets, preuves), exécution de toutes les
 suites avec les toolchains pinées, contre-expériences ciblées, et trois vérifications
 adversariales parallèles dont les conclusions ne sont retenues qu'après reproduction.
-État de cette révision : vérificateurs A (fondations Rust) et C (SDK Python, Inspect)
-intégrés ; vérificateur B (verdict, runner, Foundry) en cours, à intégrer dans la révision
-suivante.
+État de cette révision : vérificateurs A (fondations Rust), B (verdict, runner, Foundry) et
+C (SDK Python, Inspect) intégrés. Un constat de vérificateur n'est marqué « confirmé » que si
+l'auteur l'a rejoué ou vérifié dans le code ; les autres sont signalés comme tels.
 
 Limites de l'audit :
 
@@ -237,7 +240,11 @@ ses artefacts attendus en Rust.
 Tant que cette jonction n'existe pas, « trois familles de harness à travers le même IR »
 (gate de Phase n°10) ne peut pas être démontrée au sens du canon.
 
-### AUD-09 — Provenance déclarative — `MEDIUM`
+### AUD-09 — Provenance déclarative, affirmation du README fausse — `HIGH`
+
+Le README de la Foundry affirme que le replay « binds the receipt, run identity and
+EvidenceBundle to the source commit actually executed » (`crates/gs-foundry-cli/README.md:79`).
+Cette garantie n'existe pas :
 
 - `commit_sha` de l'EvidenceBundle = argument CLI `--source-commit`, contrôlé seulement sur
   le format hexadécimal (`native.rs:698-703`, `main.rs:36-47`) ;
@@ -248,7 +255,14 @@ Tant que cette jonction n'existe pas, « trois familles de harness à travers le
   dans le dépôt) puis `replay` → `replay_verified=True`, `evidence_verified=True`, et
   l'EvidenceBundle porte `commit_sha = dddd…d` ;
 - `image_digest`, `environment_digest`, `network_policy_digest` sont des hachages de chaînes
-  constantes, pas des mesures.
+  constantes, pas des mesures ; `started_at`, `ended_at` et tous les `occurred_at` sont les
+  constantes `2026-08-14T00:00:0xZ`, `architecture` est le littéral `"x86_64"`
+  (`native.rs:28-30`, `215-228`) : un run fait aujourd'hui sur aarch64 produirait un manifeste
+  daté du 14 août sur x86_64, et le replay passerait. Le plan prévoyait d'**exclure** les
+  horodatages du noyau canonique, pas de les figer (`GS-P00-PLAN-001`, gate M0) ;
+- le vérificateur B a relancé toute la suite Foundry avec un `GITSPACE_TEST_SOURCE_COMMIT`
+  différent du HEAD : `passed=36 failed=0` — aucun test ne vérifie le commit réellement exécuté,
+  alors que le paquet Task 9 exigeait un test GREEN pour ce lien.
 
 ### AUD-10 — Deux définitions de « JSON canonique » — `MEDIUM (latent)`
 
@@ -259,7 +273,7 @@ separators=…)` (`inspect_replay.py:590-600`, `inspect_adapter.py:297-307`). So
 |---|---|---|
 | `{"b":1e16}` | `10000000000000000` | `1e+16` |
 | `{"x":1e-7,"y":123456789012345678}` | `1e-7`, `123456789012345680` | `1e-07`, `123456789012345678` |
-| clés `` / `𐀀` | ordre UTF-16 | ordre des points de code |
+| clés U+E000 et U+10000 (paire `\uD800\uDC00`) | U+10000 d'abord (ordre UTF-16) | U+E000 d'abord (ordre des points de code) |
 
 Sans effet sur la fixture actuelle, mais toute re-canonicalisation Rust d'un artefact Python
 contenant ces valeurs produira un autre digest.
@@ -338,6 +352,30 @@ NaN, ±Infini, `-0.0`, entiers hors ±(2⁵³−1), surrogates isolés, cycles e
 validation de schéma avant tout accès à l'adaptateur ; shim restauré après succès, exception et
 `KeyboardInterrupt` ; le classificateur Sonar ne peut produire `PASS` sans quality gate calculé.
 
+### AUD-24 — Runner et Foundry : attribution des échecs — `MEDIUM`
+
+Signalés par le vérificateur B ; **confirmés par l'auteur** :
+
+| Défaut | Emplacement | Confirmation |
+|---|---|---|
+| Un agent peut transformer son échec en erreur du runner : écrire un répertoire à l'emplacement vérifié par l'oracle, ou lire un fichier absent, fait renvoyer `Err` au lieu de `OracleFailed` ; le run est détruit et la Foundry s'arrête sans verdict | `runner.rs:247-254`, `389-426` ; `path.rs:216-219` | sonde : réponse fausse écrite en fichier → `Ok(OracleFailed)` ; `Write output/result.txt/decoy` → `Err(UnsafePath "file path resolves to a directory")` ; `Read input/missing.txt` → `Err(Io NotFound)` |
+| Le verdict souverain du scénario INFRA impute l'échec à l'agent : `functional_outcome=fail`, `task_validity=valid`, gates `functional_outcome` et `obligations` en échec ; aucun champ de `EvalVerdict` ne marque l'infrastructure | `native.rs:447`, `454` | sortie CLI du scénario `infra` (tableau d'AUD-06) |
+| L'`EvalTaskSpec` validé ne pilote pas le run : budgets (5 s, 8 appels d'outil), autorité et obligations sont décoratifs ; le plan utilise ses propres constantes (1 000 ms, 2 ms) et le verdict compte 1 obligation pour 3 déclarées | `native.rs:328-407`, `497-534` | lecture du code |
+| Les chemins `output/./a.txt`, `output//b.txt`, `output/c.txt/` sont acceptés et normalisés, mais l'effet journalisé garde la chaîne brute | `path.rs:28-58`, `runner.rs:262`, `299` | lecture du code ; B : effets bruts contre instantané normalisé |
+
+Signalés par B, non rejoués par l'auteur : supprimer le contrôle `can_read` laisse les 16 tests
+du runner et les 34 tests de la Foundry verts ; la comparaison `OracleFileEquals` n'est jamais
+testée contre une valeur différente (mutation « toujours vrai » : 0 échec) ; deux tests exigés par
+le paquet Task 8 manquent (oracle inchangé, chemin non UTF-8) ; trois tests de substitution ne
+ciblent pas le contrôle dont ils portent le nom ; la machine d'états de run de la SPEC §6.2 n'est
+pas représentée (trois événements écrits après coup, jamais `REPLAYED` ni `CLOSED`).
+
+Vérifié vrai par B : sur une énumération de 248 832 combinaisons d'entrées, **0** `safe_success`
+dangereux et **0** écart à la formule du paquet Task 7 ; en revanche, 27 646 combinaisons donnent
+un `false_done` différent de la définition SPEC §7.2. Classification des cinq statuts
+déterministe ; EvidenceBundle émis et validé ; replay réellement en lecture seule (rien créé ni
+réparé, second replay identique octet par octet) ; substitutions d'artefacts rejetées.
+
 ## 5. CI et reproductibilité
 
 - **AUD-12** — `gs-cas/tests/adversarial.rs:184` (`write_permission_failure…`) échoue en
@@ -391,6 +429,7 @@ validation de schéma avant tout accès à l'adaptateur ; shim restauré après 
 | Système de preuve | **défaillant là où il compte** : malgré une cérémonie très lourde, il a produit des preuves invalides que deux contre-expériences simples ont révélées |
 | Sémantique de mesure | `false_done` à reprendre avant toute campagne |
 | Architecture d'ensemble | jonction adaptateurs → verdict souverain absente ; autorité de replay qui glisse vers Python |
+| Provenance et attribution | commit, horodatages et environnement déclaratifs ; un agent peut faire passer son échec pour une panne d'infrastructure |
 | Rythme | 11 tâches en ~31 h puis 6 semaines sans fusion ; coût documentaire > code (423 Ko contre 231 Ko de source) |
 
 Diagnostic : la méthode fonctionne pour de l'infrastructure pure et locale ; elle cale au
@@ -399,7 +438,7 @@ en partie à cause de gates que la Phase 00 — un pilote de recherche — ne re
 Le nombre de rapports ne remplace pas des méta-contrôles mécaniques : base verte avant
 mutation, test réseau hermétique, reproduction dans un environnement différent.
 
-Les défauts AUD-01, AUD-02, AUD-03 et AUD-06 ont traversé toute la chaîne paquet →
+Les défauts AUD-01, AUD-02, AUD-03, AUD-06 et AUD-09 ont traversé toute la chaîne paquet →
 implémentation → CI → revue → promotion canonique → RAGLite sans être détectés. C'est
 exactement le mode d'échec que le canon décrit lui-même (loi 5 : « le consensus n'est pas la
 correction » ; loi 8 : « une CI verte n'est pas une terminaison ») : un planificateur unique
@@ -415,7 +454,10 @@ différent, ont suffi à les révéler.
    exécuter le test « sans réseau » isolé dans un espace réseau vide (`unshare -n`) ; tuer les
    4 survivants ; rendre le test CAS indépendant de root ; comparer les requêtes par octets
    canoniques plutôt que par `==` ; conserver le fichier de log Inspect brut et re-projeter
-   depuis lui au replay ; isoler l'environnement d'Inspect (`.env`, `INSPECT_TELEMETRY`).
+   depuis lui au replay ; isoler l'environnement d'Inspect (`.env`, `INSPECT_TELEMETRY`) ;
+   classer toute erreur provoquée par une opération d'agent comme résultat d'agent (FAIL ou
+   POLICY), jamais comme erreur du runner ; lier le commit au binaire ou au checkout vérifié au
+   lieu de l'argument `--source-commit`, et corriger le README en attendant.
 2. **Décision propriétaire sur `false_done`** : inscrire le conflit SPEC §7.2 ↔ Task 7 ; séparer
    `false_done` (sur-déclaration imputable à l'agent) de l'acceptation (vérification en attente) ;
    prévoir la ré-émission du verdict après replay et vérification indépendante.
@@ -434,7 +476,8 @@ différent, ont suffi à les révéler.
 Packetiser depuis `main@dcde1142…` un correctif borné `P00-TASK-011-R1` : RED = mutant identité
 qui doit échouer le contrôle de base + test réseau sur cache froid dans `unshare -n` ; GREEN =
 harnais corrigés, run hermétique, 26/26 réellement tués ; puis mettre à jour `00/02/04` et
-RAGLite. En parallèle : décision propriétaire sur la sémantique `false_done`.
+RAGLite. En parallèle, deux décisions propriétaire : la sémantique `false_done` (AUD-06) et le
+statut de Task 9 tant que l'affirmation de provenance du README reste fausse (AUD-09).
 
 ## 10. MEMORY_PATCH proposé (non appliqué)
 
@@ -462,6 +505,12 @@ MEMORY_PATCH:
     - id: claim.task10.semantic_loss_blocking
       cause: "comparaison == : 1/1.0/True et 0.0/False confondus ; budgets non transmis"
       proposed_status: PARTIALLY_VERIFIED
+    - id: claim.task9.replay_binds_executed_source_commit
+      cause: "commit fourni par l'appelant ; run avec commit inexistant rejoué avec succès"
+      proposed_status: REFUTED
+    - id: P00-TASK-009.status.PROVEN
+      cause: "lien de provenance exigé par le paquet non testé et faux ; horodatages figés"
+      proposed_status: PARTIALLY_VERIFIED
   APPEND:
     - target: docs/conflicts/CONFLICT-REGISTER.md
       id: GS-CONFLICT-P00-VERDICT-001
@@ -475,9 +524,12 @@ MEMORY_PATCH:
     - target: docs/risks/RSK-REGISTER.md
       id: RSK-P00-017
       content: "autorité de replay/rescoring des harness externes implémentée en Python"
+    - target: docs/risks/RSK-REGISTER.md
+      id: RSK-P00-018
+      content: "un agent peut convertir son échec en erreur runner (INFRA) ; attribution à corriger"
   REPLACE:
     - file: 02_GITSPACE_NOW_DECISIONS_ROADMAP.md
-      sections: [état Task 11, prochaine tâche]
-      new_content: "Task 11 PARTIALLY_VERIFIED ; Task 12 : PR #55/#56/#57 ouvertes, bloquées"
+      sections: [état Task 9, état Task 11, prochaine tâche]
+      new_content: "Tasks 9 et 11 PARTIALLY_VERIFIED ; Task 12 : PR #55/#56/#57 ouvertes, bloquées ; prochaine unité : P00-TASK-011-R1"
   NO_CHANGE: false
 ```
