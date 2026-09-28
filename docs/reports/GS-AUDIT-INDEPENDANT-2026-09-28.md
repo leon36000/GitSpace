@@ -52,8 +52,8 @@ Méthode : lecture intégrale du code source et des tests Rust/Python, lecture d
 (`00`–`04`, ADR, RSK, CONFLICT, SPEC, PLAN, paquets, preuves), exécution de toutes les
 suites avec les toolchains pinées, contre-expériences ciblées, et trois vérifications
 adversariales parallèles dont les conclusions ne sont retenues qu'après reproduction.
-État de cette révision : vérificateur A (fondations Rust) intégré ; vérificateurs B
-(verdict, runner, Foundry) et C (SDK Python, Inspect) en cours, à intégrer dans la révision
+État de cette révision : vérificateurs A (fondations Rust) et C (SDK Python, Inspect)
+intégrés ; vérificateur B (verdict, runner, Foundry) en cours, à intégrer dans la révision
 suivante.
 
 Limites de l'audit :
@@ -120,6 +120,13 @@ survivors=allow-non-eval-log,skip-published-artifact-digest,
 
 Confirmation manuelle sur `git archive` propre : avec `sort-event-order` ou
 `skip-published-artifact-digest` appliqué, la suite complète reste `Ran 49 tests — OK`.
+
+De plus, deux des 26 mutants ne compilent même pas (`drop-event-receiver-close`,
+`drop-cleanup-shim-restore` → `IndentationError`) : ils sont « tués » par l'erreur de syntaxe
+du harnais. Le vérificateur C a écrit des versions syntaxiquement valides de ces deux mutants :
+elles sont réellement tuées, le score corrigé reste donc 22/26. Il a aussi montré que quatre
+comportements du shim AnyIO (fermeture de l'émetteur, attente, émission des événements en
+attente, remise à zéro des références) peuvent être supprimés sans qu'un seul test échoue.
 
 Conséquences :
 
@@ -305,6 +312,32 @@ date-time absente de tous les schémas (`occurred_at: "yesterday"` est valide) ;
 journal place le verrou avant l'écriture CAS, le code fait l'inverse ; Task 5 annonce 10 tests
 CAS et 20 tests au total, le code en contient 11 et 21.
 
+### AUD-23 — SDK Python et adaptateur Inspect : constats complémentaires
+
+Signalés par le vérificateur C ; **confirmés par l'auteur** (reproduction ou lecture du code) :
+
+| Défaut | Emplacement | Confirmation |
+|---|---|---|
+| La garde « perte sémantique » compare avec `==` Python (`1 == 1.0 == True`, `0.0 == False`) | `sdk.py:100` | requête préparée avec `seed 11 → 11.0`, `task.version 1 → True`, `cost_limit_usd 0.0 → False` : aucune `SemanticLossError`, et la requête transmise à `invoke` **ne valide plus le schéma souverain** |
+| Le « replay » re-note l'enregistrement, pas le log : la projection n'est jamais recoupée avec les octets du log ; seule la cohérence `log_uri = sha256(log_bytes)` est vérifiée | `inspect_replay.py:199-250`, `260-296` | lecture du code ; C a produit un enregistrement falsifié pointant vers le vrai log, noté PASS |
+| Projection permissive : noms de solver et de score comparés par `endswith`, options de scorer enregistrées par Inspect ignorées puis remplacées par les valeurs pinées | `inspect_replay.py:330`, `:347` | lecture du code (`endswith`) ; C : solver `totally_not_generate` et options `location:any` projetés comme la fixture qualifiée |
+| « Log brut conservé » faux : le fichier écrit par Inspect est supprimé avec le répertoire temporaire ; le CAS reçoit une re-sérialisation `model_dump(exclude_none=True)` | `inspect_adapter.py:124-145` | lecture du code ; C : 15 465 octets bruts contre 9 462 publiés, 7 différences structurelles |
+| Aucune isolation d'environnement : Inspect charge `.env` depuis le répertoire courant et honore `INSPECT_TELEMETRY` (code arbitraire appelé avec les données d'usage) | Inspect `_eval/context.py:27`, `hooks/_legacy.py` | lecture du code ; C : hook de télémétrie exécuté, statut toujours PASS |
+| Budgets, `forbidden_actions`, provider et `model_parameters` silencieusement abandonnés | `inspect_adapter.py:52-141` | lecture du code ; C : `wall_time_seconds=0`, `token_limit=1`, `provider=openai` → PASS, aucune limite passée à `inspect_eval` |
+| Rescoring « indépendant » non équivalent au scorer Inspect : suppression de toute ponctuation Unicode et casse neutre, contre retrait de la ponctuation ASCII en début et fin de chaîne chez Inspect | `inspect_replay.py:582-587` vs Inspect `_util/text.py:32-33` | lecture du code ; C : `'a-b'/'ab'` → Inspect `I`, GitSpace `C` ; `'100$'/'100'` → Inspect `C`, GitSpace `I` |
+
+Signalés par C, non rejoués par l'auteur (sévérité faible ou information) : `AdapterResult`
+gelé mais contenant des dictionnaires mutables, `to_json` sans revalidation ; descripteur de
+métaclasse exécuté lors du formatage d'erreur ; dérogation Sonar codée en dur dans le workflow ;
+un eval en erreur publie son log puis renvoie INFRA sans artefact (objet CAS orphelin) ;
+trois des six obligations du replay ne peuvent jamais être fausses ; `except Exception` laisse
+passer les `BaseException`.
+
+Vérifié vrai par C : rejet des sous-classes de `dict/list/str/int/float`, tuples, octets,
+NaN, ±Infini, `-0.0`, entiers hors ±(2⁵³−1), surrogates isolés, cycles et profondeur > 64 ;
+validation de schéma avant tout accès à l'adaptateur ; shim restauré après succès, exception et
+`KeyboardInterrupt` ; le classificateur Sonar ne peut produire `PASS` sans quality gate calculé.
+
 ## 5. CI et reproductibilité
 
 - **AUD-12** — `gs-cas/tests/adversarial.rs:184` (`write_permission_failure…`) échoue en
@@ -314,7 +347,9 @@ CAS et 20 tests au total, le code en contient 11 et 21.
   sans `__init__.py`, `tests/adapters/inspect/` n'est pas inclus. Le filtre de chemins du
   workflow Task 11 ignore `sdk.py`, `model.py`, `json_boundary.py`, `registry.py`,
   `schemas.py`, `errors.py` et `schemas/v1/**`. Une modification du SDK ou d'un schéma peut
-  casser l'adaptateur Inspect sans qu'aucune CI ne l'exécute.
+  casser l'adaptateur Inspect sans qu'aucune CI ne l'exécute. Exemple reproduit par le
+  vérificateur C : `MAX_DEPTH = 64 → 8` dans `json_boundary.py` ne déclenche que le workflow
+  010 (43 tests verts) alors que tout run Inspect réel devient INFRA.
 - **AUD-14** — SonarCloud échoue sur les PR #52 et #57 (« The last analysis has failed ») ;
   l'état est honnêtement classé `NOT_COMPUTED_EXTERNAL`, mais l'intégration n'a jamais été
   réparée.
@@ -378,7 +413,9 @@ différent, ont suffi à les révéler.
    deux harnais ; rendre le run Inspect hermétique (cache tiktoken vendoré et vérifié par hash,
    ou `ModelOutput` avec `usage` renseigné pour que mockllm ne compte pas les tokens) ;
    exécuter le test « sans réseau » isolé dans un espace réseau vide (`unshare -n`) ; tuer les
-   4 survivants ; rendre le test CAS indépendant de root.
+   4 survivants ; rendre le test CAS indépendant de root ; comparer les requêtes par octets
+   canoniques plutôt que par `==` ; conserver le fichier de log Inspect brut et re-projeter
+   depuis lui au replay ; isoler l'environnement d'Inspect (`.env`, `INSPECT_TELEMETRY`).
 2. **Décision propriétaire sur `false_done`** : inscrire le conflit SPEC §7.2 ↔ Task 7 ; séparer
    `false_done` (sur-déclaration imputable à l'agent) de l'acceptation (vérification en attente) ;
    prévoir la ré-émission du verdict après replay et vérification indépendante.
@@ -419,6 +456,12 @@ MEMORY_PATCH:
     - id: evidence.task10.mutations_19_of_19
       cause: "preuve CI invalide (harnais vide) ; affirmation re-mesurée vraie (19/19)"
       proposed_status: RE_EVIDENCE_REQUIRED
+    - id: claim.task11.raw_log_preserved
+      cause: "le fichier Inspect est supprimé ; le CAS reçoit une re-sérialisation model_dump"
+      proposed_status: REFUTED
+    - id: claim.task10.semantic_loss_blocking
+      cause: "comparaison == : 1/1.0/True et 0.0/False confondus ; budgets non transmis"
+      proposed_status: PARTIALLY_VERIFIED
   APPEND:
     - target: docs/conflicts/CONFLICT-REGISTER.md
       id: GS-CONFLICT-P00-VERDICT-001
